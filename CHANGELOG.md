@@ -5,9 +5,10 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
-## Unreleased
+## 0.1.0 — 2026-04-27
 
-Active development. The next tagged version will be `0.1.0`.
+First tagged release. Bundles M1–M6 from the development plan into a
+single Apache-2.0 package on PyPI.
 
 See [`docs/changelog.md`](docs/changelog.md) for the per-milestone
 breakdown of M1 through M6.

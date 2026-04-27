@@ -1,0 +1,29 @@
+app_name = "RegStack Postgres Demo"
+base_url = "http://localhost:8000"
+behind_proxy = false
+
+# Override at runtime via REGSTACK_DATABASE_URL env var.
+database_url = "postgresql+asyncpg://postgres@localhost/regstack_demo"
+
+jwt_ttl_seconds = 7200
+transport = "bearer"
+
+require_verification = true
+allow_registration = true
+enable_password_reset = true
+enable_account_deletion = true
+enable_admin_router = true
+enable_ui_router = true
+enable_sms_2fa = true
+
+verification_token_ttl_seconds = 86400
+password_reset_token_ttl_seconds = 1800
+email_change_token_ttl_seconds = 3600
+
+[email]
+backend = "console"
+from_address = "noreply@example.com"
+from_name = "RegStack Postgres Demo"
+
+[sms]
+backend = "null"

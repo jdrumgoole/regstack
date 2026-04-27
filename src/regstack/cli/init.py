@@ -48,9 +48,42 @@ def init(target_dir: Path, *, force: bool) -> None:
     )
     behind_proxy = click.confirm("Behind a reverse proxy (X-Forwarded-* headers)?", default=False)
 
-    # --- MongoDB ---
-    mongodb_url = click.prompt("MongoDB connection URL", default="mongodb://localhost:27017")
-    mongodb_database = click.prompt("MongoDB database", default=app_name.lower().replace(" ", "_"))
+    # --- Database backend ---
+    backend = click.prompt(
+        "Database backend",
+        type=click.Choice(["sqlite", "postgres", "mongo"]),
+        default="sqlite",
+    )
+    db_slug = app_name.lower().replace(" ", "_")
+    if backend == "sqlite":
+        sqlite_path = click.prompt(
+            "SQLite file path",
+            default=f"./{db_slug}.sqlite",
+        )
+        database_url = f"sqlite+aiosqlite:///{sqlite_path}"
+        mongodb_database = ""
+    elif backend == "postgres":
+        pg_url = click.prompt(
+            "Postgres URL",
+            default=f"postgresql+asyncpg://postgres@localhost/{db_slug}",
+        )
+        if not pg_url.startswith(("postgresql+asyncpg://", "postgres+asyncpg://")):
+            click.echo(
+                click.style(
+                    "Note: regstack pins the asyncpg driver — coercing scheme to "
+                    "postgresql+asyncpg://",
+                    fg="yellow",
+                )
+            )
+            pg_url = pg_url.replace("postgresql://", "postgresql+asyncpg://", 1).replace(
+                "postgres://", "postgresql+asyncpg://", 1
+            )
+        database_url = pg_url
+        mongodb_database = ""
+    else:  # mongo
+        host = click.prompt("MongoDB host", default="localhost:27017")
+        mongodb_database = click.prompt("MongoDB database", default=db_slug)
+        database_url = f"mongodb://{host}/{mongodb_database}"
 
     # --- JWT ---
     if click.confirm("Auto-generate a 64-byte JWT secret?", default=True):
@@ -129,7 +162,7 @@ def init(target_dir: Path, *, force: bool) -> None:
     )
     secrets_text = _render_secrets(
         jwt_secret=jwt_secret,
-        mongodb_url=mongodb_url,
+        database_url=database_url,
         smtp_password=smtp_pass,
     )
 
@@ -182,8 +215,13 @@ def _render_toml(
         [
             f"behind_proxy = {str(behind_proxy).lower()}",
             "",
-            f'mongodb_database = "{mongodb_database}"',
-            "",
+        ]
+    )
+    if mongodb_database:
+        lines.append(f'mongodb_database = "{mongodb_database}"')
+        lines.append("")
+    lines.extend(
+        [
             f"jwt_ttl_seconds = {jwt_ttl_seconds}",
             f'transport = "{transport}"',
             "",
@@ -218,13 +256,13 @@ def _render_toml(
 def _render_secrets(
     *,
     jwt_secret: str,
-    mongodb_url: str,
+    database_url: str,
     smtp_password: str | None,
 ) -> str:
     lines = [
         "# regstack.secrets.env — keep out of version control.",
         f"REGSTACK_JWT_SECRET={jwt_secret}",
-        f"REGSTACK_MONGODB_URL={mongodb_url}",
+        f"REGSTACK_DATABASE_URL={database_url}",
     ]
     if smtp_password:
         lines.append(f"REGSTACK_EMAIL__SMTP_PASSWORD={smtp_password}")

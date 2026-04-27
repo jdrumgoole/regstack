@@ -70,9 +70,7 @@ def test_create_admin_short_password_rejected(tmp_path: Path) -> None:
     assert "8 characters" in result.output
 
 
-def test_doctor_runs_against_local_mongo(
-    tmp_path: Path, jwt_secret: str, monkeypatch
-) -> None:
+def test_doctor_runs_against_local_mongo(tmp_path: Path, jwt_secret: str, monkeypatch) -> None:
     db_name = f"regstack_doctor_test_{__import__('secrets').token_hex(4)}"
     """End-to-end smoke for `regstack doctor` against the live local Mongo.
 
@@ -87,9 +85,7 @@ def test_doctor_runs_against_local_mongo(
     # for it. Promote secrets directly to env so the in-process subcommand
     # invocations don't need to chdir.
     monkeypatch.setenv("REGSTACK_JWT_SECRET", jwt_secret)
-    monkeypatch.setenv(
-        "REGSTACK_DATABASE_URL", f"mongodb://localhost:27017/{db_name}"
-    )
+    monkeypatch.setenv("REGSTACK_DATABASE_URL", f"mongodb://localhost:27017/{db_name}")
     for var in list(os.environ):
         if var.startswith("REGSTACK_") and var not in {
             "REGSTACK_CONFIG",
@@ -124,8 +120,8 @@ def test_doctor_runs_against_local_mongo(
     assert "core indexes present" in result.output
 
     # Drop the test DB so we don't leak.
-    from regstack.config.schema import RegStackConfig
     from regstack.backends.mongo import make_client
+    from regstack.config.schema import RegStackConfig
 
     cfg = RegStackConfig.load(toml_path=cfg_path)
 

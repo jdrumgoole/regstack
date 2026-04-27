@@ -62,10 +62,10 @@ class RegStackConfig(BaseSettings):
 
     # Database
     # Backend is selected by URL scheme. Supported:
-    #   sqlite+aiosqlite:///./regstack.db        — SQLite (Phase 2)
-    #   postgresql+asyncpg://user:pw@host/db     — Postgres (Phase 2)
-    #   mongodb://host:port/dbname               — MongoDB (always)
-    database_url: SecretStr = SecretStr("mongodb://localhost:27017/regstack")
+    #   sqlite+aiosqlite:///./regstack.db        — SQLite (default; zero infra)
+    #   postgresql+asyncpg://user:pw@host/db     — Postgres
+    #   mongodb://host:port/dbname               — MongoDB
+    database_url: SecretStr = SecretStr("sqlite+aiosqlite:///./regstack.db")
     # Mongo-only fallback for when the URL has no /dbname path.
     mongodb_database: str = "regstack"
     # Collection / table names (used by the active backend).

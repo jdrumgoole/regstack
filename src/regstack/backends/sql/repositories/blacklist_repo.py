@@ -26,9 +26,7 @@ class SqlBlacklistRepo:
 
     async def is_revoked(self, jti: str) -> bool:
         async with self._engine.connect() as conn:
-            row = (
-                await conn.execute(select(self._t.c.id).where(self._t.c.jti == jti))
-            ).first()
+            row = (await conn.execute(select(self._t.c.id).where(self._t.c.jti == jti))).first()
         return row is not None
 
     async def purge_expired(self, now: datetime | None = None) -> int:

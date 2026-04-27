@@ -148,7 +148,7 @@ class MfaCodeRepoProtocol(Protocol):
         user_id: str,
         kind: MfaKind,
         raw_code: str,
-    ) -> "MfaVerifyResult": ...
+    ) -> MfaVerifyResult: ...
 
     async def delete(self, *, user_id: str, kind: MfaKind | None = None) -> None: ...
 
@@ -157,7 +157,7 @@ class MfaCodeRepoProtocol(Protocol):
     async def purge_expired(self, now: datetime | None = None) -> int: ...
 
 
-# Re-exported here so callers don't need a deeper import. The concrete
-# implementation lives in regstack.db.repositories.mfa_code_repo (Mongo
-# backend) for now; we'll move it into backends/ in a follow-up step.
-from regstack.backends.mongo.repositories.mfa_code_repo import MfaVerifyResult  # noqa: E402  (cycle break)
+# Re-exported here so callers don't need a deeper import. Lives in the
+# Mongo backend module because it predates the SQL backend; the dataclass
+# is backend-agnostic, only the import path is historical.
+from regstack.backends.mongo.repositories.mfa_code_repo import MfaVerifyResult  # noqa: E402

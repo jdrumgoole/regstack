@@ -1,6 +1,6 @@
 [project]
 name = "regstack"
-version = "0.1.0"
+version = "0.1.1"
 description = "Embeddable user registration, login, and account management for FastAPI/MongoDB apps."
 readme = "README.md"
 requires-python = ">=3.11"

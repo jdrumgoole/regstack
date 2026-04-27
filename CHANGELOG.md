@@ -5,6 +5,11 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
+## 0.1.1 — 2026-04-27
+
+- Rewrite README relative links as absolute URLs so they resolve on the
+  PyPI project page. README-only release.
+
 ## 0.1.0 — 2026-04-27
 
 First tagged release. Bundles M1–M6 from the development plan into a

@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## 0.1.1 — 2026-04-27
+
+- Rewrite the README's relative links (`examples/minimal/`,
+  `docs/security.md`, `LICENSE`, `SECURITY.md`, etc.) as absolute
+  GitHub / Read the Docs URLs so they resolve on the PyPI project page,
+  not just on GitHub. README-only release.
+
 ## 0.1.0 — 2026-04-27
 
 First tagged release. Bundles M1–M6 from the development plan into a

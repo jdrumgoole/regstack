@@ -3,7 +3,7 @@
 [![CI](https://github.com/jdrumgoole/regstack/actions/workflows/test.yml/badge.svg)](https://github.com/jdrumgoole/regstack/actions/workflows/test.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/built%20with-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
-[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-green.svg)](https://github.com/jdrumgoole/regstack/blob/main/LICENSE)
 
 **Drop-in user accounts for FastAPI + MongoDB.** Stop hand-rolling
 register / login / verify / reset / 2FA in every project — install
@@ -11,9 +11,9 @@ regstack, point it at your MongoDB, and you're done.
 
 📚 **Docs:** <https://regstack.readthedocs.io>
 &nbsp;·&nbsp;
-🧪 **Try it:** [`examples/minimal`](examples/minimal/)
+🧪 **Try it:** [`examples/minimal`](https://github.com/jdrumgoole/regstack/tree/main/examples/minimal)
 &nbsp;·&nbsp;
-🛡️ **Security model:** [`docs/security.md`](docs/security.md)
+🛡️ **Security model:** [security guide](https://regstack.readthedocs.io/en/latest/security.html)
 
 ---
 
@@ -122,12 +122,12 @@ reference](https://regstack.readthedocs.io/en/latest/configuration.html).
 | [CLI](https://regstack.readthedocs.io/en/latest/cli.html) | `init`, `create-admin`, `doctor` |
 | [API reference](https://regstack.readthedocs.io/en/latest/api.html) | Public types, generated from source |
 
-The same docs are also browsable as Markdown in [`docs/`](docs/).
+The same docs are also browsable as Markdown in [`docs/`](https://github.com/jdrumgoole/regstack/tree/main/docs).
 
 ## Status
 
 Alpha. Milestones M1 through M6 are complete and verified end-to-end
-in the bundled example. See the [changelog](docs/changelog.md) for the
+in the bundled example. See the [changelog](https://regstack.readthedocs.io/en/latest/changelog.html) for the
 per-milestone breakdown. The next tagged release will be `v0.1.0`.
 
 ## Contributing
@@ -146,8 +146,8 @@ A local MongoDB on `mongodb://localhost:27017` is required for the
 integration tests. Each pytest-xdist worker creates and drops its own
 database, so the suite is safe to re-run while you iterate.
 
-Security disclosures: see [SECURITY.md](SECURITY.md).
+Security disclosures: see [SECURITY.md](https://github.com/jdrumgoole/regstack/blob/main/SECURITY.md).
 
 ## License
 
-[Apache License 2.0](LICENSE) © 2026 Joe Drumgoole.
+[Apache License 2.0](https://github.com/jdrumgoole/regstack/blob/main/LICENSE) © 2026 Joe Drumgoole.

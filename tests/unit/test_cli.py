@@ -71,8 +71,9 @@ def test_create_admin_short_password_rejected(tmp_path: Path) -> None:
 
 
 def test_doctor_runs_against_local_mongo(
-    tmp_path: Path, jwt_secret: str, db_name: str, monkeypatch
+    tmp_path: Path, jwt_secret: str, monkeypatch
 ) -> None:
+    db_name = f"regstack_doctor_test_{__import__('secrets').token_hex(4)}"
     """End-to-end smoke for `regstack doctor` against the live local Mongo.
 
     Skips network-dependent checks (DNS, real email) — exercises the

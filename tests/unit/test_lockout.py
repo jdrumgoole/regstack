@@ -12,10 +12,26 @@ from regstack.config.schema import RegStackConfig
 from regstack.backends.mongo.repositories.login_attempt_repo import LoginAttemptRepo
 
 
+@pytest.fixture
+def backend_kind() -> str:
+    """LockoutService unit tests pin to Mongo's repo so the fixture
+    parametrization in the top-level conftest doesn't double the
+    matrix; cross-backend lockout coverage lives in
+    tests/integration/test_login_lockout.py.
+    """
+    return "mongo"
+
+
 @pytest_asyncio.fixture
-async def attempts_repo(mongo_client, config):
-    db = mongo_client[config.mongodb_database]
-    yield LoginAttemptRepo(db, config.login_attempt_collection)
+async def attempts_repo(mongo_client):
+    """Fresh per-test attempts collection inside the legacy mongo_client
+    DB. Pins to a unique collection name so leaks from other tests can't
+    skew counts.
+    """
+    coll_name = f"login_attempts_{secrets.token_hex(4)}"
+    db = mongo_client.get_default_database()
+    yield LoginAttemptRepo(db, coll_name)
+    await db[coll_name].drop()
 
 
 def _make_config(*, threshold: int = 3, window: int = 60) -> RegStackConfig:

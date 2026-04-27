@@ -11,10 +11,23 @@ from regstack.backends.mongo.repositories.mfa_code_repo import MfaCodeRepo, MfaV
 from regstack.models.mfa_code import MfaCode
 
 
+@pytest.fixture
+def backend_kind() -> str:
+    """Pin to mongo so the parametrized backend_kind from the top-level
+    conftest doesn't generate a [sqlite] variant. Cross-backend MFA
+    coverage lives in tests/integration/test_mfa.py.
+    """
+    return "mongo"
+
+
 @pytest_asyncio.fixture
-async def repo(mongo_client, config):
-    db = mongo_client[config.mongodb_database]
-    return MfaCodeRepo(db, "mfa_codes_test", clock=FrozenClock())
+async def repo(mongo_client):
+    import secrets
+
+    coll_name = f"mfa_codes_test_{secrets.token_hex(4)}"
+    db = mongo_client.get_default_database()
+    yield MfaCodeRepo(db, coll_name, clock=FrozenClock())
+    await db[coll_name].drop()
 
 
 def _put_code(clock: FrozenClock, *, code: str, max_attempts: int = 5) -> MfaCode:

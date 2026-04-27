@@ -1,3 +1,12 @@
+"""Mongo-specific index behaviour. Forced to backend_kind=mongo via the
+local fixture override so the parametrized backend_kind fixture in the
+top-level conftest doesn't generate a [sqlite] variant.
+
+Cross-backend "duplicate emails are rejected" assertions live in the
+integration suite (test_happy_path) where they verify the
+UserAlreadyExistsError contract — that's the protocol-level guarantee.
+"""
+
 from __future__ import annotations
 
 import pytest
@@ -5,6 +14,11 @@ from pymongo.errors import DuplicateKeyError
 
 from regstack import RegStack
 from regstack.models.user import BaseUser
+
+
+@pytest.fixture
+def backend_kind() -> str:
+    return "mongo"
 
 
 @pytest.mark.asyncio

@@ -105,8 +105,9 @@ async def _ensure_postgres_db(
     if backend_kind != "postgres":
         yield
         return
-    import asyncpg
     from urllib.parse import urlsplit, urlunsplit
+
+    import asyncpg
 
     url, _ = database_url
     # url looks like postgresql+asyncpg://user:pw@host:port/dbname.

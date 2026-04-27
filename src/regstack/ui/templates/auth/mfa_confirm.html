@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Two-factor sign-in — {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="rs-title">Enter your sign-in code</h1>
+<p class="rs-meta">We just sent a 6-digit code to your phone. It expires shortly.</p>
+<form class="rs-form" data-rs-form="mfa-confirm" autocomplete="off">
+  <label class="rs-field">
+    <span class="rs-label">Code</span>
+    <input type="text" name="code" required minlength="4" maxlength="10" inputmode="numeric" pattern="\d+" autofocus>
+  </label>
+  <button type="submit" class="rs-btn rs-btn-primary">Sign in</button>
+</form>
+<p class="rs-meta"><a href="{{ ui_prefix }}/login">Back to sign in</a></p>
+{% endblock %}

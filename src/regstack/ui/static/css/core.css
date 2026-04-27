@@ -1,0 +1,204 @@
+/* regstack — structural CSS. Colors and fonts are defined entirely via
+   CSS custom properties in theme.css so this file can ship unchanged
+   regardless of host branding. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--rs-bg);
+  color: var(--rs-fg);
+  font-family: var(--rs-font-body);
+  line-height: 1.5;
+  font-size: 16px;
+}
+
+a { color: var(--rs-accent); text-decoration: none; }
+a:hover, a:focus-visible { text-decoration: underline; }
+
+img { max-width: 100%; height: auto; }
+
+.rs-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--rs-border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--rs-surface);
+}
+
+.rs-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--rs-font-display);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--rs-fg);
+}
+.rs-brand:hover { text-decoration: none; }
+.rs-brand-logo { height: 28px; width: auto; }
+.rs-brand-tagline { color: var(--rs-fg-muted); font-size: 14px; margin-left: auto; }
+
+.rs-main {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 32px 16px;
+}
+
+.rs-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--rs-surface);
+  border: 1px solid var(--rs-border);
+  border-radius: var(--rs-radius);
+  padding: 28px 28px 32px;
+  box-shadow: var(--rs-shadow);
+}
+
+.rs-title {
+  font-family: var(--rs-font-display);
+  font-size: 24px;
+  margin: 0 0 18px;
+  font-weight: 600;
+}
+
+.rs-meta {
+  margin: 14px 0 0;
+  color: var(--rs-fg-muted);
+  font-size: 14px;
+}
+
+.rs-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+}
+
+.rs-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rs-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--rs-fg-muted);
+}
+
+input[type="email"],
+input[type="text"],
+input[type="password"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--rs-border);
+  border-radius: var(--rs-radius);
+  background: var(--rs-bg);
+  color: var(--rs-fg);
+  font: inherit;
+}
+input:focus-visible {
+  outline: 2px solid var(--rs-accent);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.rs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 1px solid var(--rs-border);
+  border-radius: var(--rs-radius);
+  background: var(--rs-surface);
+  color: var(--rs-fg);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+}
+.rs-btn:hover, .rs-btn:focus-visible { background: var(--rs-bg-hover); }
+
+.rs-btn-primary {
+  background: var(--rs-accent);
+  color: var(--rs-accent-fg);
+  border-color: transparent;
+}
+.rs-btn-primary:hover, .rs-btn-primary:focus-visible {
+  filter: brightness(1.05);
+  background: var(--rs-accent);
+}
+
+.rs-btn-ghost { background: transparent; }
+
+.rs-btn-danger {
+  background: var(--rs-danger);
+  color: var(--rs-danger-fg);
+  border-color: transparent;
+}
+.rs-btn-danger:hover, .rs-btn-danger:focus-visible { filter: brightness(1.05); background: var(--rs-danger); }
+
+.rs-message {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: var(--rs-radius);
+  font-size: 14px;
+  border: 1px solid var(--rs-border);
+  background: var(--rs-bg);
+}
+.rs-message[data-rs-tone="error"] {
+  border-color: var(--rs-danger);
+  background: var(--rs-danger-bg);
+  color: var(--rs-danger);
+}
+.rs-message[data-rs-tone="success"] {
+  border-color: var(--rs-accent);
+  background: var(--rs-accent-bg);
+  color: var(--rs-accent);
+}
+
+.rs-section {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--rs-border);
+  border-radius: var(--rs-radius);
+  background: var(--rs-bg);
+}
+.rs-section > summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+.rs-section[open] > summary { margin-bottom: 12px; }
+.rs-section-danger { border-color: var(--rs-danger); }
+.rs-section-danger > summary { color: var(--rs-danger); }
+
+.rs-account-summary {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.rs-account-summary dt { color: var(--rs-fg-muted); font-weight: 500; }
+.rs-account-summary dd { margin: 0; word-break: break-word; }
+
+.rs-footer {
+  text-align: center;
+  font-size: 13px;
+  color: var(--rs-fg-muted);
+  padding: 18px 16px 24px;
+}
+
+@media (max-width: 480px) {
+  .rs-card { padding: 20px; }
+}

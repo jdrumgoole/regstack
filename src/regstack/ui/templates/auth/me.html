@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Your account — {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="rs-title">Your account</h1>
+
+<dl class="rs-account-summary" data-rs-account>
+  <dt>Email</dt><dd data-rs-field="email">…</dd>
+  <dt>Full name</dt><dd data-rs-field="full_name">…</dd>
+  <dt>Verified</dt><dd data-rs-field="is_verified">…</dd>
+  <dt>Member since</dt><dd data-rs-field="created_at">…</dd>
+</dl>
+
+<details class="rs-section">
+  <summary>Update profile</summary>
+  <form class="rs-form" data-rs-form="update-profile">
+    <label class="rs-field">
+      <span class="rs-label">Full name</span>
+      <input type="text" name="full_name" autocomplete="name">
+    </label>
+    <button type="submit" class="rs-btn">Save</button>
+  </form>
+</details>
+
+<details class="rs-section">
+  <summary>Change password</summary>
+  <form class="rs-form" data-rs-form="change-password" autocomplete="off">
+    <label class="rs-field">
+      <span class="rs-label">Current password</span>
+      <input type="password" name="current_password" required minlength="8" autocomplete="current-password">
+    </label>
+    <label class="rs-field">
+      <span class="rs-label">New password</span>
+      <input type="password" name="new_password" required minlength="8" autocomplete="new-password">
+    </label>
+    <button type="submit" class="rs-btn">Change password</button>
+  </form>
+</details>
+
+<details class="rs-section">
+  <summary>Change email</summary>
+  <form class="rs-form" data-rs-form="change-email" autocomplete="off">
+    <label class="rs-field">
+      <span class="rs-label">New email</span>
+      <input type="email" name="new_email" required autocomplete="email">
+    </label>
+    <label class="rs-field">
+      <span class="rs-label">Current password</span>
+      <input type="password" name="current_password" required minlength="8" autocomplete="current-password">
+    </label>
+    <button type="submit" class="rs-btn">Send confirmation email</button>
+  </form>
+</details>
+
+{% if enable_sms_2fa %}
+<details class="rs-section" data-rs-mfa-section>
+  <summary>SMS two-factor authentication</summary>
+  <p class="rs-meta" data-rs-mfa-status>…</p>
+
+  <div data-rs-mfa-enable hidden>
+    <form class="rs-form" data-rs-form="phone-setup-start" autocomplete="off">
+      <label class="rs-field">
+        <span class="rs-label">Phone (E.164, e.g. +14155552671)</span>
+        <input type="tel" name="phone_number" required pattern="\+[1-9]\d{1,14}">
+      </label>
+      <label class="rs-field">
+        <span class="rs-label">Current password</span>
+        <input type="password" name="current_password" required minlength="8" autocomplete="current-password">
+      </label>
+      <button type="submit" class="rs-btn">Send verification code</button>
+    </form>
+
+    <form class="rs-form" data-rs-form="phone-setup-confirm" autocomplete="off" hidden>
+      <label class="rs-field">
+        <span class="rs-label">Code from SMS</span>
+        <input type="text" name="code" required minlength="4" maxlength="10" inputmode="numeric" pattern="\d+">
+      </label>
+      <button type="submit" class="rs-btn rs-btn-primary">Confirm</button>
+    </form>
+  </div>
+
+  <div data-rs-mfa-disable hidden>
+    <form class="rs-form" data-rs-form="mfa-disable" autocomplete="off">
+      <label class="rs-field">
+        <span class="rs-label">Confirm with password</span>
+        <input type="password" name="current_password" required minlength="8" autocomplete="current-password">
+      </label>
+      <button type="submit" class="rs-btn">Disable SMS 2FA</button>
+    </form>
+  </div>
+</details>
+{% endif %}
+
+{% if enable_account_deletion %}
+<details class="rs-section rs-section-danger">
+  <summary>Delete account</summary>
+  <form class="rs-form" data-rs-form="delete-account" autocomplete="off">
+    <p class="rs-meta">This permanently removes your account and cannot be undone.</p>
+    <label class="rs-field">
+      <span class="rs-label">Confirm with password</span>
+      <input type="password" name="current_password" required minlength="8" autocomplete="current-password">
+    </label>
+    <button type="submit" class="rs-btn rs-btn-danger">Delete my account</button>
+  </form>
+</details>
+{% endif %}
+
+<p class="rs-meta">
+  <button class="rs-btn rs-btn-ghost" type="button" data-rs-action="logout">Sign out</button>
+</p>
+{% endblock %}

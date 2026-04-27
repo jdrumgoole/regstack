@@ -1,0 +1,25 @@
+/* Host theme override — wine-cellar palette to demonstrate that swapping
+   one stylesheet flips every regstack page without touching the package. */
+
+:root {
+  --rs-bg: #FAF7F2;
+  --rs-bg-hover: #f1e9dc;
+  --rs-surface: #ffffff;
+  --rs-fg: #2A1810;
+  --rs-fg-muted: #6c5b50;
+  --rs-border: #e6d9c8;
+
+  --rs-accent: #5C0A2D;
+  --rs-accent-fg: #FAF7F2;
+  --rs-accent-bg: rgba(92, 10, 45, 0.08);
+
+  --rs-danger: #8B1A1A;
+  --rs-danger-fg: #FAF7F2;
+  --rs-danger-bg: rgba(139, 26, 26, 0.08);
+
+  --rs-radius: 4px;
+  --rs-shadow: 0 1px 3px rgba(60, 20, 30, 0.08), 0 6px 14px rgba(60, 20, 30, 0.06);
+
+  --rs-font-display: "Playfair Display", "Cormorant Garamond", Georgia, serif;
+  --rs-font-body: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}

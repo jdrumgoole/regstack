@@ -1,0 +1,1 @@
+{{ app_name }} verification code: {{ code }}. It expires in {{ ttl_minutes }} minutes.

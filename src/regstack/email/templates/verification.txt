@@ -1,0 +1,7 @@
+Hi{% if full_name %} {{ full_name }}{% endif %},
+
+Thanks for signing up to {{ app_name }}. Please confirm your email address by visiting the link below:
+
+  {{ url }}
+
+If you didn't create an account, you can safely ignore this email — the link will expire automatically.

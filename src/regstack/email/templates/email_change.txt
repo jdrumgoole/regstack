@@ -1,0 +1,7 @@
+Hi{% if full_name %} {{ full_name }}{% endif %},
+
+Someone — hopefully you — asked to change the email address on your {{ app_name }} account to this one. Use the link below to confirm. It is valid for {{ ttl_minutes }} minutes.
+
+  {{ url }}
+
+If you didn't request this change, ignore this email — your address won't change.

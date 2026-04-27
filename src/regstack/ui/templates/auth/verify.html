@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Confirm your email — {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="rs-title">Confirming your email…</h1>
+<p class="rs-meta" data-rs-status="pending">Hold on while we verify your account.</p>
+<input type="hidden" data-rs-token>
+<p class="rs-meta">
+  <a href="{{ ui_prefix }}/login">Sign in</a>
+</p>
+{% endblock %}

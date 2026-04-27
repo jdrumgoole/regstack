@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Choose a new password — {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="rs-title">Choose a new password</h1>
+<form class="rs-form" data-rs-form="reset" autocomplete="off">
+  <input type="hidden" name="token" data-rs-token>
+  <label class="rs-field">
+    <span class="rs-label">New password</span>
+    <input type="password" name="new_password" required minlength="8" autocomplete="new-password" autofocus>
+  </label>
+  <button type="submit" class="rs-btn rs-btn-primary">Save new password</button>
+</form>
+{% endblock %}

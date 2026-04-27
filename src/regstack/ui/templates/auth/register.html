@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Create your {{ app_name }} account{% endblock %}
+{% block content %}
+<h1 class="rs-title">Create your account</h1>
+<form class="rs-form" data-rs-form="register" autocomplete="on">
+  <label class="rs-field">
+    <span class="rs-label">Email</span>
+    <input type="email" name="email" required autocomplete="email" autofocus>
+  </label>
+  <label class="rs-field">
+    <span class="rs-label">Full name <small>(optional)</small></span>
+    <input type="text" name="full_name" autocomplete="name">
+  </label>
+  <label class="rs-field">
+    <span class="rs-label">Password</span>
+    <input type="password" name="password" required minlength="8" autocomplete="new-password">
+  </label>
+  <button type="submit" class="rs-btn rs-btn-primary">Create account</button>
+</form>
+<p class="rs-meta">
+  Already have one? <a href="{{ ui_prefix }}/login">Sign in</a>.
+</p>
+{% endblock %}

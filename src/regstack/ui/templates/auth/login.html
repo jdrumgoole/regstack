@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Sign in — {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="rs-title">Sign in</h1>
+<form class="rs-form" data-rs-form="login" autocomplete="on">
+  <label class="rs-field">
+    <span class="rs-label">Email</span>
+    <input type="email" name="email" required autocomplete="email" autofocus>
+  </label>
+  <label class="rs-field">
+    <span class="rs-label">Password</span>
+    <input type="password" name="password" required minlength="8" autocomplete="current-password">
+  </label>
+  <button type="submit" class="rs-btn rs-btn-primary">Sign in</button>
+</form>
+<p class="rs-meta">
+  {% if allow_registration %}
+  No account? <a href="{{ ui_prefix }}/register">Create one</a>.
+  {% endif %}
+  {% if enable_password_reset %}
+  <br><a href="{{ ui_prefix }}/forgot">Forgot password?</a>
+  {% endif %}
+</p>
+{% endblock %}

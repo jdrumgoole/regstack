@@ -1,0 +1,1 @@
+{{ app_name }} sign-in code: {{ code }}. Expires in {{ ttl_minutes }} minutes. If you didn't try to sign in, ignore this message.

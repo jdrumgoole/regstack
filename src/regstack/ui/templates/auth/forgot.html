@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Forgot password — {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="rs-title">Reset your password</h1>
+<p class="rs-meta">Enter your email and we'll send a reset link.</p>
+<form class="rs-form" data-rs-form="forgot" autocomplete="on">
+  <label class="rs-field">
+    <span class="rs-label">Email</span>
+    <input type="email" name="email" required autocomplete="email" autofocus>
+  </label>
+  <button type="submit" class="rs-btn rs-btn-primary">Send reset link</button>
+</form>
+<p class="rs-meta"><a href="{{ ui_prefix }}/login">Back to sign in</a></p>
+{% endblock %}

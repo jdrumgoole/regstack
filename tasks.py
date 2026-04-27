@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import shutil
+import socket
+import subprocess
+import time
+
 from invoke import Context, task
 
 
@@ -142,3 +147,201 @@ def docs_serve(c: Context, port: int = 8001) -> None:
         f"uv run sphinx-autobuild docs docs/_build/html --port {port}",
         pty=True,
     )
+
+
+# --- Local DB lifecycle ----------------------------------------------------
+#
+# Probe the port first; only try to start a service if nothing is already
+# listening. Falls back to `brew services` for hosts (like the maintainer's
+# laptop) that don't run Docker. If neither path works the task prints a
+# helpful message instead of failing — running Postgres.app or a Docker
+# postgres container manually is still valid.
+
+_PORTS = {"mongo": 27017, "postgres": 5432}
+_NAMES = {"mongo": "MongoDB", "postgres": "Postgres"}
+_BREW_SERVICES = {
+    # In preference order; first one that brew knows about wins.
+    "mongo": ["mongodb-community", "mongodb-community@8.0", "mongodb-community@7.0"],
+    "postgres": [
+        "postgresql@17",
+        "postgresql@16",
+        "postgresql@15",
+        "postgresql@14",
+        "postgresql",
+    ],
+}
+
+
+def _port_open(port: int, host: str = "localhost", timeout: float = 0.5) -> bool:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(timeout)
+    try:
+        return sock.connect_ex((host, port)) == 0
+    finally:
+        sock.close()
+
+
+def _have_brew() -> bool:
+    return shutil.which("brew") is not None
+
+
+def _brew_services_table() -> dict[str, str]:
+    """Map service name → status (started / stopped / error / unknown).
+
+    Empty dict if brew isn't installed or `brew services list` fails.
+    """
+    if not _have_brew():
+        return {}
+    res = subprocess.run(["brew", "services", "list"], capture_output=True, text=True, check=False)
+    if res.returncode != 0:
+        return {}
+    out: dict[str, str] = {}
+    for line in res.stdout.splitlines()[1:]:  # skip header
+        parts = line.split()
+        if len(parts) >= 2 and not parts[0].startswith("✔"):
+            out[parts[0]] = parts[1]
+    return out
+
+
+def _resolve_brew_service(kind: str) -> str | None:
+    """Return the first brew service for ``kind`` that brew knows about."""
+    table = _brew_services_table()
+    for cand in _BREW_SERVICES[kind]:
+        if cand in table:
+            return cand
+    return None
+
+
+def _wait_for_port(port: int, timeout: float = 15.0) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if _port_open(port):
+            return True
+        time.sleep(0.5)
+    return False
+
+
+def _ok(msg: str) -> None:
+    print(f"\033[32m✔\033[0m {msg}")
+
+
+def _warn(msg: str) -> None:
+    print(f"\033[33m!\033[0m {msg}")
+
+
+def _info(msg: str) -> None:
+    print(f"  {msg}")
+
+
+@task(name="db-status")
+def db_status(c: Context, mongo: bool = True, postgres: bool = True) -> None:
+    """Report whether local mongo + postgres are reachable.
+
+    Probes each port and (if brew is available) reports which brew service
+    manages it. Useful before running ``inv test-mongo`` or
+    ``inv test-postgres`` to diagnose connection failures.
+    """
+    table = _brew_services_table()
+    targets: list[str] = []
+    if mongo:
+        targets.append("mongo")
+    if postgres:
+        targets.append("postgres")
+    for kind in targets:
+        port = _PORTS[kind]
+        name = _NAMES[kind]
+        listening = _port_open(port)
+        brew_svc = _resolve_brew_service(kind)
+        brew_state = table.get(brew_svc, "unknown") if brew_svc else "n/a"
+        if listening:
+            _ok(f"{name}: listening on :{port} (brew: {brew_svc or 'n/a'} = {brew_state})")
+        else:
+            _warn(f"{name}: NOT listening on :{port} (brew: {brew_svc or 'n/a'} = {brew_state})")
+
+
+@task(name="db-up")
+def db_up(c: Context, mongo: bool = True, postgres: bool = True) -> None:
+    """Start local mongo + postgres if they aren't already listening.
+
+    Tries `brew services start <service>` for whatever brew knows about.
+    Skips anything already up. If brew can't help (no formula installed),
+    prints a hint and moves on — start it manually (Postgres.app, docker,
+    etc.) and re-run.
+    """
+    targets: list[str] = []
+    if mongo:
+        targets.append("mongo")
+    if postgres:
+        targets.append("postgres")
+    for kind in targets:
+        port = _PORTS[kind]
+        name = _NAMES[kind]
+        if _port_open(port):
+            _ok(f"{name}: already listening on :{port}; nothing to do")
+            continue
+        brew_svc = _resolve_brew_service(kind)
+        if brew_svc is None:
+            _warn(
+                f"{name}: not listening on :{port} and brew has no service for it. "
+                "Start it manually (Postgres.app, docker, etc.) and re-run."
+            )
+            continue
+        _info(f"{name}: starting via `brew services start {brew_svc}`...")
+        res = subprocess.run(
+            ["brew", "services", "start", brew_svc],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if res.returncode != 0:
+            _warn(
+                f"{name}: brew failed to start {brew_svc}: "
+                f"{res.stderr.strip() or res.stdout.strip()}"
+            )
+            continue
+        if _wait_for_port(port):
+            _ok(f"{name}: listening on :{port}")
+        else:
+            _warn(
+                f"{name}: brew reported success but :{port} didn't come up within 15s. "
+                "Run `inv db-status` to recheck."
+            )
+
+
+@task(name="db-down")
+def db_down(c: Context, mongo: bool = True, postgres: bool = True) -> None:
+    """Stop the local mongo + postgres services that brew is managing.
+
+    No-op for services running outside brew (Postgres.app, docker, manual
+    launchd plists). The ``inv db-status`` output tells you which is which.
+    """
+    targets: list[str] = []
+    if mongo:
+        targets.append("mongo")
+    if postgres:
+        targets.append("postgres")
+    table = _brew_services_table()
+    for kind in targets:
+        name = _NAMES[kind]
+        brew_svc = _resolve_brew_service(kind)
+        if brew_svc is None:
+            _warn(f"{name}: brew has no service registered; can't stop. Skipping.")
+            continue
+        state = table.get(brew_svc, "unknown")
+        if state != "started":
+            _info(f"{name}: brew service {brew_svc} is {state}; nothing to stop.")
+            continue
+        _info(f"{name}: stopping via `brew services stop {brew_svc}`...")
+        res = subprocess.run(
+            ["brew", "services", "stop", brew_svc],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if res.returncode == 0:
+            _ok(f"{name}: stopped ({brew_svc})")
+        else:
+            _warn(
+                f"{name}: brew failed to stop {brew_svc}: "
+                f"{res.stderr.strip() or res.stdout.strip()}"
+            )

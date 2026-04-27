@@ -24,15 +24,61 @@ def fmt(c: Context) -> None:
     c.run("uv run ruff check --fix src tests", pty=True)
 
 
-@task
-def test(c: Context, k: str = "", verbose: bool = False) -> None:
-    """Run the parallel test suite."""
+_DEFAULT_PG_URL = "postgresql+asyncpg://postgres@localhost:5432"
+
+
+def _pytest(c: Context, *, env: dict | None = None, k: str = "", verbose: bool = False) -> None:
     flags = ["uv run python -m pytest", "-n", "auto"]
     if verbose:
         flags.append("-vv")
     if k:
         flags.extend(["-k", k])
-    c.run(" ".join(flags), pty=True)
+    c.run(" ".join(flags), pty=True, env=env)
+
+
+@task
+def test(c: Context, k: str = "", verbose: bool = False) -> None:
+    """Run the full parallel test suite (sqlite + mongo by default)."""
+    _pytest(c, k=k, verbose=verbose)
+
+
+@task(name="test-sqlite")
+def test_sqlite(c: Context, k: str = "", verbose: bool = False) -> None:
+    """Run only the SQLite parametrization. No external services needed."""
+    _pytest(c, env={"REGSTACK_TEST_BACKENDS": "sqlite"}, k=k, verbose=verbose)
+
+
+@task(name="test-mongo")
+def test_mongo(c: Context, k: str = "", verbose: bool = False) -> None:
+    """Run only the MongoDB parametrization (needs local mongo on :27017)."""
+    _pytest(c, env={"REGSTACK_TEST_BACKENDS": "mongo"}, k=k, verbose=verbose)
+
+
+@task(name="test-postgres")
+def test_postgres(
+    c: Context, k: str = "", verbose: bool = False, url: str = _DEFAULT_PG_URL
+) -> None:
+    """Run only the Postgres parametrization (needs local postgres on :5432).
+
+    Override the connection with --url=postgresql+asyncpg://user:pw@host:port.
+    The user must have CREATE DATABASE permission; the per-test fixture
+    creates a fresh database per test and drops it on teardown.
+    """
+    env = {
+        "REGSTACK_TEST_BACKENDS": "postgres",
+        "REGSTACK_TEST_POSTGRES_URL": url,
+    }
+    _pytest(c, env=env, k=k, verbose=verbose)
+
+
+@task(name="test-all")
+def test_all(c: Context, verbose: bool = False, pg_url: str = _DEFAULT_PG_URL) -> None:
+    """Run the suite against all three backends. Needs local mongo + postgres."""
+    env = {
+        "REGSTACK_TEST_BACKENDS": "sqlite,mongo,postgres",
+        "REGSTACK_TEST_POSTGRES_URL": pg_url,
+    }
+    _pytest(c, env=env, verbose=verbose)
 
 
 @task(name="test-serial")

@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from regstack.backends.base import Backend, BackendKind
+from regstack.backends.sql.migrations import upgrade_async
 from regstack.backends.sql.repositories.blacklist_repo import SqlBlacklistRepo
 from regstack.backends.sql.repositories.login_attempt_repo import SqlLoginAttemptRepo
 from regstack.backends.sql.repositories.mfa_code_repo import SqlMfaCodeRepo
 from regstack.backends.sql.repositories.pending_repo import SqlPendingRepo
 from regstack.backends.sql.repositories.user_repo import SqlUserRepo
-from regstack.backends.sql.schema import metadata
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine
@@ -46,15 +46,18 @@ class SqlBackend(Backend):
         self.mfa_codes = SqlMfaCodeRepo(self._engine, clock=clock)
 
     async def install_schema(self) -> None:
-        """Create all tables. Idempotent thanks to SQLAlchemy's
-        ``checkfirst=True`` default. We deliberately skip Alembic for
-        the in-process create so a fresh SQLite file is usable without
-        running ``alembic upgrade head`` first; production callers on
-        Postgres should still drive migrations through Alembic for
-        evolutions, but the initial create is fine either way.
+        """Run the bundled Alembic migrations to head.
+
+        Idempotent — Alembic's `upgrade` is a no-op when the database
+        is already at the target revision. Safe to call from a FastAPI
+        ``lifespan`` startup on every boot.
+
+        Hosts that need to drive migrations from CI / a deploy step
+        instead of in-process can call ``regstack migrate`` (CLI) or
+        ``regstack.backends.sql.migrations.upgrade(database_url)``
+        (programmatic) and skip ``install_schema()``.
         """
-        async with self._engine.begin() as conn:
-            await conn.run_sync(metadata.create_all)
+        await upgrade_async(self.config.database_url.get_secret_value())
 
     async def aclose(self) -> None:
         await self._engine.dispose()

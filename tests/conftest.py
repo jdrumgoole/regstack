@@ -21,9 +21,27 @@ from regstack.email.console import ConsoleEmailService
 # workers running the same test never see each other's writes.
 _WORKER_ID = os.environ.get("PYTEST_XDIST_WORKER", "gw0")
 
-_BACKENDS_AVAILABLE: list[str] = ["sqlite", "mongo"]
-if os.environ.get("REGSTACK_TEST_POSTGRES_URL"):
-    _BACKENDS_AVAILABLE.append("postgres")
+
+def _resolve_backends() -> list[str]:
+    """Pick which backends the parametrized fixture covers.
+
+    Override with ``REGSTACK_TEST_BACKENDS=sqlite,mongo,postgres`` to
+    constrain a run to specific backends — used by the per-backend
+    invoke tasks (test-sqlite, test-mongo, test-postgres).
+
+    Default: sqlite + mongo. Postgres joins automatically when
+    ``REGSTACK_TEST_POSTGRES_URL`` is set.
+    """
+    override = os.environ.get("REGSTACK_TEST_BACKENDS")
+    if override:
+        return [b.strip() for b in override.split(",") if b.strip()]
+    backends = ["sqlite", "mongo"]
+    if os.environ.get("REGSTACK_TEST_POSTGRES_URL"):
+        backends.append("postgres")
+    return backends
+
+
+_BACKENDS_AVAILABLE: list[str] = _resolve_backends()
 
 
 def _unique_token() -> str:
@@ -224,9 +242,13 @@ def make_client(
 
 
 # Backwards-compat fixture for the few unit tests that still touch the
-# raw Mongo client. These tests are mongo-only by definition.
+# raw Mongo client. These tests are mongo-only by definition; if mongo
+# isn't in the active backend set (e.g. `inv test-sqlite`) skip them
+# so the SQLite-only run needs zero infrastructure.
 @pytest_asyncio.fixture
 async def mongo_client():
+    if "mongo" not in _BACKENDS_AVAILABLE:
+        pytest.skip("mongo backend not active (set REGSTACK_TEST_BACKENDS to include 'mongo')")
     from regstack.backends.mongo import make_client
     from regstack.config.schema import RegStackConfig as _Cfg
 

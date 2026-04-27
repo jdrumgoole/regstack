@@ -1,30 +1,38 @@
 # Quickstart
 
-regstack expects Python 3.11+ and `uv`. The default backend is SQLite —
-**no database server required** for development. Postgres and MongoDB
-are also supported (just point ``database_url`` at the right place).
+This guide walks you from "nothing installed" to "registered user
+with a verified email" in about ten minutes. You will need
+[Python 3.11 or newer](https://www.python.org/downloads/) and
+[`uv`](https://docs.astral.sh/uv/) (Astral's fast Python package
+manager — used throughout regstack's tooling).
+
+The default storage backend is [SQLite](https://www.sqlite.org/index.html),
+so **no database server is required for development**. The same code
+runs against [PostgreSQL](https://www.postgresql.org/) or
+[MongoDB](https://www.mongodb.com/) by changing one URL.
 
 ## Install
 
 ```bash
-uv add regstack            # production (SQLite-only by default)
+uv add regstack            # production install (SQLite-only by default)
 uv add 'regstack[postgres]' # add Postgres support
 uv add 'regstack[mongo]'    # add MongoDB support
 uv sync --extra dev        # for working in this repo
 ```
 
-Optional extras:
+The base install bundles SQLite, [SQLAlchemy](https://www.sqlalchemy.org/),
+and [Alembic](https://alembic.sqlalchemy.org/) (used to manage SQL
+schema migrations). Heavyweight dependencies are pulled in only when
+you opt in via an extra.
 
 | Extra      | Pulls in       | Needed for                       |
 |------------|---------------|----------------------------------|
 | `postgres` | `asyncpg`     | Postgres backend                 |
 | `mongo`    | `pymongo`     | MongoDB backend                  |
-| `ses`      | `aioboto3`    | AWS SES email backend            |
-| `sns`      | `aioboto3`    | AWS SNS SMS backend              |
-| `twilio`   | `twilio`      | Twilio SMS backend               |
+| `ses`      | `aioboto3`    | [Amazon SES](https://aws.amazon.com/ses/) email backend |
+| `sns`      | `aioboto3`    | [Amazon SNS](https://aws.amazon.com/sns/) SMS backend   |
+| `twilio`   | `twilio`      | [Twilio](https://www.twilio.com/) SMS backend           |
 | `docs`     | sphinx + ext  | Building these docs              |
-
-SQLite, SQLAlchemy and Alembic are bundled in the base install.
 
 ## Generate a config
 
@@ -32,24 +40,28 @@ SQLite, SQLAlchemy and Alembic are bundled in the base install.
 uv run regstack init
 ```
 
-The wizard:
+The wizard asks a handful of questions and writes two files:
 
-1. Asks which backend you want (SQLite / Postgres / MongoDB).
-2. Builds the right `database_url` for it (SQLite path / Postgres URL /
-   Mongo URL).
-3. Generates a 64-byte JWT secret.
+1. Which backend do you want? (SQLite / Postgres / MongoDB)
+2. Builds the right `database_url` for your choice (a SQLite path, a
+   Postgres connection URL, or a Mongo URL).
+3. Generates a 64-byte JWT signing secret (used to sign and verify
+   [JSON Web Tokens](https://datatracker.ietf.org/doc/html/rfc7519) —
+   keep this secret).
 4. Walks through email backend (`console` / SMTP / SES) and feature
    flags.
 
-Two files land in the current directory:
+Output:
 
-- `regstack.toml` — non-sensitive settings.
-- `regstack.secrets.env` — JWT secret + database URL. Mode 0600. Add
-  to `.gitignore`.
+- `regstack.toml` — non-sensitive settings, safe to commit if you
+  redact secrets.
+- `regstack.secrets.env` — JWT secret and database URL. Mode `0600`.
+  **Add to `.gitignore`.**
 
 The wizard never provisions infrastructure. It validates connection
-URLs and runs read-only DNS sanity checks if you opt in, but it never
-creates SES identities, Route 53 records, or anything similar.
+URLs and runs read-only DNS sanity checks (SPF/DKIM/MX) if you opt in,
+but it never creates SES identities, Route 53 records, or anything
+similar. Provisioning is your responsibility.
 
 ## Embed in a FastAPI app
 
@@ -67,7 +79,7 @@ regstack = RegStack(config=config)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await regstack.install_schema()
+    await regstack.install_schema()       # idempotent
     yield
     await regstack.aclose()
 
@@ -76,12 +88,18 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(regstack.router, prefix=config.api_prefix)
 ```
 
-The backend is selected automatically by the URL scheme of
-`config.database_url`. Hosts that need to share a connection pool with
-their own code can build a backend explicitly and pass
-``RegStack(config=config, backend=my_backend)``.
+`RegStack` picks the right backend automatically from the URL scheme of
+`config.database_url`:
 
-That mounts:
+- `sqlite+aiosqlite://` → SQLite via SQLAlchemy
+- `postgresql+asyncpg://` → Postgres via SQLAlchemy
+- `mongodb://` (or `mongodb+srv://`) → MongoDB
+
+`install_schema()` is idempotent. On SQL backends it runs Alembic
+migrations to head; on MongoDB it ensures the indexes exist. Calling
+it on every boot is the right thing to do.
+
+The mounted router gives you:
 
 - `POST /api/auth/register`
 - `POST /api/auth/verify`
@@ -102,16 +120,19 @@ That mounts:
 
 ## Add the SSR pages (optional)
 
+If you want browser-facing forms in addition to the JSON API:
+
 ```python
 if config.enable_ui_router:
     app.include_router(regstack.ui_router, prefix=config.ui_prefix)
     app.mount(config.static_prefix, regstack.static_files)
 ```
 
-This adds browser-facing forms at `/account/login`, `/account/register`,
-`/account/me`, etc. and serves the bundled `core.css`, `theme.css`, and
-`regstack.js` at `/regstack-static/`. The pages are stateless and use
-the JSON API via `fetch`.
+This adds pages at `/account/login`, `/account/register`,
+`/account/me`, etc., and serves the bundled `core.css`, `theme.css`,
+and `regstack.js` at `/regstack-static/`. The pages are stateless and
+talk to the JSON API via [`fetch`](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API).
+Re-skin them by serving a single CSS file — see [Theming](theming.md).
 
 ## End-to-end smoke test (zero infrastructure)
 
@@ -126,7 +147,11 @@ curl -X POST http://localhost:8000/api/auth/register \
     -d '{"email":"a@example.com","password":"hunter2hunter2","full_name":"A"}'
 ```
 
-The SQLite demo enables verification by default — follow the link
-printed to the demo's stdout to verify, then `POST /api/auth/login` to
-get a JWT. There's a Postgres demo (`examples/postgres/`) and a Mongo
-demo (`examples/mongo/`) that take the same route inventory.
+The SQLite demo enables verification by default. Look at the demo's
+stdout — the `console` email backend prints the verification link
+there instead of sending a real email. Click it (or `curl` it), then
+`POST /api/auth/login` to receive a JWT.
+
+A Postgres demo (`examples/postgres/`) and a Mongo demo
+(`examples/mongo/`) take the same routes. The only thing that changes
+between them is `database_url`.

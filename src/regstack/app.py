@@ -10,13 +10,8 @@ from regstack.auth.dependencies import AuthDependencies
 from regstack.auth.jwt import JwtCodec
 from regstack.auth.lockout import LockoutService
 from regstack.auth.password import PasswordHasher
+from regstack.backends.factory import build_backend
 from regstack.config.schema import RegStackConfig
-from regstack.db.indexes import install_indexes as _install_indexes
-from regstack.db.repositories.blacklist_repo import BlacklistRepo
-from regstack.db.repositories.login_attempt_repo import LoginAttemptRepo
-from regstack.db.repositories.mfa_code_repo import MfaCodeRepo
-from regstack.db.repositories.pending_repo import PendingRepo
-from regstack.db.repositories.user_repo import UserRepo
 from regstack.email.base import EmailService
 from regstack.email.composer import MailComposer
 from regstack.email.factory import build_email_service
@@ -32,7 +27,8 @@ if TYPE_CHECKING:
 
     from fastapi import APIRouter
     from jinja2 import Environment
-    from pymongo.asynchronous.database import AsyncDatabase
+
+    from regstack.backends.base import Backend
 
 
 class RegStack:
@@ -40,28 +36,38 @@ class RegStack:
 
     Hosts construct one of these per FastAPI application, then mount
     ``regstack.router`` with ``app.include_router(regstack.router, prefix=...)``.
+
+    The persistence story is owned by a :class:`~regstack.backends.base.Backend`
+    selected by ``config.database_url``'s URL scheme — `mongodb://` →
+    Mongo, `sqlite+aiosqlite://` → SQLite, `postgresql+asyncpg://` →
+    Postgres. Hosts that need to share a connection pool with their own
+    code can pass an explicit ``backend=`` argument.
     """
 
     def __init__(
         self,
         *,
         config: RegStackConfig,
-        db: AsyncDatabase,
+        backend: Backend | None = None,
         clock: Clock | None = None,
         email_service: EmailService | None = None,
         mail_composer: MailComposer | None = None,
         sms_service: SmsService | None = None,
     ) -> None:
         self.config = config
-        self.db = db
         self.clock: Clock = clock or SystemClock()
+        self.backend: Backend = backend or build_backend(config, clock=self.clock)
         self.password_hasher = PasswordHasher()
         self.jwt = JwtCodec(config, self.clock)
-        self.users = UserRepo(db, config.user_collection, clock=self.clock)
-        self.pending = PendingRepo(db, config.pending_collection)
-        self.blacklist = BlacklistRepo(db, config.blacklist_collection)
-        self.attempts = LoginAttemptRepo(db, config.login_attempt_collection)
-        self.mfa_codes = MfaCodeRepo(db, config.mfa_code_collection, clock=self.clock)
+
+        # Repos come straight off the backend so they're always in sync
+        # with whatever implementation is configured.
+        self.users = self.backend.users
+        self.pending = self.backend.pending
+        self.blacklist = self.backend.blacklist
+        self.attempts = self.backend.attempts
+        self.mfa_codes = self.backend.mfa_codes
+
         self.lockout = LockoutService(attempts=self.attempts, config=config, clock=self.clock)
         self.email: EmailService = email_service or build_email_service(config.email)
         self.sms: SmsService = sms_service or build_sms_service(config.sms)
@@ -104,8 +110,18 @@ class RegStack:
 
     # --- Lifecycle -------------------------------------------------------
 
+    async def install_schema(self) -> None:
+        """Create indexes (Mongo) or run migrations (SQL). Idempotent."""
+        await self.backend.install_schema()
+
+    # Legacy alias kept for the 0.1.x install_indexes() name. New callers
+    # should use install_schema().
     async def install_indexes(self) -> None:
-        await _install_indexes(self.db, self.config)
+        await self.install_schema()
+
+    async def aclose(self) -> None:
+        """Tear down the backend's connection pool."""
+        await self.backend.aclose()
 
     async def bootstrap_admin(self, email: str, password: str) -> BaseUser:
         """Create a verified superuser if none exists for the given email."""

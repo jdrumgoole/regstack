@@ -1,4 +1,4 @@
-"""Minimal embedding example.
+"""Minimal embedding example (MongoDB).
 
 Run from the repo root:
 
@@ -8,7 +8,7 @@ Or with a custom config:
 
     REGSTACK_CONFIG=examples/minimal/regstack.toml \\
     REGSTACK_JWT_SECRET=$(python -c 'import secrets; print(secrets.token_urlsafe(64))') \\
-    REGSTACK_MONGODB_URL=mongodb://localhost:27017 \\
+    REGSTACK_DATABASE_URL=mongodb://localhost:27017/regstack_demo \\
     uv run uvicorn examples.minimal.main:app --reload
 """
 
@@ -21,7 +21,6 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from regstack import RegStack, RegStackConfig
-from regstack.db.client import make_client
 
 
 def make_config() -> RegStackConfig:
@@ -30,9 +29,7 @@ def make_config() -> RegStackConfig:
 
 
 config = make_config()
-mongo = make_client(config)
-db = mongo[config.mongodb_database]
-regstack = RegStack(config=config, db=db)
+regstack = RegStack(config=config)
 
 
 # Demo-only hooks: print the verification / reset URLs to stdout so a curl-driven
@@ -69,9 +66,9 @@ regstack.on("mfa_login_started", _print_login_mfa)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await regstack.install_indexes()
+    await regstack.install_schema()
     yield
-    await mongo.aclose()
+    await regstack.aclose()
 
 
 app = FastAPI(title=f"{config.app_name} (regstack demo)", lifespan=lifespan)

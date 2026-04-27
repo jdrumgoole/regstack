@@ -160,4 +160,4 @@ class MfaCodeRepoProtocol(Protocol):
 # Re-exported here so callers don't need a deeper import. The concrete
 # implementation lives in regstack.db.repositories.mfa_code_repo (Mongo
 # backend) for now; we'll move it into backends/ in a follow-up step.
-from regstack.db.repositories.mfa_code_repo import MfaVerifyResult  # noqa: E402  (cycle break)
+from regstack.backends.mongo.repositories.mfa_code_repo import MfaVerifyResult  # noqa: E402  (cycle break)

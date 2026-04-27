@@ -16,6 +16,7 @@ def _write_config(tmp_path: Path, *, db_name: str, jwt_secret: str) -> Path:
         f"""\
 app_name = "doctor-test"
 base_url = "http://localhost:8000"
+database_url = "mongodb://localhost:27017/{db_name}"
 mongodb_database = "{db_name}"
 
 jwt_ttl_seconds = 7200
@@ -34,7 +35,8 @@ backend = "null"
     )
     secrets_env = tmp_path / "regstack.secrets.env"
     secrets_env.write_text(
-        f"REGSTACK_JWT_SECRET={jwt_secret}\nREGSTACK_MONGODB_URL=mongodb://localhost:27017\n"
+        f"REGSTACK_JWT_SECRET={jwt_secret}\n"
+        f"REGSTACK_DATABASE_URL=mongodb://localhost:27017/{db_name}\n"
     )
     return cfg
 
@@ -84,33 +86,35 @@ def test_doctor_runs_against_local_mongo(
     # for it. Promote secrets directly to env so the in-process subcommand
     # invocations don't need to chdir.
     monkeypatch.setenv("REGSTACK_JWT_SECRET", jwt_secret)
-    monkeypatch.setenv("REGSTACK_MONGODB_URL", "mongodb://localhost:27017")
+    monkeypatch.setenv(
+        "REGSTACK_DATABASE_URL", f"mongodb://localhost:27017/{db_name}"
+    )
     for var in list(os.environ):
         if var.startswith("REGSTACK_") and var not in {
             "REGSTACK_CONFIG",
             "REGSTACK_JWT_SECRET",
-            "REGSTACK_MONGODB_URL",
+            "REGSTACK_DATABASE_URL",
         }:
             monkeypatch.delenv(var, raising=False)
 
     runner = CliRunner()
 
-    # Pre-install: doctor reports indexes missing.
+    # Pre-install: doctor reports schema missing.
     result = runner.invoke(cli, ["doctor", "--config", str(cfg_path)])
-    assert "mongodb" in result.output
+    assert "backend" in result.output
     assert "email backend" in result.output
-    assert "indexes" in result.output
+    assert "schema" in result.output
     assert "missing" in result.output
     assert result.exit_code >= 1
 
-    # Install indexes via the live façade, then re-run doctor — green.
+    # Install schema via the live façade, then re-run doctor — green.
     import asyncio
 
     from regstack.cli._runtime import open_regstack
 
     async def _install() -> None:
         async with open_regstack(cfg_path) as rs:
-            await rs.install_indexes()
+            await rs.install_schema()
 
     asyncio.run(_install())
 
@@ -120,7 +124,7 @@ def test_doctor_runs_against_local_mongo(
 
     # Drop the test DB so we don't leak.
     from regstack.config.schema import RegStackConfig
-    from regstack.db.client import make_client
+    from regstack.backends.mongo import make_client
 
     cfg = RegStackConfig.load(toml_path=cfg_path)
 

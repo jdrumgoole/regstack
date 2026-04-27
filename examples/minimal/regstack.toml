@@ -2,6 +2,7 @@ app_name = "RegStack Demo"
 base_url = "http://localhost:8000"
 behind_proxy = false
 
+database_url = "mongodb://localhost:27017/regstack_demo"
 mongodb_database = "regstack_demo"
 
 jwt_ttl_seconds = 7200

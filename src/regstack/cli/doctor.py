@@ -7,10 +7,9 @@ from pathlib import Path
 
 import click
 import dns.resolver
-from pymongo import AsyncMongoClient
 
+from regstack.backends.factory import build_backend, detect_backend_kind
 from regstack.cli._runtime import load_runtime_config
-from regstack.db.client import make_client
 from regstack.email.factory import build_email_service
 
 
@@ -73,10 +72,8 @@ async def _run(
     else:
         out.append(CheckResult("jwt secret", True, f"present ({len(secret_value)} chars)"))
 
-    out.append(await _check_mongo(config))
-
-    out.append(await _check_indexes(config))
-
+    out.append(await _check_backend(config))
+    out.append(await _check_schema(config))
     out.append(_check_email_factory(config))
 
     if check_dns:
@@ -88,43 +85,54 @@ async def _run(
     return out
 
 
-async def _check_mongo(config) -> CheckResult:
-    client: AsyncMongoClient = make_client(config)
+async def _check_backend(config) -> CheckResult:
+    kind = detect_backend_kind(config.database_url.get_secret_value())
+    backend = build_backend(config)
     try:
-        await client.admin.command("ping")
-        names = await client.list_database_names()
-        present = config.mongodb_database in names
-        detail = (
-            f"reachable; database {config.mongodb_database!r} "
-            f"{'exists' if present else 'will be created on first use'}"
-        )
-        return CheckResult("mongodb", True, detail)
+        await backend.ping()
+        return CheckResult("backend", True, f"{kind} reachable")
     except Exception as exc:
-        return CheckResult("mongodb", False, f"unreachable: {exc}")
+        return CheckResult("backend", False, f"{kind} unreachable: {exc}")
     finally:
-        await client.aclose()
+        await backend.aclose()
 
 
-async def _check_indexes(config) -> CheckResult:
-    client: AsyncMongoClient = make_client(config)
+async def _check_schema(config) -> CheckResult:
+    """Confirm the schema/indexes are installed.
+
+    For Mongo we look for the canonical email_unique + jti_unique indexes;
+    for SQL backends we just attempt a roundtrip query against the users
+    table (Alembic migrations are idempotent, so absence is detected by
+    a missing-table error from the driver).
+    """
+    from regstack.backends.base import BackendKind
+
+    backend = build_backend(config)
     try:
-        db = client[config.mongodb_database]
-        users_idx = await db[config.user_collection].index_information()
-        bl_idx = await db[config.blacklist_collection].index_information()
-        missing: list[str] = []
-        if "email_unique" not in users_idx:
-            missing.append(f"{config.user_collection}.email_unique")
-        if "jti_unique" not in bl_idx:
-            missing.append(f"{config.blacklist_collection}.jti_unique")
-        if missing:
-            return CheckResult(
-                "indexes", False, f"missing: {', '.join(missing)} (call install_indexes)"
-            )
-        return CheckResult("indexes", True, "core indexes present")
+        if backend.kind is BackendKind.MONGO:
+            from regstack.backends.mongo import MongoBackend
+
+            assert isinstance(backend, MongoBackend)
+            db = backend.database
+            users_idx = await db[config.user_collection].index_information()
+            bl_idx = await db[config.blacklist_collection].index_information()
+            missing = []
+            if "email_unique" not in users_idx:
+                missing.append(f"{config.user_collection}.email_unique")
+            if "jti_unique" not in bl_idx:
+                missing.append(f"{config.blacklist_collection}.jti_unique")
+            if missing:
+                return CheckResult(
+                    "schema", False, f"missing: {', '.join(missing)} (call install_schema)"
+                )
+            return CheckResult("schema", True, "core indexes present")
+        # SQL backends: attempt a count query — fails with a missing-table error if not installed.
+        await backend.users.count()
+        return CheckResult("schema", True, "users table present")
     except Exception as exc:
-        return CheckResult("indexes", False, f"check failed: {exc}")
+        return CheckResult("schema", False, f"check failed: {exc}")
     finally:
-        await client.aclose()
+        await backend.aclose()
 
 
 def _check_email_factory(config) -> CheckResult:

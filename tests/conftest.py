@@ -11,7 +11,6 @@ import pytest
 import pytest_asyncio
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from pymongo import AsyncMongoClient
 
 from regstack import RegStack, RegStackConfig
 from regstack.auth.clock import FrozenClock
@@ -33,7 +32,7 @@ def _build_config(jwt_secret: str, db_name: str, **overrides: Any) -> RegStackCo
         secrets_env_path=Path("/dev/null"),
         jwt_secret=jwt_secret,
         mongodb_database=db_name,
-        mongodb_url="mongodb://localhost:27017",
+        database_url=f"mongodb://localhost:27017/{db_name}",
         require_verification=False,
         allow_registration=True,
         rate_limit_disabled=True,
@@ -64,10 +63,13 @@ def config(jwt_secret: str, db_name: str) -> RegStackConfig:
 
 
 @pytest_asyncio.fixture
-async def mongo_client(config: RegStackConfig) -> AsyncIterator[AsyncMongoClient]:
-    from regstack.db.client import make_client
+async def mongo_client(config: RegStackConfig):
+    """Direct Mongo client for tests that need to reach below the abstraction
+    (e.g. raw cursor work for the unit MfaCodeRepo tests).
+    """
+    from regstack.backends.mongo import make_client
 
-    client: AsyncMongoClient = make_client(config)
+    client = make_client(config)
     try:
         yield client
     finally:
@@ -78,18 +80,23 @@ async def mongo_client(config: RegStackConfig) -> AsyncIterator[AsyncMongoClient
 @pytest_asyncio.fixture
 async def regstack(
     config: RegStackConfig,
-    mongo_client: AsyncMongoClient,
     frozen_clock: FrozenClock,
 ) -> AsyncIterator[RegStack]:
-    db = mongo_client[config.mongodb_database]
     rs = RegStack(
         config=config,
-        db=db,
         clock=frozen_clock,
         email_service=ConsoleEmailService(),
     )
-    await rs.install_indexes()
-    yield rs
+    await rs.install_schema()
+    try:
+        yield rs
+    finally:
+        # Clean up the DB the backend just touched.
+        from regstack.backends.mongo import MongoBackend
+
+        if isinstance(rs.backend, MongoBackend):
+            await rs.backend.client.drop_database(config.mongodb_database)
+        await rs.aclose()
 
 
 @pytest_asyncio.fixture
@@ -110,7 +117,6 @@ async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
 def make_client(
     jwt_secret: str,
     db_name: str,
-    mongo_client: AsyncMongoClient,
     frozen_clock: FrozenClock,
 ) -> Callable[..., Any]:
     """Factory yielding ``(regstack, AsyncClient)`` for tests that need a non-default config.
@@ -120,25 +126,29 @@ def make_client(
         async with make_client(require_verification=True) as (rs, client):
             ...
 
-    Re-uses the per-worker DB; ``install_indexes`` is idempotent so spawning
-    a second RegStack on the same DB does not collide.
+    Each call gets its own RegStack (and therefore its own backend
+    connection); the underlying database is shared with the per-test
+    fixture and dropped once at the end of the test via the regstack
+    fixture's teardown — so don't enable this factory for tests that
+    haven't requested ``regstack`` themselves.
     """
 
     @asynccontextmanager
     async def _factory(**overrides: Any) -> AsyncIterator[tuple[RegStack, AsyncClient]]:
         cfg = _build_config(jwt_secret, db_name, **overrides)
-        db = mongo_client[cfg.mongodb_database]
         rs = RegStack(
             config=cfg,
-            db=db,
             clock=frozen_clock,
             email_service=ConsoleEmailService(),
         )
-        await rs.install_indexes()
-        app = FastAPI()
-        app.include_router(rs.router, prefix="/api/auth")
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
-            yield rs, ac
+        await rs.install_schema()
+        try:
+            app = FastAPI()
+            app.include_router(rs.router, prefix="/api/auth")
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+                yield rs, ac
+        finally:
+            await rs.aclose()
 
     return _factory

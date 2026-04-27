@@ -9,7 +9,7 @@ import pytest_asyncio
 from regstack.auth.clock import FrozenClock
 from regstack.auth.lockout import LockoutService
 from regstack.config.schema import RegStackConfig
-from regstack.db.repositories.login_attempt_repo import LoginAttemptRepo
+from regstack.backends.mongo.repositories.login_attempt_repo import LoginAttemptRepo
 
 
 @pytest_asyncio.fixture

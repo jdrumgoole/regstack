@@ -7,7 +7,7 @@ import pytest_asyncio
 
 from regstack.auth.clock import FrozenClock
 from regstack.auth.tokens import hash_token
-from regstack.db.repositories.mfa_code_repo import MfaCodeRepo, MfaVerifyOutcome
+from regstack.backends.mongo.repositories.mfa_code_repo import MfaCodeRepo, MfaVerifyOutcome
 from regstack.models.mfa_code import MfaCode
 
 

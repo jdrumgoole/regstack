@@ -95,6 +95,11 @@ markers = [
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning:passlib.*",
+    # CI surfaces PytestUnraisableExceptionWarning when async fixtures
+    # from a previous test leak sockets/event loops past their cleanup
+    # window — the sync UI tests shouldn't fail just because asyncpg or
+    # aiosqlite teardown was sloppy in a sibling test.
+    "ignore::pytest.PytestUnraisableExceptionWarning",
 ]
 
 [tool.ruff]

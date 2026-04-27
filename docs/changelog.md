@@ -3,13 +3,19 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
-## 0.2.0 — unreleased
+## 0.2.0 — 2026-04-28
 
 **Multi-backend support + Alembic migrations.** SQLite is now the
 default; Postgres and
 MongoDB are switched in by changing `database_url`. Embedding API
 breaking change: `RegStack(config=, db=)` → `RegStack(config=,
 backend=None)`; the backend is auto-built from the URL scheme.
+
+This release also includes a documentation rewrite for less-expert
+readers: the README and core docs now lead with the problem regstack
+solves, hyperlink external standards (Argon2, RFC 7519, OWASP
+enumeration, E.164, CSP, …), and compare regstack to the alternatives
+(hosted SaaS, self-hosted IAM, `fastapi-users`, DIY).
 
 ### Added
 

@@ -5,6 +5,18 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
+## 0.2.0 — 2026-04-28
+
+Multi-backend support — SQLite (default), Postgres, MongoDB — switched
+by `database_url` URL scheme. Bundled Alembic migrations for SQL
+backends. Embedding API change: `RegStack(config=, db=)` →
+`RegStack(config=, backend=None)`. README + core docs rewritten for
+less-expert readers (problem framing, hyperlinks to external
+standards, comparison vs Auth0/Clerk/Keycloak/fastapi-users).
+
+See [`docs/changelog.md`](docs/changelog.md) for the full per-feature
+breakdown.
+
 ## 0.1.1 — 2026-04-27
 
 - Rewrite README relative links as absolute URLs so they resolve on the

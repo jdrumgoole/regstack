@@ -287,6 +287,30 @@ collections.** The full suite must pass under `pytest -n auto` reliably —
 flaky tests are bugs, not noise. Time-dependent assertions use the
 `frozen_clock` fixture, never `time.sleep` or wall-clock delays.
 
+### A test run that doesn't cover every backend is a failing test
+
+The whole point of the SQL + Mongo abstraction is parity. **Reporting
+"all tests passed" when the run only exercised one or two backends is a
+lie.** Treat any partial-backend run as red until it's been re-run
+across the full matrix.
+
+Concretely:
+
+- `inv test-sqlite` is fine for tight inner-loop iteration, but it is
+  **not** a release gate.
+- Before declaring a feature done — and definitely before merging /
+  tagging — run `inv test-all`, which exercises sqlite + mongo +
+  postgres in one go. Use `inv db-up` first to bring the local services
+  up if they aren't already (`inv db-status` reports what's running).
+- The CI matrix runs all three backends on every push. A green local
+  `inv test-sqlite` followed by a CI failure on `mongo` or `postgres`
+  is the failure pattern this rule exists to prevent.
+- A test that's `mongo`-only or `sqlite`-only by design must
+  short-circuit the parametrized fixture (see how
+  `tests/integration/test_indexes.py` does it with a local
+  `backend_kind = "mongo"` fixture override). Skipping silently because
+  a service isn't running doesn't count.
+
 ## Conventions
 
 - **Python 3.11+.** Use `from __future__ import annotations` in every module.

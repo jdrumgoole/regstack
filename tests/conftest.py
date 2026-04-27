@@ -93,10 +93,53 @@ def database_url(backend_kind: str, db_token: str, tmp_path: Path) -> tuple[str,
     return _make_database_url(backend_kind, db_token, file_dir=tmp_path)
 
 
+@pytest_asyncio.fixture
+async def _ensure_postgres_db(
+    backend_kind: str, database_url: tuple[str, str | None]
+) -> AsyncIterator[None]:
+    """For Postgres, CREATE DATABASE before the test runs and DROP it after.
+
+    SQLite creates files on demand; Mongo creates databases on first
+    write; Postgres requires the DB to exist before you can connect.
+    """
+    if backend_kind != "postgres":
+        yield
+        return
+    import asyncpg
+    from urllib.parse import urlsplit, urlunsplit
+
+    url, _ = database_url
+    # url looks like postgresql+asyncpg://user:pw@host:port/dbname.
+    # Strip the +asyncpg suffix and the database path so we can connect to
+    # the server's "postgres" maintenance DB to issue CREATE/DROP DATABASE.
+    bare = url.replace("postgresql+asyncpg://", "postgresql://", 1)
+    parts = urlsplit(bare)
+    db_name = parts.path.lstrip("/")
+    admin_url = urlunsplit(parts._replace(path="/postgres"))
+    conn = await asyncpg.connect(admin_url)
+    try:
+        await conn.execute(f'CREATE DATABASE "{db_name}"')
+    finally:
+        await conn.close()
+    try:
+        yield
+    finally:
+        conn = await asyncpg.connect(admin_url)
+        try:
+            await conn.execute(
+                f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                f"WHERE datname = '{db_name}' AND pid <> pg_backend_pid()"
+            )
+            await conn.execute(f'DROP DATABASE IF EXISTS "{db_name}"')
+        finally:
+            await conn.close()
+
+
 @pytest.fixture
 def config(
     jwt_secret: str,
     database_url: tuple[str, str | None],
+    _ensure_postgres_db,
 ) -> RegStackConfig:
     url, mongo_db = database_url
     return _build_config(jwt_secret=jwt_secret, database_url=url, mongo_db_name=mongo_db)

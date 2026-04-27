@@ -3,6 +3,50 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## 0.2.0 — unreleased
+
+**Multi-backend support.** SQLite is now the default; Postgres and
+MongoDB are switched in by changing `database_url`. Embedding API
+breaking change: `RegStack(config=, db=)` → `RegStack(config=,
+backend=None)`; the backend is auto-built from the URL scheme.
+
+### Added
+
+- `regstack.backends.protocols` — `Protocol` classes for the five repos
+  plus the shared `UserAlreadyExistsError`.
+- `regstack.backends.base.Backend` ABC and
+  `regstack.backends.factory.build_backend(config)` URL-scheme router.
+- `regstack.backends.mongo` — relocated Mongo code with a `MongoBackend`
+  class.
+- `regstack.backends.sql` — new SQLAlchemy 2 async backend driving
+  SQLite (aiosqlite) and Postgres (asyncpg). Five protocol-conforming
+  repos, `UtcDateTime` TypeDecorator for cross-database tz-aware
+  datetimes, `install_schema()` that creates all tables idempotently.
+- `RegStack.aclose()` to tear down the backend's connection pool.
+- `regstack.backends.protocols.UserRepoProtocol.purge_expired(...)` on
+  every repo so SQL backends can drive cleanup uniformly (Mongo still
+  relies on TTL indexes in normal operation).
+- `examples/sqlite/`, `examples/postgres/`, `examples/mongo/` — one
+  demo per backend sharing a FastAPI scaffold under `examples/_common/`.
+
+### Changed
+
+- `RegStackConfig.mongodb_url` → `database_url`. Default is
+  `sqlite+aiosqlite:///./regstack.db`. `mongodb_database` retained for
+  Mongo URLs without a `/dbname` path.
+- `RegStack.install_indexes()` → `install_schema()` (alias kept).
+- `UserRepo.count(filter_=...)` → `count(*, is_active=,
+  is_verified=, is_superuser=)`.
+- `UserRepo.list_paged(sort=...)` → `list_paged(*,
+  sort_by_created_at_desc=)`.
+- `MfaCodeRepo.find` returns `MfaCode | None` instead of `dict`.
+- `regstack init` wizard asks which backend to use and writes the
+  appropriate `database_url`.
+- `regstack doctor` is backend-agnostic (`Backend.ping()`, schema check
+  per backend kind).
+- pyproject: `pymongo` and `asyncpg` moved to optional extras
+  (`mongo` / `postgres`); SQLAlchemy + aiosqlite + Alembic in base deps.
+
 ## 0.1.1 — 2026-04-27
 
 - Rewrite the README's relative links (`examples/minimal/`,

@@ -3,6 +3,34 @@
 The minimum-viable embed is in [Quickstart](quickstart.md). This page
 covers the patterns most hosts adopt next.
 
+## Picking a backend
+
+The default ``database_url`` is SQLite — a host that does nothing
+gets a working backend with no infrastructure. To switch:
+
+```toml
+# regstack.toml
+# SQLite (default — file lives wherever the path points)
+database_url = "sqlite+aiosqlite:///./regstack.db"
+
+# Postgres (needs the `postgres` extra → asyncpg)
+database_url = "postgresql+asyncpg://user:pw@db.internal/myapp"
+
+# MongoDB (needs the `mongo` extra → pymongo)
+database_url = "mongodb://db.internal:27017/myapp"
+```
+
+Hosts that already manage their own connection pool can skip the URL
+and pass an explicit Backend:
+
+```python
+from regstack.backends.sql import SqlBackend
+from regstack.backends.base import BackendKind
+
+backend = SqlBackend(config=config, clock=SystemClock(), kind=BackendKind.POSTGRES)
+regstack = RegStack(config=config, backend=backend)
+```
+
 ## Subscribing to events
 
 ```python

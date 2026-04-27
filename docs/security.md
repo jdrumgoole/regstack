@@ -85,8 +85,11 @@ a logged-out user only.
 - Random 32-byte URL-safe token, SHA-256 hashed in
   `pending_registrations.token_hash`. The raw token only ever exists
   in the email body and the click URL.
-- TTL index on `expires_at` reaps unused pending rows.
-- Re-issuing a code (`POST /resend-verification`) `find_one_and_replace`s
+- Mongo: TTL index on `expires_at` reaps unused pending rows
+  automatically. SQL backends rely on read-side ``expires_at > now()``
+  filtering (so stale rows are harmless) plus the optional
+  ``backend.pending.purge_expired()`` reaper for disk hygiene.
+- Re-issuing a code (`POST /resend-verification`) atomically replaces
   the row, so the previous link silently stops working.
 - Pending rows are deleted on successful verification.
 

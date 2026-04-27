@@ -42,15 +42,15 @@ addressed in env using a `__` separator: `REGSTACK_EMAIL__FROM_ADDRESS`.
 * - `behind_proxy`
   - `false`
   - Tells the host app to trust `X-Forwarded-*`.
-* - `mongodb_url`
-  - `mongodb://localhost:27017`
-  - Stored as `SecretStr`. Set via env or secrets file.
+* - `database_url`
+  - `sqlite+aiosqlite:///./regstack.db`
+  - SecretStr. Backend selected by URL scheme — see "Backends" below.
 * - `mongodb_database`
   - `"regstack"`
-  - Single database; collections are configured separately.
+  - Mongo-only fallback when the URL has no `/dbname` path.
 * - `user_collection`
   - `"users"`
-  - Override to share a database with another app.
+  - Table / collection name. Override to share a database with another app.
 * - `pending_collection`
   - `"pending_registrations"`
   -
@@ -64,6 +64,37 @@ addressed in env using a `__` separator: `REGSTACK_EMAIL__FROM_ADDRESS`.
   - `"mfa_codes"`
   -
 ```
+
+## Backends
+
+regstack picks a backend at construction time from the URL scheme of
+``database_url``:
+
+```{list-table}
+:header-rows: 1
+:widths: 18 38 44
+
+* - Backend
+  - URL scheme
+  - Notes
+
+* - SQLite
+  - `sqlite+aiosqlite:///./path.db`
+  - Default. Bundled in the base install — no extras needed.
+    `:memory:` works too (per-test).
+* - Postgres
+  - `postgresql+asyncpg://user:pw@host/dbname`
+  - Requires the `postgres` extra (pulls in `asyncpg`). The driver is
+    pinned to `+asyncpg` — sync drivers won't work.
+* - MongoDB
+  - `mongodb://host:port/dbname` (or `mongodb+srv://`)
+  - Requires the `mongo` extra (pulls in `pymongo`). Database is taken
+    from the URL path; falls back to ``mongodb_database`` if absent.
+```
+
+The active backend exposes the same five repository protocols on
+``RegStack.users``, ``.pending``, ``.blacklist``, ``.attempts``,
+``.mfa_codes``. Routers / hooks never branch on backend kind.
 
 ## JWT
 

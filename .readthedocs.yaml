@@ -8,7 +8,7 @@ build:
     pre_install:
       - pip install --upgrade uv
     install:
-      - uv sync --extra docs --extra dev
+      - uv sync --extra docs
     build:
       html:
         - uv run sphinx-build -b html -W --keep-going docs $READTHEDOCS_OUTPUT/html
@@ -17,5 +17,7 @@ sphinx:
   configuration: docs/conf.py
   fail_on_warning: true
 
-formats:
-  - htmlzip
+# `formats` deliberately omitted: RTD's default htmlzip build runs
+# `python -m sphinx` outside our uv-managed venv, where sphinx is not
+# installed. The HTML build above is enough; htmlzip can be re-added
+# once we add a uv-aware htmlzip job to the `build:` section.

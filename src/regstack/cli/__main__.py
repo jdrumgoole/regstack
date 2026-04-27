@@ -5,10 +5,11 @@ import click
 from regstack.cli.admin import create_admin as create_admin_cmd
 from regstack.cli.doctor import doctor as doctor_cmd
 from regstack.cli.init import init as init_cmd
+from regstack.cli.migrate import migrate as migrate_cmd
 from regstack.version import __version__
 
 
-@click.group(help="regstack — embeddable account registration for FastAPI/MongoDB apps.")
+@click.group(help="regstack — embeddable account registration for FastAPI apps.")
 @click.version_option(__version__, prog_name="regstack")
 def cli() -> None:
     pass
@@ -17,6 +18,7 @@ def cli() -> None:
 cli.add_command(init_cmd, name="init")
 cli.add_command(create_admin_cmd)
 cli.add_command(doctor_cmd)
+cli.add_command(migrate_cmd)
 
 
 def main() -> None:

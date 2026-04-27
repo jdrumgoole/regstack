@@ -5,13 +5,30 @@ All notable changes to this project are documented here. Versions follow
 
 ## 0.2.0 — unreleased
 
-**Multi-backend support.** SQLite is now the default; Postgres and
+**Multi-backend support + Alembic migrations.** SQLite is now the
+default; Postgres and
 MongoDB are switched in by changing `database_url`. Embedding API
 breaking change: `RegStack(config=, db=)` → `RegStack(config=,
 backend=None)`; the backend is auto-built from the URL scheme.
 
 ### Added
 
+- **Alembic migrations bundled.** `regstack.backends.sql.migrations`
+  ships an in-package Alembic env (no `alembic.ini` on disk).
+  `SqlBackend.install_schema()` runs `alembic upgrade head` instead of
+  `MetaData.create_all`, so schema evolutions land as new revision
+  files. New `regstack migrate [--target REV]` CLI for deploy-step
+  migrations. New autogen-drift test catches `schema.py` ↔ migration
+  mismatches before users see them.
+- **`regstack doctor` schema check** is now Alembic-aware: it reports
+  the deployed revision vs the bundled head and tells you to run
+  `regstack migrate` if they diverge.
+- **Per-backend invoke tasks**: `inv test-sqlite` (zero infra),
+  `inv test-mongo` (needs local Mongo), `inv test-postgres
+  [--url=...]` (needs local Postgres), `inv test-all` (all three).
+  Driven by a new `REGSTACK_TEST_BACKENDS` env var that the
+  parametrized backend fixture honours; mongo-only unit tests skip
+  cleanly when mongo isn't in the active backend set.
 - `regstack.backends.protocols` — `Protocol` classes for the five repos
   plus the shared `UserAlreadyExistsError`.
 - `regstack.backends.base.Backend` ABC and

@@ -101,9 +101,9 @@ async def _check_schema(config) -> CheckResult:
     """Confirm the schema/indexes are installed.
 
     For Mongo we look for the canonical email_unique + jti_unique indexes;
-    for SQL backends we just attempt a roundtrip query against the users
-    table (Alembic migrations are idempotent, so absence is detected by
-    a missing-table error from the driver).
+    for SQL backends we ask Alembic for the current revision and assert
+    it matches the bundled head — drift here means hosts have a DB at
+    revision X while the package ships migrations through revision Y.
     """
     from regstack.backends.base import BackendKind
 
@@ -126,9 +126,25 @@ async def _check_schema(config) -> CheckResult:
                     "schema", False, f"missing: {', '.join(missing)} (call install_schema)"
                 )
             return CheckResult("schema", True, "core indexes present")
-        # SQL backends: attempt a count query — fails with a missing-table error if not installed.
-        await backend.users.count()
-        return CheckResult("schema", True, "users table present")
+        # SQL backends: compare alembic_version to the bundled head.
+        from regstack.backends.sql.migrations import current, head_revision
+
+        url = config.database_url.get_secret_value()
+        live = current(url)
+        head = head_revision()
+        if live is None:
+            return CheckResult(
+                "schema",
+                False,
+                f"alembic_version table missing (run `regstack migrate`); bundled head is {head}",
+            )
+        if live != head:
+            return CheckResult(
+                "schema",
+                False,
+                f"deployed revision {live} ≠ bundled head {head} (run `regstack migrate`)",
+            )
+        return CheckResult("schema", True, f"at head ({head})")
     except Exception as exc:
         return CheckResult("schema", False, f"check failed: {exc}")
     finally:

@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from regstack.auth.jwt import TokenError
 from regstack.auth.mfa import generate_mfa_code
-from regstack.db.repositories.mfa_code_repo import MfaVerifyOutcome
+from regstack.backends.mongo.repositories.mfa_code_repo import MfaVerifyOutcome
 from regstack.models.mfa_code import MfaCode
 from regstack.models.user import BaseUser, UserPublic
 from regstack.routers._schemas import MessageResponse

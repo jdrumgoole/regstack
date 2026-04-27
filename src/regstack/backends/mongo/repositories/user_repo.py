@@ -142,17 +142,31 @@ class UserRepo:
         result = await self._collection.delete_one({"_id": ObjectId(user_id)})
         return bool(result.deleted_count)
 
-    async def count(self, *, filter_: dict[str, Any] | None = None) -> int:
-        return await self._collection.count_documents(filter_ or {})
+    async def count(
+        self,
+        *,
+        is_active: bool | None = None,
+        is_verified: bool | None = None,
+        is_superuser: bool | None = None,
+    ) -> int:
+        filter_: dict[str, Any] = {}
+        if is_active is not None:
+            filter_["is_active"] = is_active
+        if is_verified is not None:
+            filter_["is_verified"] = is_verified
+        if is_superuser is not None:
+            filter_["is_superuser"] = is_superuser
+        return await self._collection.count_documents(filter_)
 
     async def list_paged(
         self,
         *,
         skip: int = 0,
         limit: int = 50,
-        sort: tuple[str, int] = ("created_at", -1),
+        sort_by_created_at_desc: bool = True,
     ) -> list[BaseUser]:
-        cursor = self._collection.find().sort([sort]).skip(skip).limit(limit)
+        sort_dir = -1 if sort_by_created_at_desc else 1
+        cursor = self._collection.find().sort([("created_at", sort_dir)]).skip(skip).limit(limit)
         out: list[BaseUser] = []
         async for doc in cursor:
             user = self._hydrate(doc)

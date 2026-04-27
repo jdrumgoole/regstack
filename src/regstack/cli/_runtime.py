@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING
 
 from regstack.app import RegStack
 from regstack.config.schema import RegStackConfig
-from regstack.db.client import make_client
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -23,17 +22,16 @@ def load_runtime_config(toml_path: Path | None = None) -> RegStackConfig:
 
 @asynccontextmanager
 async def open_regstack(toml_path: Path | None = None) -> AsyncIterator[RegStack]:
-    """Yield a fully-wired ``RegStack`` against a real Mongo connection.
+    """Yield a fully-wired ``RegStack`` against the configured backend.
 
-    Both the connection and the regstack instance are torn down on exit so
-    short-lived CLI invocations don't leak background tasks.
+    The backend's connection pool is torn down on exit so short-lived CLI
+    invocations don't leak background tasks. Backend selection (Mongo,
+    SQLite, Postgres) follows ``config.database_url``.
     """
     config = load_runtime_config(toml_path)
-    mongo = make_client(config)
+    rs = RegStack(config=config)
     try:
-        db = mongo[config.mongodb_database]
-        rs = RegStack(config=config, db=db)
-        await rs.install_indexes()
+        await rs.install_schema()
         yield rs
     finally:
-        await mongo.aclose()
+        await rs.aclose()

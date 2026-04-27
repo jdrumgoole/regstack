@@ -85,8 +85,20 @@ class MfaCodeRepo:
             query["kind"] = kind
         await self._collection.delete_many(query)
 
-    async def find(self, *, user_id: str, kind: MfaKind) -> dict[str, object] | None:
-        return await self._collection.find_one({"user_id": user_id, "kind": kind})
+    async def find(self, *, user_id: str, kind: MfaKind) -> MfaCode | None:
+        doc = await self._collection.find_one({"user_id": user_id, "kind": kind})
+        if doc is None:
+            return None
+        if "_id" in doc:
+            doc["_id"] = str(doc["_id"])
+        return MfaCode.model_validate(doc)
+
+    async def purge_expired(self, now: datetime | None = None) -> int:
+        from datetime import UTC
+
+        cutoff = now or datetime.now(UTC)
+        result = await self._collection.delete_many({"expires_at": {"$lt": cutoff}})
+        return int(result.deleted_count)
 
     @staticmethod
     def make_code_hash(raw_code: str) -> str:

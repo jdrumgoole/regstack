@@ -1,8 +1,10 @@
-app_name = "RegStack Demo"
+app_name = "RegStack SQLite Demo"
 base_url = "http://localhost:8000"
 behind_proxy = false
 
-mongodb_database = "regstack_demo"
+# SQLite file lives next to this regstack.toml. Add to .gitignore in real
+# deployments — it contains hashed credentials and pending tokens.
+database_url = "sqlite+aiosqlite:///./regstack-demo.sqlite"
 
 jwt_ttl_seconds = 7200
 transport = "bearer"
@@ -14,7 +16,6 @@ enable_account_deletion = true
 enable_admin_router = true
 enable_ui_router = true
 enable_sms_2fa = true
-theme_css_url = "/branding/theme.css"   # host override loaded after defaults
 
 verification_token_ttl_seconds = 86400      # 24h
 password_reset_token_ttl_seconds = 1800     # 30 min
@@ -23,7 +24,7 @@ email_change_token_ttl_seconds = 3600       # 1 h
 [email]
 backend = "console"
 from_address = "noreply@example.com"
-from_name = "RegStack Demo"
+from_name = "RegStack SQLite Demo"
 
 [sms]
 backend = "null"     # captures messages in-process; demo prints them via a hook

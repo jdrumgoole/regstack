@@ -1,7 +1,7 @@
 [project]
 name = "regstack"
-version = "0.1.1"
-description = "Embeddable user registration, login, and account management for FastAPI/MongoDB apps."
+version = "0.2.0.dev0"
+description = "Embeddable user registration, login, and account management for FastAPI apps. SQLite / Postgres / MongoDB."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
@@ -20,7 +20,6 @@ dependencies = [
     "fastapi>=0.110",
     "pydantic>=2.6",
     "pydantic-settings>=2.2",
-    "pymongo>=4.9",
     "pwdlib[argon2]>=0.2.1",
     "pyjwt>=2.8",
     "jinja2>=3.1",
@@ -29,9 +28,15 @@ dependencies = [
     "python-multipart>=0.0.9",
     "email-validator>=2.1",
     "aiosmtplib>=3.0",
+    # SQL stack — bundled by default because SQLite is the default backend.
+    "sqlalchemy[asyncio]>=2.0",
+    "aiosqlite>=0.20",
+    "alembic>=1.13",
 ]
 
 [project.optional-dependencies]
+postgres = ["asyncpg>=0.29"]
+mongo = ["pymongo>=4.9"]
 ses = ["aioboto3>=12.3"]
 sns = ["aioboto3>=12.3"]
 twilio = ["twilio>=9.0"]
@@ -54,6 +59,9 @@ dev = [
     "mypy>=1.10",
     "invoke>=2.2",
     "uvicorn[standard]>=0.29",
+    # All backend drivers in dev so the parametrized test suite can run.
+    "pymongo>=4.9",
+    "asyncpg>=0.29",
 ]
 
 [project.scripts]
@@ -87,6 +95,11 @@ markers = [
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning:passlib.*",
+    # CI surfaces PytestUnraisableExceptionWarning when async fixtures
+    # from a previous test leak sockets/event loops past their cleanup
+    # window — the sync UI tests shouldn't fail just because asyncpg or
+    # aiosqlite teardown was sloppy in a sibling test.
+    "ignore::pytest.PytestUnraisableExceptionWarning",
 ]
 
 [tool.ruff]

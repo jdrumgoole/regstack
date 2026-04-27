@@ -1,0 +1,30 @@
+app_name = "RegStack Demo"
+base_url = "http://localhost:8000"
+behind_proxy = false
+
+database_url = "mongodb://localhost:27017/regstack_demo"
+mongodb_database = "regstack_demo"
+
+jwt_ttl_seconds = 7200
+transport = "bearer"
+
+require_verification = true
+allow_registration = true
+enable_password_reset = true
+enable_account_deletion = true
+enable_admin_router = true
+enable_ui_router = true
+enable_sms_2fa = true
+theme_css_url = "/branding/theme.css"   # host override loaded after defaults
+
+verification_token_ttl_seconds = 86400      # 24h
+password_reset_token_ttl_seconds = 1800     # 30 min
+email_change_token_ttl_seconds = 3600       # 1 h
+
+[email]
+backend = "console"
+from_address = "noreply@example.com"
+from_name = "RegStack Demo"
+
+[sms]
+backend = "null"     # captures messages in-process; demo prints them via a hook

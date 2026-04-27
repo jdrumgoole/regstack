@@ -25,3 +25,9 @@ class LoginAttemptRepo:
 
     async def clear(self, email: str) -> None:
         await self._collection.delete_many({"email": email})
+
+    async def purge_expired(self, now: datetime, window: timedelta) -> int:
+        """Manual reaper for protocol parity with SQL backends."""
+        cutoff = now - window
+        result = await self._collection.delete_many({"when": {"$lt": cutoff}})
+        return int(result.deleted_count)

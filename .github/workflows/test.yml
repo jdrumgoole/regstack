@@ -22,15 +22,30 @@ jobs:
         image: mongo:7
         ports:
           - 27017:27017
-        # Wait until mongo answers a `ping` before the tests start.
         options: >-
           --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1}).ok' --port 27017"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
           --health-start-period 10s
+      postgres:
+        image: postgres:16
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: regstack
+          POSTGRES_PASSWORD: regstack
+          POSTGRES_DB: regstack
+        options: >-
+          --health-cmd "pg_isready -U regstack"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+          --health-start-period 10s
     env:
-      REGSTACK_MONGODB_URL: mongodb://localhost:27017
+      # Drives the parametrized backend fixture in tests/conftest.py.
+      # Connect as superuser so the per-test fixture can CREATE/DROP DATABASE.
+      REGSTACK_TEST_POSTGRES_URL: postgresql+asyncpg://regstack:regstack@localhost:5432
     steps:
       - uses: actions/checkout@v4
 
@@ -51,7 +66,7 @@ jobs:
       - name: ruff format check
         run: uv run ruff format --check src tests
 
-      - name: pytest (parallel)
+      - name: pytest (parallel, all backends)
         run: uv run python -m pytest -n auto --tb=short
 
   docs:

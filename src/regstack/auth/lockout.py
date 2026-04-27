@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from regstack.auth.clock import Clock
+    from regstack.backends.mongo.repositories.login_attempt_repo import LoginAttemptRepo
     from regstack.config.schema import RegStackConfig
-    from regstack.db.repositories.login_attempt_repo import LoginAttemptRepo
 
 
 @dataclass(slots=True, frozen=True)

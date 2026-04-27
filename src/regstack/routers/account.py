@@ -7,8 +7,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from regstack.auth.jwt import TokenError
+from regstack.backends.mongo.repositories.user_repo import UserAlreadyExistsError
 from regstack.config.secrets import derive_secret
-from regstack.db.repositories.user_repo import UserAlreadyExistsError
 from regstack.models.user import BaseUser, UserPublic
 from regstack.routers._schemas import MessageResponse, PasswordStr
 

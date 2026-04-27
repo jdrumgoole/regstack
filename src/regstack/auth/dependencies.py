@@ -9,8 +9,8 @@ from regstack.auth.jwt import TokenError, is_payload_bulk_revoked
 
 if TYPE_CHECKING:
     from regstack.auth.jwt import JwtCodec
-    from regstack.db.repositories.blacklist_repo import BlacklistRepo
-    from regstack.db.repositories.user_repo import UserRepo
+    from regstack.backends.mongo.repositories.blacklist_repo import BlacklistRepo
+    from regstack.backends.mongo.repositories.user_repo import UserRepo
     from regstack.models.user import BaseUser
 
 _bearer = HTTPBearer(auto_error=False)

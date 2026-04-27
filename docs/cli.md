@@ -8,8 +8,9 @@ flag overrides where the TOML file is found.
 ## `regstack init`
 
 Interactive wizard that writes `regstack.toml` and `regstack.secrets.env`
-in the current directory. Generates a 64-byte JWT secret by default,
-runs DNS sanity checks if asked, never provisions infrastructure.
+in the current directory. Asks which backend to use (SQLite default →
+Postgres → MongoDB), generates a 64-byte JWT secret, runs DNS sanity
+checks if asked, never provisions infrastructure.
 
 ```bash
 uv run regstack init
@@ -72,8 +73,8 @@ Default checks:
 | Check | Pass criterion |
 |-------|----------------|
 | `jwt secret` | Present, ≥ 32 chars |
-| `mongodb` | `ping` succeeds |
-| `indexes` | `users.email_unique` and `token_blacklist.jti_unique` present |
+| `backend` | `Backend.ping()` succeeds (works for any backend) |
+| `schema` | Mongo: required indexes present. SQL: `users` table responds to `count(*)` |
 | `email backend` | `build_email_service(config.email)` instantiates |
 
 Optional checks:

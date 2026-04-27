@@ -18,26 +18,34 @@ application and mount its router(s) wherever they like.
 │   RegStackConfig · Clock · HookRegistry        │
 │   JwtCodec · PasswordHasher · LockoutService   │
 │   MailComposer · EmailService · SmsService     │
-│   Repos: User · Pending · Blacklist            │
-│          LoginAttempt · MfaCode                │
+│   Backend (Mongo / SQLite / Postgres)          │
+│     ↳ Repos: User · Pending · Blacklist        │
+│              LoginAttempt · MfaCode            │
 └────────────────────┬───────────────────────────┘
                      │
-                     ▼
-┌────────────────────────────────────────────────┐
-│ MongoDB                                        │
-│   users · pending_registrations                │
-│   token_blacklist · login_attempts · mfa_codes │
-└────────────────────────────────────────────────┘
+        ┌────────────┼─────────────┐
+        ▼            ▼             ▼
+   ┌────────┐  ┌──────────┐  ┌──────────┐
+   │ SQLite │  │ Postgres │  │ MongoDB  │
+   │ (file) │  │ (asyncpg)│  │ (pymongo)│
+   └────────┘  └──────────┘  └──────────┘
 ```
 
 ## One façade per process
 
-`RegStack(config=…, db=…, clock=…, email_service=…, sms_service=…,
-mail_composer=…)` is the only public constructor. Everything downstream
-(routers, dependencies, repos) takes its dependencies from this instance,
-so you can run **two regstack instances in the same process** without
-shared state — useful for multi-tenant deployments where a single
-FastAPI app serves multiple `<host, mongo, branding>` triples.
+`RegStack(config=…, backend=None, clock=…, email_service=…,
+sms_service=…, mail_composer=…)` is the only public constructor.
+Everything downstream (routers, dependencies, repos) takes its
+dependencies from this instance, so you can run **two regstack instances
+in the same process** without shared state — useful for multi-tenant
+deployments where a single FastAPI app serves multiple
+`<host, database, branding>` triples.
+
+The backend is auto-built from ``config.database_url`` if not supplied
+explicitly. URL scheme decides:
+``sqlite+aiosqlite://`` → SQLAlchemy backend in SQLite mode.
+``postgresql+asyncpg://`` → SQLAlchemy backend in Postgres mode.
+``mongodb://`` / ``mongodb+srv://`` → Mongo backend.
 
 The façade exposes:
 
@@ -50,14 +58,54 @@ The façade exposes:
 - `users`, `pending`, `blacklist`, `attempts`, `mfa_codes` — repos.
 - `lockout`, `mail`, `jwt`, `password_hasher`, `hooks`, `email`, `sms` —
   collaborators.
-- `install_indexes()`, `bootstrap_admin(email, password)`.
-- `add_template_dir(path)`, `set_email_backend(...)`,
+- `backend` — the active :class:`~regstack.backends.base.Backend`.
+- `install_schema()` — install indexes (Mongo) or run migrations (SQL).
+  ``install_indexes()`` kept as a backwards-compat alias.
+- `aclose()` — tear down the backend's connection pool.
+- `bootstrap_admin(email, password)`,
+  `add_template_dir(path)`, `set_email_backend(...)`,
   `set_sms_backend(...)`, `on(event, handler)`.
+
+## Backend abstraction
+
+The Backend ABC owns the persistence story. Each backend ships:
+
+- One concrete repository per protocol
+  (``UserRepoProtocol``, ``PendingRepoProtocol``,
+  ``BlacklistRepoProtocol``, ``LoginAttemptRepoProtocol``,
+  ``MfaCodeRepoProtocol``).
+- ``install_schema()`` to create indexes (Mongo) or run table creation
+  / Alembic migrations (SQL).
+- ``ping()`` for ``regstack doctor`` health checks.
+- ``aclose()`` for clean shutdown.
+
+The Mongo backend lives at ``regstack.backends.mongo``; the SQL
+backend (driving both SQLite and Postgres via SQLAlchemy 2 async)
+lives at ``regstack.backends.sql``. Both are routed via the
+``regstack.backends.factory.build_backend(config)`` factory.
+
+### TTL handling differences
+
+Mongo gets free expiry via TTL indexes — `pending_registrations`,
+`token_blacklist`, `login_attempts`, and `mfa_codes` all have
+``expireAfterSeconds`` indexes that the Mongo background task reaps.
+
+The SQL backends have no equivalent. Two safety nets:
+
+- **Read-side filtering**: every query that pulls a "live" row also
+  checks ``expires_at > now()`` (or equivalent). A stale row in the
+  table is harmless because it's never returned.
+- **Periodic reaper**: each repo exposes ``purge_expired(...)``. Hosts
+  that care about disk usage can run it on a schedule (e.g. via
+  APScheduler or a `regstack reap` cron job).
+
+This means SQL backends are functionally correct without the reaper,
+but accumulate dead rows over time. Mongo doesn't.
 
 ## Repositories
 
-Each MongoDB collection has a thin async repo that translates between
-the pydantic model and BSON documents. The repos are all tz-aware
+Each backend ships a thin async repo per collection / table. The repos
+are all tz-aware
 because `make_client` configures `AsyncMongoClient(..., tz_aware=True)`
 — every layer above assumes UTC-aware datetimes.
 

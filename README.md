@@ -32,17 +32,15 @@ the admin panel, lock out brute-force attackers, and ideally a second
 factor. Every one of those endpoints has a well-known way to get
 subtly wrong:
 
-- **Password hashing.** Use [Argon2](https://en.wikipedia.org/wiki/Argon2)
-  (the [PHC winner](https://www.password-hashing.net/)), not MD5, SHA-1,
-  bcrypt-without-pepper, or — somehow still common — plain text.
+- **Password hashing.** Use Argon2id, not MD5, SHA-1, bcrypt-without-pepper,
+  or — somehow still common — plain text.
 - **Token revocation.** A [JWT](https://datatracker.ietf.org/doc/html/rfc7519)
   is signed and self-contained: the server can't "log it out" unless you
   build a revocation list. Forget this and a stolen token works until it
   expires.
 - **Account enumeration.** A login or password-reset endpoint that
   responds differently for "user exists" vs "user doesn't" lets an
-  attacker harvest your customer list. See
-  [OWASP WSTG-IDNT-04](https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/03-Identity_Management_Testing/04-Testing_for_Account_Enumeration_and_Guessable_User_Account).
+  attacker harvest your customer list.
 - **Bulk session invalidation.** When a user changes their password
   because they think they were compromised, every existing token they
   hold should stop working immediately. Most homegrown JWT layers don't
@@ -51,9 +49,9 @@ subtly wrong:
   random, hashed at rest, single-use, and expire fast. Storing the raw
   token in the database is a "now your DB backup is also a credential
   dump" mistake.
-- **Phone numbers.** SMS codes need [E.164](https://en.wikipedia.org/wiki/E.164)-validated
-  numbers, attempt limits, and an upstream provider. Wiring all of that
-  yourself for a single feature is rarely worth it.
+- **Phone numbers.** SMS codes need E.164-validated numbers, attempt
+  limits, and an upstream provider. Wiring all of that yourself for a
+  single feature is rarely worth it.
 
 Doing all of these correctly, with tests, is two to four weeks of
 engineering for a competent team. Doing them once and embedding the
@@ -180,9 +178,9 @@ The same docs are also browsable as Markdown in [`docs/`](https://github.com/jdr
 
 Alpha. Single-file SQLite is the default and runs with no infrastructure;
 PostgreSQL and MongoDB backends pass the same parametrized integration
-suite. The next tagged release is `v0.2.0`. See the
+suite. Latest tagged release: `v0.2.1`. See the
 [changelog](https://regstack.readthedocs.io/en/latest/changelog.html)
-for the per-milestone breakdown.
+for the per-release breakdown.
 
 ## Contributing
 

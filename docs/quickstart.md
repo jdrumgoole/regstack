@@ -2,13 +2,13 @@
 
 This guide walks you from "nothing installed" to "registered user
 with a verified email" in about ten minutes. You will need
-[Python 3.11 or newer](https://www.python.org/downloads/) and
-[`uv`](https://docs.astral.sh/uv/) (Astral's fast Python package
-manager — used throughout regstack's tooling).
+Python 3.11 or newer and [`uv`](https://docs.astral.sh/uv/)
+(Astral's fast Python package manager — used throughout regstack's
+tooling).
 
-The default storage backend is [SQLite](https://www.sqlite.org/index.html),
-so **no database server is required for development**. The same code
-runs against [PostgreSQL](https://www.postgresql.org/) or
+The default storage backend is SQLite, so **no database server is
+required for development**. The same code runs against
+[PostgreSQL](https://www.postgresql.org/) or
 [MongoDB](https://www.mongodb.com/) by changing one URL.
 
 ## Install
@@ -45,9 +45,9 @@ The wizard asks a handful of questions and writes two files:
 1. Which backend do you want? (SQLite / Postgres / MongoDB)
 2. Builds the right `database_url` for your choice (a SQLite path, a
    Postgres connection URL, or a Mongo URL).
-3. Generates a 64-byte JWT signing secret (used to sign and verify
-   [JSON Web Tokens](https://datatracker.ietf.org/doc/html/rfc7519) —
-   keep this secret).
+3. Generates a 64-byte signing secret used to sign and verify
+   [JWTs](https://datatracker.ietf.org/doc/html/rfc7519) — keep this
+   secret.
 4. Walks through email backend (`console` / SMTP / SES) and feature
    flags.
 
@@ -131,8 +131,8 @@ if config.enable_ui_router:
 This adds pages at `/account/login`, `/account/register`,
 `/account/me`, etc., and serves the bundled `core.css`, `theme.css`,
 and `regstack.js` at `/regstack-static/`. The pages are stateless and
-talk to the JSON API via [`fetch`](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API).
-Re-skin them by serving a single CSS file — see [Theming](theming.md).
+talk to the JSON API via `fetch`. Re-skin them by serving a single
+CSS file — see [Theming](theming.md).
 
 ## End-to-end smoke test (zero infrastructure)
 

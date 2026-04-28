@@ -28,13 +28,38 @@ PAGE_NAMES = (
 
 
 def default_static_dir() -> Path:
-    """Filesystem path to the bundled static assets — used by the StaticFiles
-    factory in :mod:`regstack.app`.
+    """Return the filesystem path to the bundled static assets.
+
+    Resolves ``regstack/ui/static/`` from the installed package via
+    ``importlib.resources``, so it works whether regstack is in an
+    editable install or a wheel. Used by the ``StaticFiles`` factory
+    on :class:`~regstack.app.RegStack`.
+
+    Returns:
+        Filesystem path containing ``css/core.css``, ``css/theme.css``,
+        and ``js/regstack.js``.
     """
     return Path(str(resources.files(_PACKAGE).joinpath(_STATIC_DIR)))
 
 
 def build_ui_environment(host_template_dirs: list[Path] | None = None) -> Environment:
+    """Construct the Jinja2 environment used by the SSR pages.
+
+    Wraps a :class:`jinja2.ChoiceLoader` so that **host directories
+    are searched first**, falling back to the bundled templates from
+    the regstack package. A host can override ``auth/login.html``
+    (or any other bundled template) by dropping a same-named file
+    into one of the supplied directories.
+
+    Args:
+        host_template_dirs: Optional list of host template directories
+            to prepend. Order matters — earlier entries win on
+            collisions.
+
+    Returns:
+        A configured :class:`jinja2.Environment` with autoescape on
+        for HTML.
+    """
     loaders = [FileSystemLoader(str(p)) for p in (host_template_dirs or [])]
     loaders.append(PackageLoader(_PACKAGE, _TEMPLATE_DIR))
     return Environment(
@@ -47,12 +72,28 @@ def build_ui_environment(host_template_dirs: list[Path] | None = None) -> Enviro
 
 
 def build_ui_router(rs: RegStack) -> APIRouter:
-    """Server-rendered pages that pair with the JSON API.
+    """Build the SSR :class:`APIRouter` for the bundled HTML pages.
 
-    Pages are stateless: they read API + UI prefixes from the page body and
-    let ``regstack.js`` drive form submissions and auth-state redirects.
-    No cookie-based session is established here, so this router is safe to
-    mount alongside the JSON API without CSRF middleware.
+    Mounts a ``GET`` endpoint for each of :data:`PAGE_NAMES`
+    (``login``, ``register``, ``verify``, ``forgot``, ``reset``,
+    ``me``, ``confirm-email-change``, ``mfa-confirm``).
+
+    Pages are **stateless** — they render the same HTML regardless of
+    auth state. The bundled ``regstack.js`` reads the API and UI
+    prefixes from ``<body data-rs-api data-rs-ui>``, drives form
+    submissions via ``fetch``, and stores the access token in
+    ``localStorage``. No cookie session is established here, so this
+    router is safe to mount alongside the JSON API without CSRF
+    middleware.
+
+    Args:
+        rs: The owning :class:`~regstack.app.RegStack` instance — its
+            config drives the page context (brand, prefixes, theme
+            URL) and its template environment is reused.
+
+    Returns:
+        A FastAPI ``APIRouter`` ready for ``app.include_router(...,
+        prefix=config.ui_prefix)``.
     """
     router = APIRouter()
     env = rs.ui_env

@@ -18,7 +18,27 @@ if TYPE_CHECKING:
 
 
 def build_router(rs: RegStack) -> APIRouter:
-    """Compose the JSON router that hosts mount via ``app.include_router``."""
+    """Build the composite JSON router for one :class:`RegStack` instance.
+
+    Always includes ``register``, ``verify``, ``login``, ``logout``,
+    and ``account``. Conditionally adds:
+
+    - ``password`` (forgot/reset) when ``config.enable_password_reset``.
+    - ``phone`` and the MFA confirm route when ``config.enable_sms_2fa``.
+    - ``admin`` when ``config.enable_admin_router``.
+
+    Hosts normally don't call this directly; access
+    ``regstack.router`` instead, which calls it lazily.
+
+    Args:
+        rs: The owning :class:`~regstack.app.RegStack` instance — its
+            config drives which sub-routers are mounted, and its
+            collaborators are captured in the endpoint closures.
+
+    Returns:
+        A FastAPI ``APIRouter`` ready for ``app.include_router(...,
+        prefix=config.api_prefix)``.
+    """
     router = APIRouter(tags=["regstack"])
     router.include_router(build_register_router(rs))
     router.include_router(build_verify_router(rs))

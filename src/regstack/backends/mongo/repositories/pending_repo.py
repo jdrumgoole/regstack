@@ -64,6 +64,10 @@ class PendingRepo:
         result = await self._collection.delete_many({"expires_at": {"$lt": cutoff}})
         return int(result.deleted_count)
 
+    async def count_unexpired(self, now: datetime | None = None) -> int:
+        cutoff = now or datetime.now(UTC)
+        return await self._collection.count_documents({"expires_at": {"$gt": cutoff}})
+
     @staticmethod
     def _hydrate(doc: dict[str, Any] | None) -> PendingRegistration | None:
         if doc is None:

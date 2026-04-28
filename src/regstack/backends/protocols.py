@@ -154,6 +154,22 @@ class PendingRepoProtocol(Protocol):
         """
         ...
 
+    async def count_unexpired(self, now: datetime | None = None) -> int:
+        """Count pending-registration rows whose ``expires_at`` is in the future.
+
+        "Unexpired" rather than a raw row-count because SQL backends
+        accumulate dead rows until ``purge_expired`` runs — a raw
+        count would double-report a verification email that's been
+        unanswered for a month and a fresh one sent today.
+
+        Args:
+            now: Reference instant. Defaults to ``datetime.now(UTC)``.
+
+        Returns:
+            Number of pending rows with ``expires_at > now``.
+        """
+        ...
+
 
 @runtime_checkable
 class BlacklistRepoProtocol(Protocol):

@@ -50,13 +50,7 @@ def build_admin_router(rs: RegStack) -> APIRouter:
         active = await rs.users.count(is_active=True)
         verified = await rs.users.count(is_verified=True)
         supers = await rs.users.count(is_superuser=True)
-        # PendingRegistrations don't have a count() yet — peek through the
-        # mongo backend; SQL backends will add a typed count too.
-        pending_count_doc = getattr(rs.pending, "_collection", None)
-        if pending_count_doc is not None:
-            pending = await pending_count_doc.count_documents({})
-        else:  # pragma: no cover — used by SQL backends in Phase 2
-            pending = 0
+        pending = await rs.pending.count_unexpired(rs.clock.now())
         return AdminStats(
             total_users=total,
             active_users=active,

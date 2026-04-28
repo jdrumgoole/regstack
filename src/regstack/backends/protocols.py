@@ -22,6 +22,20 @@ from regstack.models.user import BaseUser
 
 
 class MfaVerifyOutcome(StrEnum):
+    """Result of submitting an SMS MFA code to the repo.
+
+    The five possible values:
+
+    - ``OK`` — the code matched and the row was consumed.
+    - ``WRONG`` — the code didn't match. ``attempts_remaining`` on
+      the paired :class:`MfaVerifyResult` says how many tries are
+      left before the row is deleted (forcing a re-issue).
+    - ``EXPIRED`` — a row exists but its TTL has passed.
+    - ``LOCKED`` — too many wrong guesses; the row was deleted and
+      the user must request a new code.
+    - ``MISSING`` — no outstanding code for this user / kind.
+    """
+
     OK = "ok"
     WRONG = "wrong"
     EXPIRED = "expired"
@@ -31,24 +45,35 @@ class MfaVerifyOutcome(StrEnum):
 
 @dataclass(slots=True, frozen=True)
 class MfaVerifyResult:
+    """Outcome of :meth:`MfaCodeRepoProtocol.verify`."""
+
     outcome: MfaVerifyOutcome
+    """Which terminal state the verify call landed in. See
+    :class:`MfaVerifyOutcome`."""
+
     attempts_remaining: int = 0
+    """For :attr:`MfaVerifyOutcome.WRONG`, how many more guesses the
+    user has before the code is deleted and they must request a new
+    one. ``0`` for any other outcome."""
 
 
 class UserAlreadyExistsError(Exception):
-    """Raised when an attempt is made to insert a user with a duplicate email,
-    or to set an email that another user already owns.
+    """Raised when an insert / email-change collides with an existing user.
 
-    Lifted out of the Mongo repo so SQL backends can raise the same type
-    on their own integrity-error paths.
+    Backend-agnostic — every repo raises this same type on its
+    integrity-error path so callers can branch on the type without
+    importing a backend module. Surfaced by the registration and
+    change-email routers as HTTP 409.
     """
 
 
 class PendingAlreadyExistsError(Exception):
     """A pending registration with this email already exists.
 
-    Backend-agnostic: each repo raises this on its own duplicate path so
-    callers can branch on the type without importing a backend module.
+    In practice the registration router uses an upsert so this
+    exception is rarely raised — kept as the backend-agnostic name
+    for the error so future callers don't need to import a backend
+    module.
     """
 
 

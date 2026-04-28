@@ -3,6 +3,37 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## 0.2.5 — 2026-04-28
+
+**Bug fix + tooling.**
+
+### Fixed
+
+- ``regstack doctor`` against a SQL backend crashed with
+  ``asyncio.run() cannot be called from a running event loop``. The
+  schema check called
+  ``regstack.backends.sql.migrations.current()``, which used
+  ``asyncio.run()`` internally — invalid inside doctor's own
+  ``asyncio.run``. Added ``current_async()`` and switched the doctor
+  command to use it. Sync ``current()`` is preserved for the migrate
+  CLI (which runs outside an event loop).
+
+### Added
+
+- ``inv coverage [--no-html] [--fail-under=N]`` — runs the full
+  three-backend matrix under coverage, combines per-pytest-xdist-worker
+  ``.coverage`` files, prints the term-with-missing report, and writes
+  ``htmlcov/``. Branch coverage is on by default.
+- ``[tool.coverage.*]`` config in ``pyproject.toml``.
+- ``tests/unit/test_cli_init.py`` — six tests driving the
+  ``regstack init`` wizard via ``CliRunner(input=...)``. Lifts
+  ``cli/init.py`` from 14% → 88%.
+- ``tests/unit/test_cli_doctor.py`` — four tests for the SQLite
+  ``regstack doctor`` paths. Lifts ``cli/doctor.py`` from 61% → 87%.
+
+Total line coverage on the full backend matrix: **85% → 87.1%**
+(branch coverage is also newly enabled).
+
 ## 0.2.4 — 2026-04-28
 
 **Breaking** — every back-compat shim left over from the

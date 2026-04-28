@@ -5,6 +5,23 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
+## 0.2.5 — 2026-04-28
+
+Bug fix + tooling.
+
+- **Fix:** `regstack doctor` against a SQL backend crashed with
+  `asyncio.run() cannot be called from a running event loop`. The
+  schema check called `regstack.backends.sql.migrations.current()`,
+  which used `asyncio.run()` internally — invalid inside doctor's own
+  `asyncio.run`. Added `current_async()` and switched the doctor
+  command to use it. Sync `current()` is preserved for the migrate
+  CLI.
+- **New:** `inv coverage [--no-html] [--fail-under=N]` runs the full
+  three-backend matrix under coverage and writes term + HTML reports.
+  Branch coverage is on by default.
+- Test coverage uplift on the CLI: `cli/init.py` 14% → 88%,
+  `cli/doctor.py` 61% → 87%. Total: **85% → 87.1%**.
+
 ## 0.2.4 — 2026-04-28
 
 **Breaking** — back-compat shims removed:

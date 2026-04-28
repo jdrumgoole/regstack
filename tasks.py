@@ -96,6 +96,48 @@ def test_serial(c: Context, k: str = "") -> None:
 
 
 @task
+def coverage(
+    c: Context,
+    pg_url: str = _DEFAULT_PG_URL,
+    html: bool = True,
+    fail_under: int = 0,
+) -> None:
+    """Run the full backend matrix under coverage.
+
+    Combines per-worker .coverage.* files (pytest-xdist runs one
+    coverage instance per worker; settings.parallel = true plus
+    `coverage combine` glues them back together) and prints the
+    line-coverage report. With --html (default), also writes an
+    HTML report under ``htmlcov/``.
+
+    Set ``--fail-under=N`` to make the task exit non-zero when total
+    line coverage drops below N percent — useful in CI.
+    """
+    # Wipe stale coverage state so partial reruns don't leave double-counted
+    # data files behind.
+    c.run("uv run coverage erase", pty=True, warn=True)
+    env = {
+        "REGSTACK_TEST_BACKENDS": "sqlite,mongo,postgres",
+        "REGSTACK_TEST_POSTGRES_URL": pg_url,
+        # pytest-cov picks settings up from [tool.coverage.*] in pyproject.toml.
+        "COVERAGE_PROCESS_START": "pyproject.toml",
+    }
+    c.run(
+        "uv run python -m pytest -n auto --cov=src/regstack --cov-report=",
+        pty=True,
+        env=env,
+    )
+    c.run("uv run coverage combine", pty=True, warn=True)
+    report_cmd = "uv run coverage report"
+    if fail_under > 0:
+        report_cmd += f" --fail-under={fail_under}"
+    c.run(report_cmd, pty=True)
+    if html:
+        c.run("uv run coverage html", pty=True)
+        print("\nHTML report: htmlcov/index.html")
+
+
+@task
 def e2e(c: Context) -> None:
     """Run Playwright end-to-end suite."""
     c.run("uv run python -m pytest -m e2e -vv", pty=True)

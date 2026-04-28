@@ -5,6 +5,16 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
+## 0.2.2 — 2026-04-28
+
+Docs-only release. The README and Sphinx docs landing page now lead
+with the same pitch (problem framing, "Why not just use…?" comparison
+vs Auth0 / Clerk / Keycloak / fastapi-users) before diving into
+architecture. Hyperlink density trimmed back: only major external
+packages, products, and JWT (RFC 7519) are linked — Wikipedia trivia,
+MDN basics, OWASP article links, and deep-dependency helper-class
+docs were removed.
+
 ## 0.2.1 — 2026-04-28
 
 Hotfix for 0.2.0: `import regstack` failed on a base install because

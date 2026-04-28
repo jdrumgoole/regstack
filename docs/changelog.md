@@ -3,6 +3,31 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## 0.2.2 — 2026-04-28
+
+**Docs-only release.**
+
+### Changed
+
+- README and `docs/index.md` both now lead with the same pitch — a
+  tagline ("Production-grade user accounts for your FastAPI app —
+  without the vendor lock-in, the second service to run, or the
+  homegrown auth bugs"), a "The problem regstack solves" section
+  (Argon2, JWT revocation, account enumeration, bulk session
+  invalidation, hashed one-time tokens, E.164 phone numbers), and a
+  "Why not just use…?" comparison table covering hosted SaaS
+  (Auth0 / Clerk / WorkOS / Stytch), self-hosted IAM (Keycloak /
+  Authentik / Authelia / Ory Kratos), `fastapi-users`, and DIY.
+- Trimmed hyperlink density back. Only major external packages,
+  products, and JWT (RFC 7519) are linked. Wikipedia articles on
+  CS concepts (façade pattern, multitenancy, idempotence, E.164,
+  SHA-256, HMAC), MDN web platform basics (CSP, fetch, localStorage,
+  HTTP 429, Retry-After, HTTPS, CSS custom properties), OWASP article
+  links, Python stdlib pages, and deep-dependency helper-class docs
+  (pwdlib, pydantic, asyncpg, pymongo, ChoiceLoader, TypeDecorator,
+  StaticFiles, ProxyHeadersMiddleware, slowapi, APScheduler,
+  pytest-xdist, Kubernetes probes) were removed.
+
 ## 0.2.1 — 2026-04-28
 
 **Hotfix for 0.2.0.** `import regstack` was broken on any install that

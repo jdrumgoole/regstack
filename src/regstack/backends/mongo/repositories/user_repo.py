@@ -14,9 +14,6 @@ if TYPE_CHECKING:
     from pymongo.asynchronous.database import AsyncDatabase
 
 
-__all__ = ["UserAlreadyExistsError", "UserRepo"]
-
-
 def _bulk_revoke_cutoff(now: datetime) -> datetime:
     """The cutoff timestamp recorded on the user document. Stored at full
     microsecond precision; the JWT ``iat`` claim is also emitted as a float

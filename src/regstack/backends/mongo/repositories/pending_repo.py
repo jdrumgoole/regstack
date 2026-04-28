@@ -13,9 +13,6 @@ if TYPE_CHECKING:
     from pymongo.asynchronous.database import AsyncDatabase
 
 
-__all__ = ["PendingAlreadyExistsError", "PendingRepo"]
-
-
 class PendingRepo:
     def __init__(self, db: AsyncDatabase, collection_name: str) -> None:
         self._collection = db[collection_name]

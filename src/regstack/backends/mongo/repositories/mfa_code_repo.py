@@ -13,9 +13,6 @@ if TYPE_CHECKING:
     from regstack.auth.clock import Clock
 
 
-__all__ = ["MfaCodeRepo", "MfaVerifyOutcome", "MfaVerifyResult"]
-
-
 class MfaCodeRepo:
     def __init__(self, db: AsyncDatabase, collection_name: str, *, clock: Clock) -> None:
         self._collection = db[collection_name]

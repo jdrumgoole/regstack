@@ -213,14 +213,6 @@ class RegStack:
         """
         await self.backend.install_schema()
 
-    async def install_indexes(self) -> None:
-        """Backwards-compatible alias for :meth:`install_schema`.
-
-        Kept for the 0.1.x ``install_indexes()`` name. New callers
-        should use :meth:`install_schema`.
-        """
-        await self.install_schema()
-
     async def aclose(self) -> None:
         """Tear down the backend's connection pool.
 

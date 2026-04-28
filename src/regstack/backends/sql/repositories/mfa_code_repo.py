@@ -6,10 +6,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import and_, delete, select, update
 
 from regstack.auth.tokens import hash_token
-from regstack.backends.mongo.repositories.mfa_code_repo import (
-    MfaVerifyOutcome,
-    MfaVerifyResult,
-)
+from regstack.backends.protocols import MfaVerifyOutcome, MfaVerifyResult
 from regstack.backends.sql.schema import mfa_codes_table
 from regstack.models.mfa_code import MfaCode, MfaKind
 

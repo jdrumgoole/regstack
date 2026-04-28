@@ -17,9 +17,17 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from bson import ObjectId
 from pydantic import GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
+
+# bson is imported lazily so the package remains importable on a base
+# install (the `mongo` extra is what pulls pymongo, and pymongo is the
+# only consumer of bson). When the Mongo backend is in use, bson is
+# always present.
+try:
+    from bson import ObjectId as _BsonObjectId  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover — exercised only without the mongo extra
+    _BsonObjectId = None  # type: ignore[assignment,misc]
 
 
 class _IdValidator:
@@ -28,7 +36,7 @@ class _IdValidator:
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> CoreSchema:
         def validate(value: Any) -> str:
-            if isinstance(value, ObjectId):
+            if _BsonObjectId is not None and isinstance(value, _BsonObjectId):
                 return str(value)
             if isinstance(value, str) and value:
                 return value

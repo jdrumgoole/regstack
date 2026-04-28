@@ -6,8 +6,7 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, HTTPException, status
 
 from regstack.auth.tokens import generate_verification_token
-from regstack.backends.mongo.repositories.pending_repo import PendingAlreadyExistsError
-from regstack.backends.mongo.repositories.user_repo import UserAlreadyExistsError
+from regstack.backends.protocols import PendingAlreadyExistsError, UserAlreadyExistsError
 from regstack.models.pending_registration import PendingRegistration
 from regstack.models.user import BaseUser, UserCreate, UserPublic
 from regstack.routers._schemas import PendingResponse

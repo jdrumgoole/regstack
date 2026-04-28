@@ -5,6 +5,17 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
+## 0.2.1 — 2026-04-28
+
+Hotfix for 0.2.0: `import regstack` failed on a base install because
+several modules in the import path (`models/_objectid.py`,
+`backends/protocols.py`, four routers, and the SQL `mfa_code_repo`)
+had unconditional `from bson …` / `from regstack.backends.mongo …`
+imports — but `pymongo` became an optional `mongo` extra in 0.2.0.
+Added a CI smoketest that builds the wheel and imports it in a
+no-extras venv, plus an in-process regression test that blocks `bson`
+/ `pymongo` via `sys.meta_path`.
+
 ## 0.2.0 — 2026-04-28
 
 Multi-backend support — SQLite (default), Postgres, MongoDB — switched

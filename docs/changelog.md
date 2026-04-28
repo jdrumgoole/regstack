@@ -3,6 +3,36 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## 0.2.1 — 2026-04-28
+
+**Hotfix for 0.2.0.** `import regstack` was broken on any install that
+didn't include the new `mongo` extra: `models/_objectid.py` imported
+`bson` unconditionally, and four routers + the SQL MFA repo imported
+shared error / enum types out of `regstack.backends.mongo.*`, which
+in turn imports `pymongo` at module top level.
+
+### Fixed
+
+- `models/_objectid.py` now imports `bson.ObjectId` lazily inside a
+  `try / except ImportError` and only uses it for `isinstance` checks
+  when present.
+- `UserAlreadyExistsError`, `PendingAlreadyExistsError`,
+  `MfaVerifyOutcome`, and `MfaVerifyResult` moved from their backend
+  modules to `regstack.backends.protocols` (the backend-agnostic
+  location). Mongo modules re-export them for backwards compatibility.
+- All consumer modules (`routers/register.py`, `routers/account.py`,
+  `routers/login.py`, `routers/phone.py`, the SQL MFA repo) updated to
+  import from `regstack.backends.protocols`.
+
+### Added
+
+- New `base-install-smoketest` CI job: builds the wheel and runs
+  `import regstack` + a SQLite end-to-end RegStack lifecycle in a
+  fresh venv with **no extras**. Will catch any future regression.
+- New `tests/unit/test_base_install_imports.py` regression test that
+  uses `sys.meta_path` to block `bson` / `pymongo` and confirm
+  `import regstack` still succeeds.
+
 ## 0.2.0 — 2026-04-28
 
 **Multi-backend support + Alembic migrations.** SQLite is now the

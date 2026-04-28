@@ -84,3 +84,64 @@ jobs:
         with:
           name: docs-html
           path: docs/_build/html
+
+  base-install-smoketest:
+    # Catches the kind of regression that broke 0.2.0: an unconditional
+    # `from bson import ...` (or any other optional-extra import) at module
+    # top level makes `import regstack` fail for any user who didn't opt
+    # into the `mongo` extra. The unit test of the same name exercises the
+    # equivalent in-process via meta_path blocking; this job verifies the
+    # actual built wheel installs and imports against a clean Python.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - run: uv python pin 3.11
+      - name: Build wheel
+        run: uv build --wheel
+      - name: Install wheel into a clean venv (no extras)
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --upgrade pip
+          /tmp/smoke/bin/pip install dist/regstack-*.whl
+      - name: Import smoketest
+        run: |
+          /tmp/smoke/bin/python -c "
+          import regstack
+          from regstack import RegStack, RegStackConfig
+          assert RegStack.__module__ == 'regstack.app'
+          print('ok', regstack.__version__)
+          "
+      - name: SQLite end-to-end smoketest
+        run: |
+          /tmp/smoke/bin/python <<'PY'
+          import asyncio, secrets, tempfile
+          from pathlib import Path
+          from regstack import RegStack, RegStackConfig
+          from regstack.models.user import BaseUser
+
+          async def main() -> None:
+              with tempfile.TemporaryDirectory() as td:
+                  cfg = RegStackConfig.load(
+                      toml_path=Path("/dev/null"),
+                      secrets_env_path=Path("/dev/null"),
+                      jwt_secret=secrets.token_urlsafe(64),
+                      database_url=f"sqlite+aiosqlite:///{td}/rs.db",
+                      require_verification=False,
+                      allow_registration=True,
+                      rate_limit_disabled=True,
+                  )
+                  rs = RegStack(config=cfg)
+                  await rs.install_schema()
+                  user = await rs.users.create(
+                      BaseUser(email="a@b.com", hashed_password="h", is_verified=True)
+                  )
+                  assert user.id
+                  await rs.aclose()
+                  print("sqlite ok")
+
+          asyncio.run(main())
+          PY

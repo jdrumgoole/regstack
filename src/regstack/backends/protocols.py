@@ -11,12 +11,28 @@ or Mongo idiom feels "right" to the implementer.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
 from regstack.models.mfa_code import MfaCode, MfaKind
 from regstack.models.pending_registration import PendingRegistration
 from regstack.models.user import BaseUser
+
+
+class MfaVerifyOutcome(StrEnum):
+    OK = "ok"
+    WRONG = "wrong"
+    EXPIRED = "expired"
+    LOCKED = "locked"
+    MISSING = "missing"
+
+
+@dataclass(slots=True, frozen=True)
+class MfaVerifyResult:
+    outcome: MfaVerifyOutcome
+    attempts_remaining: int = 0
 
 
 class UserAlreadyExistsError(Exception):
@@ -25,6 +41,14 @@ class UserAlreadyExistsError(Exception):
 
     Lifted out of the Mongo repo so SQL backends can raise the same type
     on their own integrity-error paths.
+    """
+
+
+class PendingAlreadyExistsError(Exception):
+    """A pending registration with this email already exists.
+
+    Backend-agnostic: each repo raises this on its own duplicate path so
+    callers can branch on the type without importing a backend module.
     """
 
 
@@ -155,9 +179,3 @@ class MfaCodeRepoProtocol(Protocol):
     async def find(self, *, user_id: str, kind: MfaKind) -> MfaCode | None: ...
 
     async def purge_expired(self, now: datetime | None = None) -> int: ...
-
-
-# Re-exported here so callers don't need a deeper import. Lives in the
-# Mongo backend module because it predates the SQL backend; the dataclass
-# is backend-agnostic, only the import path is historical.
-from regstack.backends.mongo.repositories.mfa_code_repo import MfaVerifyResult  # noqa: E402

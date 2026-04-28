@@ -6,14 +6,14 @@ from typing import TYPE_CHECKING, Any
 from bson import ObjectId
 from pymongo.errors import DuplicateKeyError
 
+from regstack.backends.protocols import PendingAlreadyExistsError
 from regstack.models.pending_registration import PendingRegistration
 
 if TYPE_CHECKING:
     from pymongo.asynchronous.database import AsyncDatabase
 
 
-class PendingAlreadyExistsError(Exception):
-    """A pending registration with this email already exists."""
+__all__ = ["PendingAlreadyExistsError", "PendingRepo"]
 
 
 class PendingRepo:

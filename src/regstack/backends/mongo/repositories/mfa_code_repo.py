@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
-from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from regstack.auth.tokens import hash_token
+from regstack.backends.protocols import MfaVerifyOutcome, MfaVerifyResult
 from regstack.models.mfa_code import MfaCode, MfaKind
 
 if TYPE_CHECKING:
@@ -14,18 +13,7 @@ if TYPE_CHECKING:
     from regstack.auth.clock import Clock
 
 
-class MfaVerifyOutcome(StrEnum):
-    OK = "ok"
-    WRONG = "wrong"
-    EXPIRED = "expired"
-    LOCKED = "locked"
-    MISSING = "missing"
-
-
-@dataclass(slots=True, frozen=True)
-class MfaVerifyResult:
-    outcome: MfaVerifyOutcome
-    attempts_remaining: int = 0
+__all__ = ["MfaCodeRepo", "MfaVerifyOutcome", "MfaVerifyResult"]
 
 
 class MfaCodeRepo:

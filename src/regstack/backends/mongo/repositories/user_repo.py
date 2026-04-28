@@ -7,14 +7,14 @@ from bson import ObjectId
 from pymongo.errors import DuplicateKeyError
 
 from regstack.auth.clock import Clock, SystemClock
+from regstack.backends.protocols import UserAlreadyExistsError
 from regstack.models.user import BaseUser
 
 if TYPE_CHECKING:
     from pymongo.asynchronous.database import AsyncDatabase
 
 
-class UserAlreadyExistsError(Exception):
-    """Raised when an attempt is made to insert a user with a duplicate email."""
+__all__ = ["UserAlreadyExistsError", "UserRepo"]
 
 
 def _bulk_revoke_cutoff(now: datetime) -> datetime:

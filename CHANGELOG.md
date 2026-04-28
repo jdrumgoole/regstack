@@ -5,6 +5,25 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
+## 0.2.4 — 2026-04-28
+
+**Breaking** — back-compat shims removed:
+
+- `RegStack.install_indexes()` (alias for `install_schema()`).
+- `ObjectIdStr` alias for `IdStr` in `regstack.models._objectid`.
+- Re-exports of `UserAlreadyExistsError`,
+  `PendingAlreadyExistsError`, `MfaVerifyOutcome`, and
+  `MfaVerifyResult` from `regstack.backends.mongo.repositories.*`.
+  Their canonical home is `regstack.backends.protocols`.
+
+If you import any of these from the old paths, switch to:
+- `RegStack.install_schema()`
+- `from regstack.models._objectid import IdStr`
+- `from regstack.backends.protocols import UserAlreadyExistsError`
+  (and friends).
+
+The internal mongo `install_indexes(db, config)` function is unchanged.
+
 ## 0.2.3 — 2026-04-28
 
 Docs-only release. Restructured the API reference around the current

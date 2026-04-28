@@ -3,6 +3,39 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## 0.2.4 — 2026-04-28
+
+**Breaking** — every back-compat shim left over from the
+multi-backend refactor has been removed.
+
+### Removed
+
+- `RegStack.install_indexes()` — the 0.1.x alias for
+  `install_schema()`. Call `install_schema()`.
+- `ObjectIdStr` alias for `IdStr` in `regstack.models._objectid`.
+  Import `IdStr` directly.
+- `__all__`-based re-exports of `UserAlreadyExistsError`,
+  `PendingAlreadyExistsError`, `MfaVerifyOutcome`, and
+  `MfaVerifyResult` from `regstack.backends.mongo.repositories.*` and
+  the package `__init__`. Their canonical home is
+  `regstack.backends.protocols`; that's where every consumer in the
+  package itself already imports them.
+
+### Migration
+
+| Old                                                                              | New                                                            |
+|----------------------------------------------------------------------------------|----------------------------------------------------------------|
+| `await regstack.install_indexes()`                                               | `await regstack.install_schema()`                              |
+| `from regstack.models._objectid import ObjectIdStr`                              | `from regstack.models._objectid import IdStr`                  |
+| `from regstack.backends.mongo.repositories.user_repo import UserAlreadyExistsError`     | `from regstack.backends.protocols import UserAlreadyExistsError`     |
+| `from regstack.backends.mongo.repositories.pending_repo import PendingAlreadyExistsError` | `from regstack.backends.protocols import PendingAlreadyExistsError`  |
+| `from regstack.backends.mongo.repositories.mfa_code_repo import MfaVerifyOutcome, MfaVerifyResult` | `from regstack.backends.protocols import MfaVerifyOutcome, MfaVerifyResult` |
+
+The internal Mongo helper
+`regstack.backends.mongo.indexes.install_indexes(db, config)` is
+unchanged — that's the function `MongoBackend.install_schema` calls
+to actually create the indexes.
+
 ## 0.2.3 — 2026-04-28
 
 **Docs-only release.** API reference rewritten around the current

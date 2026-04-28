@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from regstack.models._objectid import ObjectIdStr
+from regstack.models._objectid import IdStr
 
 
 def _utcnow() -> datetime:
@@ -23,7 +23,7 @@ class PendingRegistration(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="allow")
 
-    id: ObjectIdStr | None = Field(default=None, alias="_id")
+    id: IdStr | None = Field(default=None, alias="_id")
     email: EmailStr
     hashed_password: str
     full_name: str | None = None

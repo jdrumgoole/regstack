@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from regstack.models._objectid import ObjectIdStr
+from regstack.models._objectid import IdStr
 
 MfaKind = Literal["phone_setup", "login_mfa"]
 
@@ -24,7 +24,7 @@ class MfaCode(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="allow")
 
-    id: ObjectIdStr | None = Field(default=None, alias="_id")
+    id: IdStr | None = Field(default=None, alias="_id")
     user_id: str
     kind: MfaKind
     code_hash: str

@@ -72,7 +72,6 @@ The façade exposes:
 - `backend` — the active `regstack.backends.base.Backend`.
 - `install_schema()` — install indexes (Mongo) or run
   [Alembic](https://alembic.sqlalchemy.org/) migrations (SQL).
-  `install_indexes()` is kept as a back-compat alias.
 - `aclose()` — tear down the backend's connection pool.
 - `bootstrap_admin(email, password)`,
   `add_template_dir(path)`, `set_email_backend(...)`,

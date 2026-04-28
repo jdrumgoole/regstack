@@ -5,10 +5,11 @@ who wants to embed it, extend it, or contribute to it. If you only
 want to use it, [Quickstart](quickstart.md) is shorter.
 
 regstack is a single embeddable façade — `RegStack` — that wires
-together storage, password and JWT primitives, an email service, an
-SMS service, a [hooks bus](#hooks), and a [FastAPI](https://fastapi.tiangolo.com/)
-router. Hosts construct one façade per application and mount its
-router(s) wherever they like.
+together storage, password and [JWT](https://datatracker.ietf.org/doc/html/rfc7519)
+primitives, an email service, an SMS service, a [hooks bus](#hooks),
+and a [FastAPI](https://fastapi.tiangolo.com/) router. Hosts
+construct one façade per application and mount its router(s) wherever
+they like.
 
 ```text
 ┌────────────────────────────────────────────────┐
@@ -36,10 +37,9 @@ router(s) wherever they like.
    └────────┘  └──────────┘  └──────────┘
 ```
 
-The pattern is the
-[façade pattern](https://en.wikipedia.org/wiki/Facade_pattern): one
-object that owns and exposes a coherent set of related sub-systems,
-so the host has a single import to learn.
+The pattern is the façade pattern: one object that owns and exposes
+a coherent set of related sub-systems, so the host has a single
+import to learn.
 
 ## One façade per process
 
@@ -48,8 +48,7 @@ sms_service=…, mail_composer=…)` is the only public constructor.
 Everything downstream (routers, dependencies, repos) takes its
 dependencies from this instance, so you can run **two regstack
 instances in the same process** without shared state — useful for
-[multi-tenant](https://en.wikipedia.org/wiki/Multitenancy) deployments
-where a single FastAPI app serves multiple
+multi-tenant deployments where a single FastAPI app serves multiple
 `<host, database, branding>` triples.
 
 The backend is auto-built from `config.database_url` if not supplied
@@ -64,9 +63,7 @@ The façade exposes:
 - `router` — the JSON `APIRouter` to mount under `config.api_prefix`.
 - `ui_router` — the SSR `APIRouter` (built on first access; only
   meaningful when `enable_ui_router=True`).
-- `static_files` — Starlette
-  [`StaticFiles`](https://www.starlette.io/staticfiles/) over the
-  bundled CSS/JS.
+- `static_files` — Starlette `StaticFiles` over the bundled CSS/JS.
 - `deps` — `AuthDependencies` factory for `current_user` /
   `current_admin` (each call returns a closure-bound dep).
 - `users`, `pending`, `blacklist`, `attempts`, `mfa_codes` — repos.
@@ -75,7 +72,7 @@ The façade exposes:
 - `backend` — the active `regstack.backends.base.Backend`.
 - `install_schema()` — install indexes (Mongo) or run
   [Alembic](https://alembic.sqlalchemy.org/) migrations (SQL).
-  `install_indexes()` is kept as a backwards-compat alias.
+  `install_indexes()` is kept as a back-compat alias.
 - `aclose()` — tear down the backend's connection pool.
 - `bootstrap_admin(email, password)`,
   `add_template_dir(path)`, `set_email_backend(...)`,
@@ -85,9 +82,8 @@ The façade exposes:
 
 The Backend ABC owns the persistence story. Each backend ships:
 
-- One concrete repository per
-  [Protocol](https://docs.python.org/3/library/typing.html#typing.Protocol):
-  `UserRepoProtocol`, `PendingRepoProtocol`, `BlacklistRepoProtocol`,
+- One concrete repository per Protocol: `UserRepoProtocol`,
+  `PendingRepoProtocol`, `BlacklistRepoProtocol`,
   `LoginAttemptRepoProtocol`, `MfaCodeRepoProtocol`.
 - `install_schema()` to create indexes (Mongo) or run table creation /
   Alembic migrations (SQL).
@@ -95,16 +91,15 @@ The Backend ABC owns the persistence story. Each backend ships:
 - `aclose()` for clean shutdown.
 
 The Mongo backend lives at `regstack.backends.mongo`; the SQL backend
-(driving both SQLite and Postgres via [SQLAlchemy 2 async](https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html))
-lives at `regstack.backends.sql`. Both are routed via the
+(driving both SQLite and Postgres via [SQLAlchemy](https://www.sqlalchemy.org/)
+async) lives at `regstack.backends.sql`. Both are routed via the
 `regstack.backends.factory.build_backend(config)` factory.
 
 ### TTL handling differences
 
-Mongo gets free expiry via [TTL indexes](https://www.mongodb.com/docs/manual/core/index-ttl/) —
-`pending_registrations`, `token_blacklist`, `login_attempts`, and
-`mfa_codes` all have `expireAfterSeconds` indexes that the Mongo
-background task reaps.
+Mongo gets free expiry via TTL indexes — `pending_registrations`,
+`token_blacklist`, `login_attempts`, and `mfa_codes` all have
+`expireAfterSeconds` indexes that the Mongo background task reaps.
 
 The SQL backends have no equivalent. Two safety nets:
 
@@ -112,22 +107,21 @@ The SQL backends have no equivalent. Two safety nets:
   checks `expires_at > now()` (or equivalent). A stale row in the
   table is harmless because it's never returned.
 - **Periodic reaper**: each repo exposes `purge_expired(...)`. Hosts
-  that care about disk usage can run it on a schedule (e.g. via
-  [APScheduler](https://apscheduler.readthedocs.io/) or a
-  `regstack reap` cron job).
+  that care about disk usage can run it on a schedule (e.g. a cron
+  job calling a small `regstack reap` script).
 
 This means SQL backends are functionally correct without the reaper,
 but accumulate dead rows over time. Mongo doesn't.
 
 ## Repositories
 
-Each backend ships a thin async repo per collection / table. The Mongo
-repos are tz-aware because `make_client` configures
+Each backend ships a thin async repo per collection / table. The
+Mongo repos are tz-aware because `make_client` configures
 `AsyncMongoClient(..., tz_aware=True)`; the SQL repos use a custom
-`UtcDateTime` [TypeDecorator](https://docs.sqlalchemy.org/en/20/core/custom_types.html#sqlalchemy.types.TypeDecorator)
-that stores UTC and re-attaches the UTC tzinfo on read. Every layer
-above the repo assumes UTC-aware datetimes — there is no naive
-datetime anywhere in the public API.
+`UtcDateTime` SQLAlchemy `TypeDecorator` that stores UTC and
+re-attaches the UTC tzinfo on read. Every layer above the repo
+assumes UTC-aware datetimes — there is no naive datetime anywhere in
+the public API.
 
 `UserRepo` accepts an injected `Clock`; bulk-revoke writes
 (`update_password`, `update_email`, `set_tokens_invalidated_after`)
@@ -179,20 +173,18 @@ one mechanism:
 - `build_ui_environment` — SSR HTML templates under
   `regstack/ui/templates/`.
 
-Both wrap a
-[`ChoiceLoader([host_dirs..., regstack_default])`](https://jinja.palletsprojects.com/en/stable/api/#jinja2.ChoiceLoader)
-so a host override drops a same-named file into its template
-directory and wins over the bundled version.
-`RegStack.add_template_dir(path)` feeds both loaders simultaneously.
+Both wrap a `ChoiceLoader([host_dirs..., regstack_default])` so a
+host override drops a same-named file into its template directory and
+wins over the bundled version. `RegStack.add_template_dir(path)`
+feeds both loaders simultaneously.
 
 ## CLI runtime
 
 `regstack init`, `regstack create-admin`, and `regstack doctor` share
-`cli/_runtime.py`. `open_regstack(toml_path=None)` is an
-[async context manager](https://docs.python.org/3/library/contextlib.html#contextlib.asynccontextmanager)
-that builds a real RegStack against a real backend, runs
-`install_schema()`, and tears the connection down on exit — the right
-pattern for a short-lived CLI invocation.
+`cli/_runtime.py`. `open_regstack(toml_path=None)` is an async
+context manager that builds a real RegStack against a real backend,
+runs `install_schema()`, and tears the connection down on exit — the
+right pattern for a short-lived CLI invocation.
 
 ## Testing seams
 
@@ -206,5 +198,4 @@ pattern for a short-lived CLI invocation.
   test build multiple `RegStack` instances against per-worker DBs to
   exercise different config combinations without leaking. The
   parametrized `backend_kind` fixture runs every integration test
-  against every active backend in parallel via
-  [`pytest-xdist`](https://pytest-xdist.readthedocs.io/).
+  against every active backend in parallel via pytest-xdist.

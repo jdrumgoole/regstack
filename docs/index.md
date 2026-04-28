@@ -1,28 +1,25 @@
 # regstack
 
-regstack is a [Python](https://www.python.org/) library that gives a
+regstack is a Python library that gives a
 [FastAPI](https://fastapi.tiangolo.com/) application a complete user
 account system — registration, login, password reset, email
-verification, optional [SMS two-factor](https://en.wikipedia.org/wiki/Multi-factor_authentication),
-and admin endpoints — without making you build any of it yourself.
+verification, optional SMS two-factor, and admin endpoints — without
+making you build any of it yourself.
 
-It runs against [SQLite](https://www.sqlite.org/index.html) by default
-(no database server to install), and switches to
-[PostgreSQL](https://www.postgresql.org/) or
+It runs against SQLite by default (no database server to install),
+and switches to [PostgreSQL](https://www.postgresql.org/) or
 [MongoDB](https://www.mongodb.com/) by changing one URL in your config.
 The same routers and the same hooks work against all three.
 
 ## Why does this exist?
 
 Building user accounts well is harder than it looks. Even small apps
-need to choose a [password hashing scheme](https://en.wikipedia.org/wiki/Argon2),
-implement [JSON Web Token](https://datatracker.ietf.org/doc/html/rfc7519)
-revocation (so logouts and password changes actually invalidate
-tokens), defend against
-[account enumeration](https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/03-Identity_Management_Testing/04-Testing_for_Account_Enumeration_and_Guessable_User_Account)
-on `/forgot-password`, store one-time verification tokens hashed at
-rest, and lock out brute-force attackers without telling them they're
-locked out.
+need to choose a password hashing scheme, implement
+[JWT](https://datatracker.ietf.org/doc/html/rfc7519) revocation (so
+logouts and password changes actually invalidate tokens), defend
+against account enumeration on `/forgot-password`, store one-time
+verification tokens hashed at rest, and lock out brute-force attackers
+without telling them they're locked out.
 
 regstack does that work once, in one Apache-licensed package, so your
 app can focus on whatever it actually does for users.
@@ -62,18 +59,16 @@ changelog
 ## What's in the box
 
 - **Three storage backends, one API.** SQLite (the default — single
-  file, no server), Postgres (via [asyncpg](https://magicstack.github.io/asyncpg/)),
-  MongoDB (via [pymongo](https://pymongo.readthedocs.io/)). Same
-  routers, same hooks; switch by changing the `database_url`.
+  file, no server), Postgres (via asyncpg), MongoDB (via pymongo).
+  Same routers, same hooks; switch by changing the `database_url`.
 - **JSON API.** Register, verify email, resend verification, log in
   (with optional SMS second step), log out, `me`, change password,
   change email + confirm, forgot/reset password, delete account, admin
   endpoints.
 - **Server-rendered HTML pages** (opt-in). Login, register, verify,
-  forgot, reset, MFA confirm, account dashboard. Themed via
-  [CSS custom properties](https://developer.mozilla.org/en-US/docs/Web/CSS/--*)
-  — no template editing required for a re-skin. Full template
-  overrides are still possible per host.
+  forgot, reset, MFA confirm, account dashboard. Themed via CSS custom
+  properties — no template editing required for a re-skin. Full
+  template overrides are still possible per host.
 - **CLIs.** `regstack init` (interactive setup wizard),
   `regstack create-admin`, `regstack doctor`.
 - **Pluggable email and SMS.** Email backends: `console` (dev), SMTP,
@@ -81,14 +76,12 @@ changelog
   [Amazon SNS](https://aws.amazon.com/sns/),
   [Twilio](https://www.twilio.com/). Plug your own in by implementing
   one method.
-- **Security defaults you would otherwise have to research.** Argon2
-  password hashing (via [`pwdlib`](https://pypi.org/project/pwdlib/)),
-  per-purpose JWT signing keys, per-token revocation, bulk session
-  invalidation on password change, login lockout with
-  [HTTP 429 + Retry-After](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/429),
+- **Security defaults you would otherwise have to research.** Argon2id
+  password hashing, per-purpose [JWT](https://datatracker.ietf.org/doc/html/rfc7519)
+  signing keys, per-token revocation, bulk session invalidation on
+  password change, login lockout with HTTP 429 + `Retry-After`,
   durable hashed verification tokens, 6-digit SMS codes with attempt
-  limits, anti-enumeration on forgot/resend endpoints,
-  [CSP-friendly](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP)
+  limits, anti-enumeration on forgot/resend endpoints, CSP-friendly
   templates with no inline styles.
 
 ## Project status

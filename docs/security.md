@@ -10,42 +10,34 @@ are tradeoffs, they're documented here rather than buried in code.
 
 ## Passwords
 
-- **Hashing.** [Argon2id](https://en.wikipedia.org/wiki/Argon2) — the
-  winner of the [Password Hashing Competition](https://www.password-hashing.net/)
-  and the [OWASP-recommended](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#argon2id)
-  default for new applications. We use it via
-  [`pwdlib`](https://pypi.org/project/pwdlib/) with library defaults.
-  `PasswordHasher.needs_rehash(...)` is available so a future parameter
-  bump can quietly upgrade existing hashes on a user's next successful
-  login.
+- **Hashing.** Argon2id with library defaults.
+  `PasswordHasher.needs_rehash(...)` is available so a future
+  parameter bump can quietly upgrade existing hashes on a user's next
+  successful login.
 - **Length.** Minimum 8, maximum 128 (UTF-8). Validated by the
-  [pydantic](https://docs.pydantic.dev/) input model on every create /
-  change endpoint.
+  pydantic input model on every create / change endpoint.
 - **Storage.** Plaintext is never logged or returned. The
   `BaseUser.hashed_password` field is excluded from the `UserPublic`
   serialization model that the API returns.
 
 ## JWT issuance and validation
 
-regstack uses [JSON Web Tokens (RFC 7519)](https://datatracker.ietf.org/doc/html/rfc7519)
-for authentication. A JWT is a signed, self-contained credential — the
-server doesn't have to remember it to validate it. That's why
+regstack uses [JWTs (RFC 7519)](https://datatracker.ietf.org/doc/html/rfc7519)
+for authentication. A JWT is a signed, self-contained credential —
+the server doesn't have to remember it to validate it. That's why
 revocation needs explicit handling (see below).
 
 - **Per-purpose signing keys.** A single master `config.jwt_secret`
-  (≥32 chars) is fed through
-  [HMAC-SHA256](https://en.wikipedia.org/wiki/HMAC) with a per-purpose
-  label to derive a separate signing key for each token kind:
-  `session`, `password_reset`, `email_change`, `phone_setup`,
-  `login_mfa`. Compromise of one derived key does **not** compromise
-  the master.
-- **`iat` is a float.** [RFC 7519 NumericDate](https://datatracker.ietf.org/doc/html/rfc7519#section-2)
-  explicitly allows fractional seconds. We use them. This matters for
-  the bulk-revoke comparison (see below) — without sub-second
-  precision, a login completing in the same second as a password
-  change would be wrongly revoked.
+  (≥32 chars) is fed through HMAC-SHA256 with a per-purpose label to
+  derive a separate signing key for each token kind: `session`,
+  `password_reset`, `email_change`, `phone_setup`, `login_mfa`.
+  Compromise of one derived key does **not** compromise the master.
+- **`iat` is a float.** RFC 7519 explicitly allows fractional
+  seconds. We use them. This matters for the bulk-revoke comparison
+  (see below) — without sub-second precision, a login completing in
+  the same second as a password change would be wrongly revoked.
 - **`exp` is enforced by regstack**, using the injected `Clock`,
-  rather than relying on `pyjwt`'s wall-clock check. This keeps
+  rather than relying on pyjwt's wall-clock check. This keeps
   `FrozenClock`-driven tests consistent and makes the cutoff
   comparison deterministic.
 - **`purpose` is required.** Decode requires the `purpose` claim to
@@ -63,8 +55,7 @@ request:
 
 1. **Per-token blacklist.** `BlacklistRepo` stores `{jti, exp}` rows.
    `POST /logout` inserts one; the auth dependency rejects any token
-   whose `jti` is present. Mongo gets free expiry via a
-   [TTL index](https://www.mongodb.com/docs/manual/core/index-ttl/) on
+   whose `jti` is present. Mongo gets free expiry via a TTL index on
    `exp`; SQL backends rely on read-side filtering plus the optional
    `purge_expired()` reaper.
 2. **Bulk revocation.** `User.tokens_invalidated_after` is a
@@ -82,10 +73,10 @@ Bulk revoke fires on:
 
 ## Account enumeration
 
-[Account enumeration](https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/03-Identity_Management_Testing/04-Testing_for_Account_Enumeration_and_Guessable_User_Account)
-is when an attacker can tell whether a given email is registered, by
-observing how a public endpoint responds. It turns "guess passwords
-for a known account" into "harvest the customer list".
+Account enumeration is when an attacker can tell whether a given
+email is registered by observing how a public endpoint responds. It
+turns "guess passwords for a known account" into "harvest the
+customer list".
 
 regstack returns an identical response for "user exists" and "user does
 not" on the routes most useful for probing:
@@ -106,21 +97,19 @@ visible to logged-out users only.
   themselves. SQL backends apply read-side window filtering.
 - `LockoutService.check(email)` returns `locked=true` once the count
   of failures-in-window exceeds `login_lockout_threshold`.
-- A locked login returns
-  [HTTP 429](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/429)
-  with a [`Retry-After`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After)
-  header *before* the password is verified, so a locked-out attacker
-  can't even tell whether their next guess was correct.
+- A locked login returns HTTP 429 with a `Retry-After` header
+  *before* the password is verified, so a locked-out attacker can't
+  even tell whether their next guess was correct.
 - Successful login calls `lockout.clear(email)` to wipe accumulated
   failures.
 - Disabled in tests via `rate_limit_disabled=True`.
 
 ## Email verification (durable, hashed token)
 
-- Random 32-byte URL-safe token, [SHA-256](https://en.wikipedia.org/wiki/SHA-2)
-  hashed in `pending_registrations.token_hash`. The raw token only
-  ever exists in the email body and the click URL — a database backup
-  can't be replayed.
+- Random 32-byte URL-safe token, SHA-256 hashed in
+  `pending_registrations.token_hash`. The raw token only ever exists
+  in the email body and the click URL — a database backup can't be
+  replayed.
 - Mongo: TTL index on `expires_at` reaps unused pending rows
   automatically. SQL backends rely on read-side `expires_at > now()`
   filtering (so stale rows are harmless) plus the optional
@@ -155,9 +144,8 @@ visible to logged-out users only.
 
 ## SMS 2FA
 
-- Codes are 6 digits, generated with
-  [`secrets.randbelow`](https://docs.python.org/3/library/secrets.html#secrets.randbelow),
-  hashed in `mfa_codes.code_hash` with a TTL of 5 minutes.
+- Codes are 6 digits, generated with `secrets.randbelow`, hashed in
+  `mfa_codes.code_hash` with a TTL of 5 minutes.
 - Per-user-per-kind unique so re-issuing a code overwrites the old
   one; prior SMS messages stop working.
 - Each row has an `attempts` counter; after `sms_code_max_attempts`
@@ -166,9 +154,8 @@ visible to logged-out users only.
 - Phone setup requires the current password before the code is sent.
 - Phone disable requires the current password (no SMS round trip — an
   attacker would need both the live session and the current password).
-- Phone numbers are validated as
-  [E.164](https://en.wikipedia.org/wiki/E.164) (the international
-  phone number standard, e.g. `+15551234567`).
+- Phone numbers are validated as E.164 (the international phone
+  number standard, e.g. `+15551234567`).
 - Login MFA: when `user.is_mfa_enabled and user.phone_number`, the
   password-correct path issues a short-lived `mfa_pending` JWT
   instead of a session token, sends an SMS, and requires
@@ -176,11 +163,11 @@ visible to logged-out users only.
 
 ## CSP and the SSR layer
 
-[Content Security Policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP)
-is a browser feature that restricts what sources of scripts and styles
-a page can load. Inline `<style>` and `<script>` blocks force you to
-either allow `unsafe-inline` (which defeats most of CSP) or skip the
-header entirely. regstack avoids that:
+Content Security Policy (CSP) is a browser feature that restricts
+what sources of scripts and styles a page can load. Inline `<style>`
+and `<script>` blocks force you to either allow `unsafe-inline`
+(which defeats most of CSP) or skip the header entirely. regstack
+avoids that:
 
 - The bundled templates contain **no inline `<style>` blocks** and
   **no `style="..."` attributes**. CSS is loaded only via `<link>`
@@ -193,31 +180,25 @@ header entirely. regstack avoids that:
 - The SSR pages are stateless — they read endpoint URLs from `<body
   data-rs-api data-rs-ui>` rather than baking them into the JS — so
   changing prefixes doesn't require shipping new JS.
-- Auth state is in
-  [`localStorage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage)
-  under `regstack.access_token`. The pending-MFA token uses
-  [`sessionStorage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage)
-  so it doesn't survive a tab close. **No cookies** are set, which
-  sidesteps [CSRF](https://owasp.org/www-community/attacks/csrf)
-  concerns at the cost of [XSS](https://owasp.org/www-community/attacks/xss/)
-  being more impactful — hosts that need cookie-based sessions can
-  swap the JS at the same data attributes.
+- Auth state is in `localStorage` under `regstack.access_token`. The
+  pending-MFA token uses `sessionStorage` so it doesn't survive a tab
+  close. **No cookies** are set, which sidesteps CSRF concerns at the
+  cost of XSS being more impactful — hosts that need cookie-based
+  sessions can swap the JS at the same data attributes.
 
 ## What you still own as a host
 
 - **TLS termination.** regstack assumes its endpoints are reachable
-  only over [HTTPS](https://developer.mozilla.org/en-US/docs/Glossary/HTTPS)
-  in production.
+  only over HTTPS in production.
 - **Reverse-proxy header trust.** `behind_proxy=True` is
   informational; the host configures the actual middleware (e.g.
-  Starlette's [`ProxyHeadersMiddleware`](https://www.starlette.io/middleware/#proxyheadersmiddleware)).
+  Starlette's `ProxyHeadersMiddleware`).
 - **Content Security Policy headers.** regstack's SSR layer is
-  CSP-friendly but the host emits the
-  `Content-Security-Policy` response header.
+  CSP-friendly but the host emits the `Content-Security-Policy`
+  response header.
 - **Rate-limiting beyond the per-account login lockout.** A future
-  milestone may add a [`slowapi`](https://slowapi.readthedocs.io/)-style
-  middleware; for now host-level rate limits are the right place to
-  push back broad attack traffic.
+  milestone may add a `slowapi`-style middleware; for now host-level
+  rate limits are the right place to push back broad attack traffic.
 - **Backups, MongoDB user permissions, network-level isolation** between
   the app and the database.
 

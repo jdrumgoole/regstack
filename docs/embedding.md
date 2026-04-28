@@ -110,9 +110,8 @@ regstack.add_template_dir(Path("/app/host/templates"))
 ```
 
 Drop a same-named file into your directory to win against the bundled
-default — regstack uses Jinja2's
-[`ChoiceLoader`](https://jinja.palletsprojects.com/en/stable/api/#jinja2.ChoiceLoader)
-so the host directory is searched first. Examples:
+default — regstack uses Jinja2's `ChoiceLoader` so the host directory
+is searched first. Examples:
 
 - `auth/login.html` — replaces the SSR sign-in page.
 - `verification.html` / `verification.txt` /
@@ -125,8 +124,8 @@ A list of every overridable file lives in
 ## Switching the SSR theme without templates
 
 If you only want to flip colors / fonts, you don't need to override
-any templates — just supply a CSS file that overrides the
-[CSS custom properties](https://developer.mozilla.org/en-US/docs/Web/CSS/--*):
+any templates — just supply a CSS file that overrides the bundled
+CSS custom properties:
 
 ```toml
 # regstack.toml
@@ -171,8 +170,8 @@ In code:
 await regstack.bootstrap_admin("admin@example.com", "long-strong-password")
 ```
 
-This is [idempotent](https://en.wikipedia.org/wiki/Idempotence) —
-promotes an existing user, creates one if not present.
+This is idempotent — promotes an existing user, creates one if not
+present.
 
 ## Health-check and probes
 
@@ -183,16 +182,14 @@ uv run regstack doctor [--config ...] [--check-dns] [--send-test-email <addr>]
 `doctor` reports JWT secret strength, database reachability, indexes,
 the email backend's instantiability, and optionally DNS (SPF/DKIM/MX)
 and a real email send. Exit code is the number of failed checks —
-wire it into a container health check or a
-[Kubernetes liveness probe](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
+wire it into a container health check or a Kubernetes liveness probe
 for production probes that need more than a TCP hit.
 
 ## What regstack does *not* do
 
-- It does not mount a [CSRF](https://owasp.org/www-community/attacks/csrf)
-  middleware. The bundled SSR pages don't use cookies, so they don't
-  need it; if you swap the bundled JS for a cookie-based variant,
-  configure CSRF at the host.
+- It does not mount a CSRF middleware. The bundled SSR pages don't
+  use cookies, so they don't need it; if you swap the bundled JS for
+  a cookie-based variant, configure CSRF at the host.
 - It does not enforce HTTPS. Run behind a TLS terminator.
 - It does not provision SES identities, Route 53 records, IAM users,
   or anything else outside the database.

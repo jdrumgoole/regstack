@@ -71,23 +71,29 @@ async def upgrade_async(database_url: str, revision: str = "head") -> None:
 
 def current(database_url: str) -> str | None:
     """Return the current revision recorded in alembic_version, or None
-    if the table doesn't exist (i.e. fresh DB)."""
-    engine = create_async_engine(database_url)
+    if the table doesn't exist (i.e. fresh DB).
 
-    async def _read() -> str | None:
-        async with engine.connect() as conn:
-            return await conn.run_sync(_current_sync)
-
+    Synchronous; do NOT call from inside a running event loop —
+    use :func:`current_async` instead.
+    """
     import asyncio
 
-    try:
-        return asyncio.run(_read())
-    finally:
-        # ``engine.dispose`` is async too; close on a fresh loop.
-        async def _close() -> None:
-            await engine.dispose()
+    return asyncio.run(_current_async_impl(database_url))
 
-        asyncio.run(_close())
+
+async def current_async(database_url: str) -> str | None:
+    """Async variant of :func:`current` — safe to call from inside an
+    already-running event loop (e.g. ``regstack doctor``)."""
+    return await _current_async_impl(database_url)
+
+
+async def _current_async_impl(database_url: str) -> str | None:
+    engine = create_async_engine(database_url)
+    try:
+        async with engine.connect() as conn:
+            return await conn.run_sync(_current_sync)
+    finally:
+        await engine.dispose()
 
 
 def _current_sync(connection) -> str | None:

@@ -119,3 +119,25 @@ python_version = "3.11"
 strict = true
 warn_unreachable = true
 plugins = ["pydantic.mypy"]
+
+[tool.coverage.run]
+source = ["src/regstack"]
+branch = true
+parallel = true
+# `concurrency = ["thread"]` is implicit; pytest-xdist workers each write
+# their own .coverage.<host>.<pid>.<token> file and `coverage combine`
+# folds them together — see the `coverage` invoke task.
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+precision = 1
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.$",                   # body-less Protocol methods
+]
+
+[tool.coverage.html]
+directory = "htmlcov"

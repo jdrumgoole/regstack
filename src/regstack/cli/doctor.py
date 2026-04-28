@@ -127,10 +127,10 @@ async def _check_schema(config) -> CheckResult:
                 )
             return CheckResult("schema", True, "core indexes present")
         # SQL backends: compare alembic_version to the bundled head.
-        from regstack.backends.sql.migrations import current, head_revision
+        from regstack.backends.sql.migrations import current_async, head_revision
 
         url = config.database_url.get_secret_value()
-        live = current(url)
+        live = await current_async(url)
         head = head_revision()
         if live is None:
             return CheckResult(

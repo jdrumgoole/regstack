@@ -3,6 +3,36 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## 0.2.6 — 2026-04-28
+
+**Bug fix.**
+
+### Fixed
+
+- ``/admin/stats`` reported ``pending_registrations: 0`` on every SQL
+  backend. The route reached into the Mongo repo's private
+  ``_collection`` attribute and silently fell back to ``0`` when the
+  attribute was absent — the kind of failure that survives a
+  multi-backend refactor when the integration tests don't pin the
+  number.
+
+### Added
+
+- ``PendingRepoProtocol.count_unexpired(now=None) -> int``, with Mongo
+  and SQL implementations. "Unexpired" rather than a raw row count
+  because SQL backends accumulate dead rows until ``purge_expired``
+  runs; an admin looking at "pending: 47" wants 47 *live* rows.
+- The admin stats route now routes the count through
+  ``rs.clock.now()``. Without this, ``FrozenClock``-driven tests
+  would see every row as "expired" because the route would be reading
+  wall-clock time while the rest of the system runs on the injected
+  clock. Same shape of clock-injection drift the bulk-revoke fix
+  closed earlier.
+- New parametrized integration test
+  ``test_stats_pending_registrations_count_unexpired`` runs against
+  SQLite + Mongo + Postgres and confirms the count excludes expired
+  rows on every backend.
+
 ## 0.2.5 — 2026-04-28
 
 **Bug fix + tooling.**

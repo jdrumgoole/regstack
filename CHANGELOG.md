@@ -5,6 +5,19 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
+## 0.2.6 — 2026-04-28
+
+Bug fix.
+
+- **Fix:** `/admin/stats` reported `pending_registrations: 0` on
+  every SQL backend. The route reached into the Mongo repo's private
+  `_collection` attribute and silently fell back to `0` when the
+  attribute was absent. Added `count_unexpired(now=None)` to
+  `PendingRepoProtocol` with Mongo + SQL implementations and routed
+  through `rs.clock.now()` so the count respects the injected clock.
+  New parametrized integration test exercises the count on every
+  backend.
+
 ## 0.2.5 — 2026-04-28
 
 Bug fix + tooling.

@@ -5,6 +5,16 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
+## 0.2.3 — 2026-04-28
+
+Docs-only release. Restructured the API reference around the current
+package layout (post multi-backend refactor) and added Google-style
+docstrings (Args / Returns / Raises) to the public surface — RegStack,
+JwtCodec, PasswordHasher, LockoutService, AuthDependencies,
+HookRegistry, EmailService, SmsService, the router builders, and the
+Clock implementations. Dataclass field docs moved to PEP 258
+attribute docstrings. Sphinx builds clean under `-W` again.
+
 ## 0.2.2 — 2026-04-28
 
 Docs-only release. The README and Sphinx docs landing page now lead

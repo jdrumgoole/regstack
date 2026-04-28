@@ -3,6 +3,34 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## 0.2.3 — 2026-04-28
+
+**Docs-only release.** API reference rewritten around the current
+package layout, public surface gained proper Google-style docstrings.
+
+### Changed
+
+- ``docs/api.md`` restructured around the post-multi-backend package
+  layout (``regstack.backends.{base,protocols,factory,mongo,sql}`` and
+  friends). Each section now opens with a one-paragraph orientation
+  before the autodoc directives. The pre-refactor
+  ``regstack.db.repositories.*`` references that rendered empty are
+  gone.
+- Added Google-style docstrings (purpose summary + Args / Returns /
+  Raises) to the most-touched public methods on ``RegStack``,
+  ``JwtCodec``, ``PasswordHasher``, ``LockoutService``,
+  ``AuthDependencies``, ``HookRegistry``, ``EmailService``,
+  ``SmsService``, ``build_router``, ``build_ui_router``,
+  ``build_ui_environment``, ``default_static_dir``, ``Clock`` /
+  ``SystemClock`` / ``FrozenClock``.
+- Dataclass field documentation moved to PEP 258 attribute docstrings
+  on ``TokenPayload``, ``LockoutDecision``, ``EmailMessage``,
+  ``SmsMessage``, ``MfaVerifyResult`` — autodoc now renders each field
+  with its description without the "duplicate object description"
+  warnings the napoleon ``Attributes:`` block was triggering.
+- ``MfaVerifyOutcome`` enum docstring reformatted as a bullet list
+  (the napoleon ``Members:`` block isn't a recognised section).
+
 ## 0.2.2 — 2026-04-28
 
 **Docs-only release.**

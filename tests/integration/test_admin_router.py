@@ -162,6 +162,62 @@ async def test_admin_resend_verification(make_client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_stats_pending_registrations_count_unexpired(make_client) -> None:
+    """Admin stats must report pending-registration count correctly on every backend.
+
+    Before this test landed, the stats route reached into Mongo's private
+    ``_collection`` attribute and silently returned 0 on SQL backends. The
+    parametrized ``backend_kind`` fixture means this asserts the count
+    against SQLite, MongoDB, and PostgreSQL in turn — a gap that survived
+    the multi-backend refactor because the existing admin tests didn't
+    pin this number.
+
+    Also seeds an already-expired pending row directly via the repo to
+    confirm the count excludes it (the SQL backend has no TTL reaper, so
+    this distinction matters).
+    """
+    from datetime import timedelta
+
+    from regstack.models.pending_registration import PendingRegistration
+
+    async with make_client(
+        require_verification=True,
+        enable_admin_router=True,
+    ) as (rs, client):
+        await rs.bootstrap_admin("admin@example.com", "adminadminadmin")
+        admin_token = await _login(client, "admin@example.com", "adminadminadmin")
+        headers = {"authorization": f"Bearer {admin_token}"}
+
+        # Two fresh registrations → two unexpired pending rows.
+        await client.post(REGISTER, json=ALICE)
+        await client.post(REGISTER, json=BOB)
+
+        r = await client.get(ADMIN_STATS, headers=headers)
+        assert r.status_code == 200
+        assert r.json()["pending_registrations"] == 2
+
+        # Insert a stale pending row directly, anchored to ``rs.clock`` so
+        # it's "in the past" from the route's POV (which also reads the
+        # injected clock). Mongo would reap it via TTL eventually; SQL
+        # leaves it in place until purge_expired runs. Either way,
+        # count_unexpired must exclude it.
+        stale = PendingRegistration(
+            email="stale@example.com",
+            hashed_password="x",
+            full_name="Stale",
+            token_hash="stale-token-hash",
+            expires_at=rs.clock.now() - timedelta(hours=1),
+        )
+        await rs.pending.upsert(stale)
+
+        r = await client.get(ADMIN_STATS, headers=headers)
+        assert r.status_code == 200
+        assert r.json()["pending_registrations"] == 2, (
+            f"stale row should not be counted: {r.json()}"
+        )
+
+
+@pytest.mark.asyncio
 async def test_admin_404_for_unknown_user(make_client) -> None:
     async with make_client(enable_admin_router=True) as (rs, client):
         await rs.bootstrap_admin("admin@example.com", "adminadminadmin")

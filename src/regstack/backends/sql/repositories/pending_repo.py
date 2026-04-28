@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from regstack.backends.sql.schema import pending_table
 from regstack.models.pending_registration import PendingRegistration
@@ -55,6 +55,14 @@ class SqlPendingRepo:
         async with self._engine.begin() as conn:
             result = await conn.execute(delete(self._t).where(self._t.c.expires_at < cutoff))
         return int(result.rowcount or 0)
+
+    async def count_unexpired(self, now: datetime | None = None) -> int:
+        cutoff = now or datetime.now(UTC)
+        async with self._engine.connect() as conn:
+            result = await conn.execute(
+                select(func.count()).select_from(self._t).where(self._t.c.expires_at > cutoff)
+            )
+        return int(result.scalar_one())
 
 
 def _pending_values(p: PendingRegistration) -> dict:

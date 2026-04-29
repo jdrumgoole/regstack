@@ -74,6 +74,8 @@ class RegStackConfig(BaseSettings):
     blacklist_collection: str = "token_blacklist"
     login_attempt_collection: str = "login_attempts"
     mfa_code_collection: str = "mfa_codes"
+    oauth_identity_collection: str = "oauth_identities"
+    oauth_state_collection: str = "oauth_states"
 
     # JWT
     jwt_secret: SecretStr = Field(default_factory=lambda: SecretStr(""))

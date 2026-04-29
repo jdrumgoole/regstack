@@ -131,6 +131,8 @@ class RegStack:
         self.blacklist = self.backend.blacklist
         self.attempts = self.backend.attempts
         self.mfa_codes = self.backend.mfa_codes
+        self.oauth_identities = self.backend.oauth_identities
+        self.oauth_states = self.backend.oauth_states
 
         self.lockout = LockoutService(attempts=self.attempts, config=config, clock=self.clock)
         self.email: EmailService = email_service or build_email_service(config.email)

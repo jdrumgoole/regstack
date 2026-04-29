@@ -8,6 +8,10 @@ from regstack.backends.mongo.indexes import install_indexes
 from regstack.backends.mongo.repositories.blacklist_repo import BlacklistRepo
 from regstack.backends.mongo.repositories.login_attempt_repo import LoginAttemptRepo
 from regstack.backends.mongo.repositories.mfa_code_repo import MfaCodeRepo
+from regstack.backends.mongo.repositories.oauth_identity_repo import (
+    MongoOAuthIdentityRepo,
+)
+from regstack.backends.mongo.repositories.oauth_state_repo import MongoOAuthStateRepo
 from regstack.backends.mongo.repositories.pending_repo import PendingRepo
 from regstack.backends.mongo.repositories.user_repo import UserRepo
 
@@ -36,6 +40,8 @@ class MongoBackend(Backend):
         self.blacklist = BlacklistRepo(self._db, config.blacklist_collection)
         self.attempts = LoginAttemptRepo(self._db, config.login_attempt_collection)
         self.mfa_codes = MfaCodeRepo(self._db, config.mfa_code_collection, clock=clock)
+        self.oauth_identities = MongoOAuthIdentityRepo(self._db, config.oauth_identity_collection)
+        self.oauth_states = MongoOAuthStateRepo(self._db, config.oauth_state_collection)
 
     async def install_schema(self) -> None:
         await install_indexes(self._db, self.config)

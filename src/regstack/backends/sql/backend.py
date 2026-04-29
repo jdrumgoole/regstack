@@ -9,6 +9,10 @@ from regstack.backends.sql.migrations import upgrade_async
 from regstack.backends.sql.repositories.blacklist_repo import SqlBlacklistRepo
 from regstack.backends.sql.repositories.login_attempt_repo import SqlLoginAttemptRepo
 from regstack.backends.sql.repositories.mfa_code_repo import SqlMfaCodeRepo
+from regstack.backends.sql.repositories.oauth_identity_repo import (
+    SqlOAuthIdentityRepo,
+)
+from regstack.backends.sql.repositories.oauth_state_repo import SqlOAuthStateRepo
 from regstack.backends.sql.repositories.pending_repo import SqlPendingRepo
 from regstack.backends.sql.repositories.user_repo import SqlUserRepo
 
@@ -44,6 +48,8 @@ class SqlBackend(Backend):
         self.blacklist = SqlBlacklistRepo(self._engine)
         self.attempts = SqlLoginAttemptRepo(self._engine)
         self.mfa_codes = SqlMfaCodeRepo(self._engine, clock=clock)
+        self.oauth_identities = SqlOAuthIdentityRepo(self._engine)
+        self.oauth_states = SqlOAuthStateRepo(self._engine)
 
     async def install_schema(self) -> None:
         """Run the bundled Alembic migrations to head.

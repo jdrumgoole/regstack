@@ -20,6 +20,8 @@ if TYPE_CHECKING:
         BlacklistRepoProtocol,
         LoginAttemptRepoProtocol,
         MfaCodeRepoProtocol,
+        OAuthIdentityRepoProtocol,
+        OAuthStateRepoProtocol,
         PendingRepoProtocol,
         UserRepoProtocol,
     )
@@ -51,6 +53,8 @@ class Backend(ABC):
     blacklist: BlacklistRepoProtocol
     attempts: LoginAttemptRepoProtocol
     mfa_codes: MfaCodeRepoProtocol
+    oauth_identities: OAuthIdentityRepoProtocol
+    oauth_states: OAuthStateRepoProtocol
 
     # --- Lifecycle -------------------------------------------------------
 

@@ -7,9 +7,11 @@ hot import path (`routers/account.py`, `routers/login.py`,
 On a base install (no ``mongo`` extra) ``import regstack`` raised
 ``ModuleNotFoundError: No module named 'bson'``.
 
-This test runs ``import regstack`` in a subprocess with ``bson`` and
-``pymongo`` blocked, so a future regression is caught even when the
-test environment happens to have pymongo installed for other reasons.
+This test runs ``import regstack`` in a subprocess with the optional
+extras' module roots blocked (``bson`` / ``pymongo`` from the
+``mongo`` extra, ``cryptography`` from the ``oauth`` extra), so a
+future regression is caught even when the test environment happens
+to have those packages installed for other reasons.
 """
 
 from __future__ import annotations
@@ -19,30 +21,38 @@ import sys
 import textwrap
 
 
-def test_import_regstack_without_pymongo() -> None:
+def test_import_regstack_without_optional_extras() -> None:
     """``import regstack`` and ``from regstack import RegStack, RegStackConfig``
     must work on a base install — no optional extras.
 
-    We can't actually uninstall pymongo from the test venv, so we
+    We can't actually uninstall the extras from the test venv, so we
     simulate "not installed" by inserting a finder that raises
-    ImportError for ``bson`` and ``pymongo`` at the top of sys.meta_path.
+    ImportError for the extras' top-level packages at the top of
+    sys.meta_path.
     """
     program = textwrap.dedent(
         """
         import importlib.abc, importlib.machinery, sys
 
-        BLOCKED = {"bson", "pymongo"}
+        BLOCKED = {
+            # mongo extra
+            "bson", "pymongo",
+            # oauth extra — pyjwt's crypto path imports cryptography lazily
+            # but a regression that pulls oauth/* into the hot path would
+            # surface here.
+            "cryptography",
+        }
 
-        class BlockMongo(importlib.abc.MetaPathFinder):
+        class BlockExtras(importlib.abc.MetaPathFinder):
             def find_spec(self, name, path, target=None):
                 root = name.split(".", 1)[0]
                 if root in BLOCKED:
                     raise ModuleNotFoundError(f"No module named {name!r}")
                 return None
 
-        sys.meta_path.insert(0, BlockMongo())
-        # Drop anything pymongo-touching that may have been pre-imported
-        # by pytest's collection of sibling test modules.
+        sys.meta_path.insert(0, BlockExtras())
+        # Drop anything that may have been pre-imported by pytest's
+        # collection of sibling test modules.
         for mod in list(sys.modules):
             root = mod.split(".", 1)[0]
             if root in BLOCKED or mod.startswith("regstack"):
@@ -63,7 +73,7 @@ def test_import_regstack_without_pymongo() -> None:
         timeout=30,
     )
     assert result.returncode == 0, (
-        f"import regstack failed without pymongo:\nstdout={result.stdout!r}"
+        f"import regstack failed without optional extras:\nstdout={result.stdout!r}"
         f"\nstderr={result.stderr!r}"
     )
     assert result.stdout.startswith("ok "), result.stdout

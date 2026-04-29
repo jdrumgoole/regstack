@@ -20,6 +20,25 @@ _EMAIL_CHANGE_PURPOSE = "email_change"
 _NEW_EMAIL_CLAIM = "new_email"
 
 
+def _require_password_set(user: BaseUser) -> None:
+    """Reject password-confirmation flows for OAuth-only users.
+
+    change-password / change-email / delete-account all confirm the
+    user's identity by re-asking for the current password. An
+    OAuth-only user has no password to supply; we direct them to the
+    password-reset flow, which doubles as a "set initial password"
+    path.
+    """
+    if user.hashed_password is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "No password set on this account. "
+                "Use forgot-password to set one before changing account details."
+            ),
+        )
+
+
 class ChangePasswordRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     current_password: str
@@ -81,6 +100,8 @@ def build_account_router(rs: RegStack) -> APIRouter:
         payload: ChangePasswordRequest,
         user: BaseUser = Depends(rs.deps.current_user()),
     ) -> MessageResponse:
+        _require_password_set(user)
+        assert user.hashed_password is not None  # narrowed by _require_password_set
         if not rs.password_hasher.verify(payload.current_password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -114,6 +135,8 @@ def build_account_router(rs: RegStack) -> APIRouter:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="New email is the same as the current email.",
             )
+        _require_password_set(user)
+        assert user.hashed_password is not None
         if not rs.password_hasher.verify(payload.current_password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -196,6 +219,8 @@ def build_account_router(rs: RegStack) -> APIRouter:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Account deletion is disabled for this application.",
             )
+        _require_password_set(user)
+        assert user.hashed_password is not None
         if not rs.password_hasher.verify(payload.current_password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -203,6 +228,9 @@ def build_account_router(rs: RegStack) -> APIRouter:
             )
 
         assert user.id is not None
+        # Cascade OAuth identities first so a brief race window can't
+        # leave orphan identity rows pointing at a deleted user_id.
+        await rs.oauth_identities.delete_by_user_id(user.id)
         await rs.users.delete(user.id)
         await rs.pending.delete_by_email(user.email)
         await rs.lockout.clear(user.email)

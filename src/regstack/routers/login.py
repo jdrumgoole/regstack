@@ -74,7 +74,13 @@ def build_login_router(rs: RegStack) -> APIRouter:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Account is disabled.",
             )
-        if not rs.password_hasher.verify(payload.password, user.hashed_password):
+        # An OAuth-only user (hashed_password=None) returns the same
+        # generic 401 as a wrong-password attempt — never reveal that
+        # the account exists but has no password set, so an attacker
+        # can't enumerate which accounts to phish via OAuth.
+        if user.hashed_password is None or not rs.password_hasher.verify(
+            payload.password, user.hashed_password
+        ):
             await rs.lockout.record_failure(payload.email)
             raise _INVALID
         if rs.config.require_verification and not user.is_verified:

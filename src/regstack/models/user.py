@@ -27,7 +27,11 @@ class BaseUser(BaseModel):
 
     id: IdStr | None = Field(default=None, alias="_id")
     email: EmailStr
-    hashed_password: str
+    hashed_password: str | None = None
+    """Argon2id hash of the user's password, or ``None`` for users
+    who only ever signed in via OAuth and never set a password.
+    OAuth-only users can use the password-reset flow as a "set
+    initial password" step."""
     is_active: bool = True
     is_verified: bool = False
     is_superuser: bool = False

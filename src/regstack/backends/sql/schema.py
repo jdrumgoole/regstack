@@ -51,7 +51,10 @@ def _users(table_name: str) -> Table:
         metadata,
         Column("id", String(36), primary_key=True),
         Column("email", String(320), nullable=False),
-        Column("hashed_password", Text, nullable=False),
+        # Nullable since 0.3.0 — OAuth-only users never set a password.
+        # Existing rows always have a value; only new OAuth signups
+        # land with NULL.
+        Column("hashed_password", Text, nullable=True),
         Column("is_active", Boolean, nullable=False, default=True),
         Column("is_verified", Boolean, nullable=False, default=False),
         Column("is_superuser", Boolean, nullable=False, default=False),
@@ -125,15 +128,58 @@ def _mfa_codes(table_name: str) -> Table:
     )
 
 
+def _oauth_identities(table_name: str) -> Table:
+    return Table(
+        table_name,
+        metadata,
+        Column("id", String(36), primary_key=True),
+        Column("user_id", String(36), nullable=False),
+        Column("provider", String(32), nullable=False),
+        Column("subject_id", String(255), nullable=False),
+        Column("email", String(320), nullable=True),
+        Column("linked_at", UtcDateTime(), nullable=False),
+        Column("last_used_at", UtcDateTime(), nullable=True),
+        # See OAuthIdentity for the rationale on both unique constraints.
+        UniqueConstraint("provider", "subject_id", name="provider_subject_unique"),
+        UniqueConstraint("user_id", "provider", name="user_provider_unique"),
+    )
+
+
+def _oauth_states(table_name: str) -> Table:
+    return Table(
+        table_name,
+        metadata,
+        # The state-id is the OAuth `state` parameter the browser carries
+        # through the provider — random url-safe 32 bytes, supplied by the
+        # caller on insert.
+        Column("id", String(64), primary_key=True),
+        Column("provider", String(32), nullable=False),
+        Column("code_verifier", Text, nullable=False),
+        Column("nonce", String(64), nullable=False),
+        Column("redirect_to", Text, nullable=False),
+        Column("mode", String(16), nullable=False),
+        Column("linking_user_id", String(36), nullable=True),
+        Column("created_at", UtcDateTime(), nullable=False),
+        Column("expires_at", UtcDateTime(), nullable=False),
+        Column("result_token", Text, nullable=True),
+        Index("ix_oauth_states_expires_at", "expires_at"),
+        CheckConstraint("mode IN ('signin', 'link')", name="mode_valid"),
+    )
+
+
 # Default-table-name accessors (collection_name from RegStackConfig).
 USERS_DEFAULT = "users"
 PENDING_DEFAULT = "pending_registrations"
 BLACKLIST_DEFAULT = "token_blacklist"
 ATTEMPTS_DEFAULT = "login_attempts"
 MFA_DEFAULT = "mfa_codes"
+OAUTH_IDENTITIES_DEFAULT = "oauth_identities"
+OAUTH_STATES_DEFAULT = "oauth_states"
 
 users_table = _users(USERS_DEFAULT)
 pending_table = _pending(PENDING_DEFAULT)
 blacklist_table = _blacklist(BLACKLIST_DEFAULT)
 login_attempts_table = _login_attempts(ATTEMPTS_DEFAULT)
 mfa_codes_table = _mfa_codes(MFA_DEFAULT)
+oauth_identities_table = _oauth_identities(OAUTH_IDENTITIES_DEFAULT)
+oauth_states_table = _oauth_states(OAUTH_STATES_DEFAULT)

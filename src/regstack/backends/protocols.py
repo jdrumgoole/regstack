@@ -17,6 +17,8 @@ from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
 from regstack.models.mfa_code import MfaCode, MfaKind
+from regstack.models.oauth_identity import OAuthIdentity
+from regstack.models.oauth_state import OAuthState
 from regstack.models.pending_registration import PendingRegistration
 from regstack.models.user import BaseUser
 
@@ -220,3 +222,90 @@ class MfaCodeRepoProtocol(Protocol):
     async def find(self, *, user_id: str, kind: MfaKind) -> MfaCode | None: ...
 
     async def purge_expired(self, now: datetime | None = None) -> int: ...
+
+
+class OAuthIdentityAlreadyLinkedError(Exception):
+    """An identity is already linked to a regstack user.
+
+    Raised by :meth:`OAuthIdentityRepoProtocol.create` when the
+    ``UNIQUE(provider, subject_id)`` or ``UNIQUE(user_id, provider)``
+    constraint fires. Routers translate this to HTTP 409.
+    """
+
+
+@runtime_checkable
+class OAuthIdentityRepoProtocol(Protocol):
+    """External-OAuth identities linked to regstack users.
+
+    One row per ``(provider, subject_id)``. Two unique constraints —
+    see :class:`~regstack.models.oauth_identity.OAuthIdentity` for
+    the rationale.
+    """
+
+    async def create(self, identity: OAuthIdentity) -> OAuthIdentity:
+        """Insert a new identity. Raises :class:`OAuthIdentityAlreadyLinkedError`
+        on either unique-constraint violation.
+        """
+        ...
+
+    async def find_by_subject(self, *, provider: str, subject_id: str) -> OAuthIdentity | None: ...
+
+    async def list_for_user(self, user_id: str) -> list[OAuthIdentity]:
+        """Every identity linked to ``user_id``, sorted by ``linked_at`` ascending."""
+        ...
+
+    async def delete(self, *, user_id: str, provider: str) -> bool:
+        """Delete one identity. Returns True if a row was removed."""
+        ...
+
+    async def delete_by_user_id(self, user_id: str) -> int:
+        """Delete every identity for a user. Called from the
+        delete-account path so identities don't outlive their owner.
+        """
+        ...
+
+    async def touch_last_used(self, *, provider: str, subject_id: str, when: datetime) -> None:
+        """Update ``last_used_at``. Called on each successful sign-in
+        through this identity. Best-effort — failure is logged, not
+        raised.
+        """
+        ...
+
+
+@runtime_checkable
+class OAuthStateRepoProtocol(Protocol):
+    """Server-side state rows for in-flight OAuth flows.
+
+    The OAuth ``state`` parameter the browser carries is just the
+    row's ``id``. The PKCE ``code_verifier`` and the post-callback
+    ``result_token`` are server-side fields on the row.
+    """
+
+    async def create(self, state: OAuthState) -> None:
+        """Insert. Caller picks the row id (usually
+        :func:`secrets.token_urlsafe`).
+        """
+        ...
+
+    async def find(self, state_id: str) -> OAuthState | None: ...
+
+    async def set_result_token(self, state_id: str, token: str) -> None:
+        """Stash the session JWT after a successful callback so the
+        SPA can pick it up via :meth:`consume`.
+        """
+        ...
+
+    async def consume(self, state_id: str) -> OAuthState | None:
+        """Atomic read + delete. The exchange endpoint reads the
+        ``result_token``; the row is gone after this call returns,
+        making the exchange single-use.
+
+        Returns ``None`` if the row is missing.
+        """
+        ...
+
+    async def purge_expired(self, now: datetime | None = None) -> int:
+        """Sweep expired rows. Mongo has a TTL index; SQL relies on
+        a periodic call to this.
+        """
+        ...

@@ -67,4 +67,31 @@ async def install_indexes(db: AsyncDatabase, config: RegStackConfig) -> None:
         ]
     )
 
+    oauth_identities = db[config.oauth_identity_collection]
+    await oauth_identities.create_indexes(
+        [
+            IndexModel(
+                [("provider", ASCENDING), ("subject_id", ASCENDING)],
+                unique=True,
+                name="provider_subject_unique",
+            ),
+            IndexModel(
+                [("user_id", ASCENDING), ("provider", ASCENDING)],
+                unique=True,
+                name="user_provider_unique",
+            ),
+        ]
+    )
+
+    oauth_states = db[config.oauth_state_collection]
+    await oauth_states.create_indexes(
+        [
+            IndexModel(
+                [("expires_at", ASCENDING)],
+                expireAfterSeconds=0,
+                name="oauth_state_ttl",
+            ),
+        ]
+    )
+
     log.info("regstack indexes installed on database %s", db.name)

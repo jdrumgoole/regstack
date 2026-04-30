@@ -3,6 +3,89 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## 0.3.0 — 2026-04-30
+
+**OAuth — Sign in with Google.** Built across four PRs (M1–M4 of
+[`tasks/oauth-design.md`](https://github.com/jdrumgoole/regstack/blob/main/tasks/oauth-design.md));
+this is the release cut that wraps them up.
+
+### Added
+
+- New optional extra `oauth = ["pyjwt[crypto]>=2.8"]`.
+- New `enable_oauth` flag and `OAuthConfig` sub-model
+  (`google_client_id`, `google_client_secret`, `google_redirect_uri`,
+  `auto_link_verified_emails`, `enforce_mfa_on_oauth_signin`,
+  `state_ttl_seconds`, `completion_ttl_seconds`).
+- `regstack.oauth` package — `OAuthProvider` ABC, `OAuthRegistry`,
+  `OAuthTokens`, `OAuthUserInfo`, error hierarchy, and the concrete
+  `GoogleProvider` (Authorization Code with PKCE, ID-token
+  verification via `pyjwt[crypto]` + `PyJWKClient` against Google's
+  JWKS).
+- Five JSON endpoints (mounted lazily when `enable_oauth=True` and a
+  provider is registered):
+  - `GET    /oauth/{provider}/start`
+  - `GET    /oauth/{provider}/callback`
+  - `POST   /oauth/exchange`
+  - `POST   /oauth/{provider}/link/start` (auth)
+  - `DELETE /oauth/{provider}/link` (auth)
+  - `GET    /oauth/providers` (auth)
+- New SSR page `/account/oauth-complete` (token-handoff round-trip).
+- "Sign in with Google" button on `/account/login` and a Connected-
+  accounts panel on `/account/me`. Login page surfaces callback
+  errors via `?error=<code>` with translated banners.
+- Two new repo protocols: `OAuthIdentityRepoProtocol`,
+  `OAuthStateRepoProtocol`. Mongo + SQL implementations with
+  parametrized integration tests over all three backends.
+- Four new hook events: `oauth_signin_started`,
+  `oauth_signin_completed`, `oauth_account_linked`,
+  `oauth_account_unlinked`.
+- `tests/_fake_google/` — in-process provider stub so the OAuth
+  test suite stays offline and parallel-safe.
+- New docs page [`docs/oauth.md`](oauth.md) — host guide.
+
+### Changed (potentially breaking)
+
+- **`BaseUser.hashed_password: str` → `str | None`.** OAuth-only
+  users have no password. The login route rejects password attempts
+  on these accounts with the same generic 401 wrong-password gets
+  (no enumeration). `change-password`, `change-email`, and
+  `delete-account` all return 400 for OAuth-only users with a
+  pointer at the password-reset flow, which doubles as a "set
+  initial password" path.
+- `users.hashed_password` is now nullable in the SQL schema —
+  migration `0002_oauth.py` flips the column via `batch_alter_table`
+  (SQLite-safe). Existing rows are unaffected.
+- New SQL tables `oauth_identities` and `oauth_states`. Mongo
+  collections + indexes added by `install_schema()`.
+
+### Security defaults
+
+- **Account-linking policy defaults to refuse.** When a Google
+  sign-in carries an email that already belongs to a regstack user,
+  the callback returns `?error=email_in_use`. Hosts can opt into
+  auto-linking via `oauth.auto_link_verified_emails = true`, which
+  also requires `email_verified=true` on the ID token. The threat
+  model is in `tasks/oauth-design.md` § 1.
+- **Server-side PKCE.** `code_verifier` is stored on the
+  `oauth_states` row and never enters the URL.
+- **One-time token-handoff.** `/oauth/exchange` consumes the state
+  row atomically; second exchange returns 404.
+- **Refuse to unlink the only sign-in method.** Returns 400 for
+  OAuth-only users attempting to unlink their only provider.
+- **OAuth sessions are normal session JWTs** — the existing
+  `tokens_invalidated_after` bulk-revoke applies, so a password
+  change kills any OAuth-issued session too.
+
+### Migration notes
+
+- Install the extra: `uv add 'regstack[oauth]'`.
+- Configure: set `enable_oauth = true` and provide
+  `oauth.google_client_id` + `oauth.google_client_secret` (the
+  secret in `regstack.secrets.env` as
+  `REGSTACK_OAUTH__GOOGLE_CLIENT_SECRET`).
+- Schema: roll forward via `regstack migrate` or rely on
+  `install_schema()` at first boot.
+
 ## 0.2.6 — 2026-04-28
 
 **Bug fix.**

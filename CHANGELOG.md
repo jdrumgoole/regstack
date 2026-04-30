@@ -5,6 +5,40 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
+## 0.3.0 — 2026-04-30
+
+**OAuth — Sign in with Google.** Opt-in via the new `oauth` extra
+and `enable_oauth=True`. Five JSON endpoints, an SSR
+`/account/oauth-complete` page, "Sign in with Google" button on the
+login page, and a Connected-accounts panel on `/account/me`.
+
+Schema migration `0002_oauth.py` creates `oauth_identities` +
+`oauth_states` and makes `users.hashed_password` nullable
+(OAuth-only users have no password). Roll forward via
+`regstack migrate` or first-boot `install_schema()` — no manual
+intervention.
+
+Account-linking policy defaults to **refuse**: if a Google sign-in
+arrives carrying an email that already belongs to a password-
+registered user, the callback returns `?error=email_in_use` and the
+user must sign in then explicitly link from `/account/me`. Hosts
+that consciously accept the email-recycling threat for UX can flip
+`oauth.auto_link_verified_emails = true`. See
+[`docs/oauth.md`](https://regstack.readthedocs.io/en/latest/oauth.html)
+and [`tasks/oauth-design.md`](https://github.com/jdrumgoole/regstack/blob/main/tasks/oauth-design.md)
+for the full threat model.
+
+**Migration**
+
+- Install the new extra: `uv add 'regstack[oauth]'`.
+- Set `enable_oauth = true` and provide `oauth.google_client_id` +
+  `oauth.google_client_secret`.
+- Run `regstack migrate` (SQL backends only) or rely on
+  `install_schema()` at first boot.
+
+`BaseUser.hashed_password` is now `str | None`. Code that imported
+the field type explicitly will need to widen it.
+
 ## 0.2.6 — 2026-04-28
 
 Bug fix.

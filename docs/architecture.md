@@ -139,8 +139,52 @@ The composite `router` conditionally includes:
 - `password` (forgot/reset) — when `enable_password_reset`.
 - `phone` and the `mfa-confirm` route — when `enable_sms_2fa`.
 - `admin` — when `enable_admin_router`.
+- `oauth` — when `enable_oauth` AND at least one provider is
+  registered on `rs.oauth`.
 
-`ui_router` mounts the same conditional pages.
+`ui_router` mounts the same conditional pages, plus
+`/account/oauth-complete` when `enable_oauth` is on.
+
+## OAuth subsystem
+
+Opt-in. Lives in `regstack.oauth/`; hosts pull it in via the
+`oauth` extra (`pyjwt[crypto]>=2.8`). Imports are lazy — the
+package keeps importing on a base install with no `cryptography`
+installed, and the OAuth-specific modules only get loaded when
+`enable_oauth` is on.
+
+The shape is:
+
+- `OAuthProvider` ABC — three methods: `authorization_url`,
+  `exchange_code`, `verify_id_token`.
+- `OAuthRegistry` — name-keyed map of providers, scoped to one
+  `RegStack` instance. The `RegStack` constructor reads
+  `config.oauth` and registers `GoogleProvider` automatically when
+  `enable_oauth` and the credentials are set; hosts can also
+  register custom providers post-construction.
+- `GoogleProvider` — Authorization Code with PKCE, ID-token
+  verification via `pyjwt[crypto]` + `PyJWKClient` against Google's
+  JWKS. ~150 lines hand-rolled rather than pulling `authlib`.
+- Two new repos via the protocol pattern:
+  `OAuthIdentityRepoProtocol` (links between regstack users and
+  external accounts; double-unique on `(provider, subject_id)` and
+  `(user_id, provider)`) and `OAuthStateRepoProtocol` (in-flight
+  state rows carrying the PKCE `code_verifier`, redirect target,
+  mode, and the `result_token` slot the SPA exchanges).
+- `build_oauth_router(rs)` — the router with the five endpoints
+  (`/start`, `/callback`, `/exchange`, `/link/start`, `/link`) plus
+  `/oauth/providers` for the SSR connected-accounts panel.
+
+The token-handoff round-trip avoids putting access tokens in URLs:
+the callback stashes the freshly-minted session JWT on the state
+row's `result_token`, redirects to `/account/oauth-complete?id=…`,
+and the SPA POSTs that id back to `/oauth/exchange` to retrieve the
+token. The exchange consumes the row atomically — the same id can't
+be exchanged twice.
+
+The full design (including the four-milestone build sequence and
+the threat model) is in
+[`tasks/oauth-design.md`](https://github.com/jdrumgoole/regstack/blob/main/tasks/oauth-design.md).
 
 ## Hooks
 
@@ -157,6 +201,8 @@ primary auth flow. Known events:
 - `phone_setup_started` / `mfa_login_started`
 - `mfa_enabled` / `mfa_disabled`
 - `user_deleted`
+- `oauth_signin_started` / `oauth_signin_completed`
+- `oauth_account_linked` / `oauth_account_unlinked`
 
 Hosts are free to subscribe to custom event names too — the registry
 is just a `defaultdict(list)`. Use this surface to push events into

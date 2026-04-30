@@ -161,6 +161,77 @@ visible to logged-out users only.
   instead of a session token, sends an SMS, and requires
   `POST /login/mfa-confirm` to complete.
 
+## OAuth (Sign in with Google)
+
+Opt-in subsystem behind `enable_oauth` and the `oauth` extra. Five
+JSON endpoints plus an SSR token-handoff page. The full host-facing
+guide is in [OAuth](oauth.md); this section is the threat model.
+
+- **Server-side PKCE.** The `code_verifier` is generated server-side
+  and persisted on a `oauth_states` row; only its SHA-256
+  `code_challenge` ever travels through the browser. The token
+  exchange POSTs the verifier directly from the regstack server to
+  Google's token endpoint, so a leaked browser-side state value
+  alone can't drive a token exchange.
+- **State row is the OAuth `state` parameter.** Random 32-byte
+  url-safe id; carries `code_verifier`, `nonce`, `redirect_to`,
+  `mode` (`signin` or `link`), optional `linking_user_id`. The
+  callback looks the row up by id, rejects missing / expired rows
+  with `?error=bad_state` or `?error=state_expired`. Mongo gets free
+  TTL via `expireAfterSeconds`; SQL backends rely on read-side
+  `expires_at > now()` plus `purge_expired()`.
+- **ID token verification.** Signature against Google's JWKS
+  (`PyJWKClient` cached), `iss` matches Google, `aud` matches the
+  configured `client_id`, `exp > now`, `nonce` matches the value
+  stashed on the state row. Any failure raises
+  `OAuthIdTokenError` and the callback redirects to the login page
+  with `?error=id_token_failed` — the specific check that failed is
+  logged but not echoed.
+- **Account-linking policy.** Defaults to **refuse**. If a Google
+  sign-in carries an email already owned by a regstack user, the
+  callback returns `?error=email_in_use` and the user has to sign
+  in with their existing password before linking from
+  `/account/me`. Auto-linking is available behind
+  `oauth.auto_link_verified_emails = true`; even then, regstack
+  requires `email_verified=true` on the ID token. The threat
+  auto-link accepts is *email recycling at the provider* — if
+  someone later acquires the original Gmail address, they could
+  sign in as the original regstack user. Hosts choosing auto-link
+  do so eyes-open. Full writeup in
+  `tasks/oauth-design.md` § 1.
+- **One-time token-handoff.** After a successful callback, the
+  fresh session JWT is stashed on the `oauth_states.result_token`
+  field and the SPA exchanges its state-id for the token via
+  `POST /oauth/exchange`. The exchange consumes the row atomically
+  (read + delete in one transaction); a second exchange call with
+  the same id returns 404. Tokens never appear in URLs longer than
+  the callback redirect, no cookies are set.
+- **OAuth-issued sessions are normal session JWTs** signed with the
+  same `session`-purpose key. The `tokens_invalidated_after` bulk-
+  revoke applies — a password change or admin-disable kills any
+  OAuth-issued session too.
+- **Open-redirect protection.** `redirect_to` on `/start` is
+  validated same-origin against `config.base_url`; a request with
+  an off-site target returns 400.
+- **Identity-row uniqueness.** `(provider, subject_id)` is unique
+  so two regstack users can't share one external account; a
+  second-user link attempt returns `?error=identity_in_use`.
+  `(user_id, provider)` is also unique so re-linking the same
+  provider to the same user returns `?error=already_linked`
+  rather than silently succeeding.
+- **OAuth-only users.** A Google sign-up creates a user with
+  `hashed_password=None`. Login with a password against such an
+  account returns the same generic 401 a wrong-password attempt
+  gets — never reveal that an account exists but has no password
+  set, so an attacker can't enumerate which accounts to phish via
+  OAuth. `change-password` / `change-email` / `delete-account`
+  return 400 with a pointer at the password-reset flow, which
+  doubles as a "set initial password" path.
+- **Refuse to unlink the only auth method.**
+  `DELETE /oauth/{provider}/link` returns 400 if the user has no
+  password and only the one identity. Forces them to either set a
+  password (via reset) or link another provider first.
+
 ## CSP and the SSR layer
 
 Content Security Policy (CSP) is a browser feature that restricts

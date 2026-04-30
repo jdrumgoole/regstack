@@ -11,9 +11,9 @@ auth bugs.**
 
 `pip install regstack`, point it at SQLite (default), [PostgreSQL](https://www.postgresql.org/),
 or [MongoDB](https://www.mongodb.com/), and you have register / login /
-verify-email / reset-password / change-email / delete-account / optional SMS
-two-factor / admin endpoints / themable HTML pages — all behind a small Python
-API and one config file.
+verify-email / reset-password / change-email / delete-account / Sign in
+with Google / optional SMS two-factor / admin endpoints / themable
+HTML pages — all behind a small Python API and one config file.
 
 📚 **Docs:** <https://regstack.readthedocs.io>
 &nbsp;·&nbsp;
@@ -65,6 +65,7 @@ result everywhere is what regstack is for.
 ✔ Forgot / reset password — anti-enumeration: identical responses
 ✔ Change password (revokes old tokens) / change email (re-verify)
 ✔ Delete account
+✔ Sign in with Google (PKCE + ID-token verification, opt-in)
 ✔ Optional SMS two-factor (TOTP-style 6-digit codes over SMS)
 ✔ Server-side login lockout (HTTP 429 + Retry-After)
 ✔ Admin endpoints (list / disable / delete users, stats)
@@ -178,7 +179,8 @@ The same docs are also browsable as Markdown in [`docs/`](https://github.com/jdr
 
 Alpha. Single-file SQLite is the default and runs with no infrastructure;
 PostgreSQL and MongoDB backends pass the same parametrized integration
-suite. Latest tagged release: `v0.2.1`. See the
+suite. OAuth (Google) shipped in `v0.3.0`. Latest tagged release:
+`v0.3.0`. See the
 [changelog](https://regstack.readthedocs.io/en/latest/changelog.html)
 for the per-release breakdown.
 

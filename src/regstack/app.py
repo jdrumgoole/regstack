@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from jinja2 import Environment
 
     from regstack.backends.base import Backend
+    from regstack.oauth import OAuthRegistry
 
 
 class RegStack:
@@ -143,11 +144,37 @@ class RegStack:
         )
         self.hooks = HookRegistry()
         self.deps = AuthDependencies(jwt=self.jwt, users=self.users, blacklist=self.blacklist)
+        self.oauth = self._build_oauth_registry()
         self._template_dirs: list[Path] = list(config.extra_template_dirs)
         self._ui_env: Environment | None = None
         self._router: APIRouter | None = None
         self._ui_router: APIRouter | None = None
         self._static_files: StaticFiles | None = None
+
+    def _build_oauth_registry(self) -> OAuthRegistry:
+        """Build the OAuth registry, populated from config.
+
+        The ``regstack.oauth`` import is lazy so the package keeps
+        importing on a base install (no ``oauth`` extra). When
+        ``enable_oauth`` is off the registry is empty; the router won't
+        be mounted regardless.
+        """
+        from regstack.oauth import OAuthRegistry
+
+        registry = OAuthRegistry()
+        if not self.config.enable_oauth:
+            return registry
+        oauth_cfg = self.config.oauth
+        if oauth_cfg.google_client_id and oauth_cfg.google_client_secret:
+            from regstack.oauth.providers.google import GoogleProvider
+
+            registry.register(
+                GoogleProvider(
+                    client_id=oauth_cfg.google_client_id,
+                    client_secret=oauth_cfg.google_client_secret.get_secret_value(),
+                )
+            )
+        return registry
 
     @property
     def router(self) -> APIRouter:

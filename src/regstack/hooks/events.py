@@ -21,6 +21,10 @@ KNOWN_EVENTS = {
     "password_reset_completed",
     "password_changed",
     "user_deleted",
+    "oauth_signin_started",
+    "oauth_signin_completed",
+    "oauth_account_linked",
+    "oauth_account_unlinked",
 }
 
 

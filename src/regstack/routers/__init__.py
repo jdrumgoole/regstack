@@ -26,6 +26,8 @@ def build_router(rs: RegStack) -> APIRouter:
     - ``password`` (forgot/reset) when ``config.enable_password_reset``.
     - ``phone`` and the MFA confirm route when ``config.enable_sms_2fa``.
     - ``admin`` when ``config.enable_admin_router``.
+    - ``oauth`` when ``config.enable_oauth`` AND at least one provider
+      is registered on ``rs.oauth``.
 
     Hosts normally don't call this directly; access
     ``regstack.router`` instead, which calls it lazily.
@@ -51,6 +53,11 @@ def build_router(rs: RegStack) -> APIRouter:
         router.include_router(build_phone_router(rs))
     if rs.config.enable_admin_router:
         router.include_router(build_admin_router(rs))
+    if rs.config.enable_oauth and rs.oauth.names():
+        # Lazy import keeps base installs (no `oauth` extra) clean.
+        from regstack.routers.oauth import build_oauth_router
+
+        router.include_router(build_oauth_router(rs))
     return router
 
 

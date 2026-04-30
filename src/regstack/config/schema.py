@@ -37,6 +37,40 @@ class SmsConfig(BaseModel):
     twilio_auth_token: SecretStr | None = None
 
 
+class OAuthConfig(BaseModel):
+    """OAuth provider configuration.
+
+    The router is mounted only when ``enable_oauth=True`` AND at least
+    one provider has its credentials set (currently just Google).
+    """
+
+    google_client_id: str | None = None
+    google_client_secret: SecretStr | None = None
+    google_redirect_uri: AnyHttpUrl | None = None
+    """Defaults to ``f"{base_url}{api_prefix}/oauth/google/callback"``
+    when None. Must match the redirect URI registered with the
+    provider exactly."""
+
+    auto_link_verified_emails: bool = False
+    """Auto-link Google sign-ins to existing email-registered users
+    when the provider's ``email_verified=true``. **Off by default**:
+    that policy trusts the provider's verified-email claim *forever*,
+    which lets account-recycling at the provider become an account
+    takeover at the host. Hosts that consciously accept that risk for
+    UX can flip this on; the safer default is to require an
+    authenticated link from /account/me. See tasks/oauth-design.md §1
+    for the full threat model."""
+
+    enforce_mfa_on_oauth_signin: bool = False
+    """When True, an OAuth sign-in for a user with SMS MFA enabled
+    still goes through the second-factor step. Off by default — the
+    OAuth provider already authenticated the human, and SMS over
+    OAuth is mostly redundant outside regulated environments."""
+
+    state_ttl_seconds: int = 300
+    completion_ttl_seconds: int = 30
+
+
 class RegStackConfig(BaseSettings):
     """Top-level configuration for an embedded regstack instance.
 
@@ -117,6 +151,7 @@ class RegStackConfig(BaseSettings):
     # Sub-configs
     email: EmailConfig = Field(default_factory=EmailConfig)
     sms: SmsConfig = Field(default_factory=SmsConfig)
+    oauth: OAuthConfig = Field(default_factory=OAuthConfig)
 
     # Branding / theming
     brand_logo_url: str | None = None

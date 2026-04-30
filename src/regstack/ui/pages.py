@@ -24,6 +24,7 @@ PAGE_NAMES = (
     "me",
     "confirm-email-change",
     "mfa-confirm",
+    "oauth-complete",
 )
 
 
@@ -166,6 +167,15 @@ def build_ui_router(rs: RegStack) -> APIRouter:
     async def mfa_confirm_page(_request: Request) -> HTMLResponse:
         return _render("auth/mfa_confirm.html", page="mfa-confirm")
 
+    @router.get(
+        "/oauth-complete",
+        response_class=HTMLResponse,
+        summary="Token-handoff landing page for OAuth callbacks",
+        include_in_schema=rs.config.enable_oauth,
+    )
+    async def oauth_complete_page(_request: Request) -> HTMLResponse:
+        return _render("auth/oauth_complete.html", page="oauth-complete")
+
     return router
 
 
@@ -183,6 +193,8 @@ def _base_context(rs: RegStack, *, page: str) -> dict[str, object]:
         "enable_password_reset": rs.config.enable_password_reset,
         "enable_account_deletion": rs.config.enable_account_deletion,
         "enable_sms_2fa": rs.config.enable_sms_2fa,
+        "enable_oauth": rs.config.enable_oauth,
+        "oauth_providers": list(rs.oauth.names()),
     }
 
 

@@ -120,6 +120,7 @@ configuration
 architecture
 security
 embedding
+oauth
 theming
 cli
 ```

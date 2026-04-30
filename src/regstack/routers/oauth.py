@@ -71,6 +71,26 @@ class MessageResponse(BaseModel):
     message: str
 
 
+class LinkedIdentitySummary(BaseModel):
+    """One identity in the ``/oauth/providers`` response."""
+
+    provider: str
+    email: str | None
+    linked_at: str
+    last_used_at: str | None
+
+
+class ProvidersResponse(BaseModel):
+    """Available providers + which ones the current user has linked.
+
+    Drives the SSR ``/account/me`` "Connected accounts" panel and the
+    ``/account/login`` "Sign in with X" buttons.
+    """
+
+    available: list[str]
+    linked: list[LinkedIdentitySummary]
+
+
 def build_oauth_router(rs: RegStack) -> APIRouter:
     """Build the OAuth router. Captures ``rs`` in closures so two
     :class:`~regstack.app.RegStack` instances in one process don't
@@ -86,6 +106,29 @@ def build_oauth_router(rs: RegStack) -> APIRouter:
         # The SPA exchange is POST-only. Reject GET loudly so a
         # misconfigured client can't hit it accidentally.
         raise HTTPException(status_code=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    @router.get(
+        "/providers",
+        response_model=ProvidersResponse,
+        summary="List configured providers and which the current user has linked",
+    )
+    async def providers_list(
+        user: BaseUser = Depends(rs.deps.current_user()),
+    ) -> ProvidersResponse:
+        assert user.id is not None
+        identities = await rs.oauth_identities.list_for_user(user.id)
+        return ProvidersResponse(
+            available=rs.oauth.names(),
+            linked=[
+                LinkedIdentitySummary(
+                    provider=i.provider,
+                    email=i.email,
+                    linked_at=i.linked_at.isoformat(),
+                    last_used_at=i.last_used_at.isoformat() if i.last_used_at else None,
+                )
+                for i in identities
+            ],
+        )
 
     @router.post(
         "/exchange",

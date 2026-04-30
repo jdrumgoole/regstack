@@ -11,6 +11,7 @@ def test_default_environment_finds_all_pages() -> None:
     aliases = {
         "confirm-email-change": "email_change_confirm",
         "mfa-confirm": "mfa_confirm",
+        "oauth-complete": "oauth_complete",
     }
     for page in PAGE_NAMES:
         suffix = aliases.get(page, page)

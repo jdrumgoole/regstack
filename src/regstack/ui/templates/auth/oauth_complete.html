@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Signing you in — {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="rs-title">Signing you in…</h1>
+<p class="rs-meta" data-rs-status>
+  Finishing OAuth sign-in. This should only take a moment.
+</p>
+<noscript>
+  <p class="rs-meta">
+    JavaScript is required to complete the OAuth sign-in.
+    <a href="{{ ui_prefix }}/login">Back to sign in</a>.
+  </p>
+</noscript>
+{% endblock %}

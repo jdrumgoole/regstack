@@ -90,6 +90,14 @@
 </details>
 {% endif %}
 
+{% if enable_oauth and oauth_providers %}
+<details class="rs-section" data-rs-oauth-section>
+  <summary>Connected accounts</summary>
+  <p class="rs-meta" data-rs-oauth-status>Loading…</p>
+  <ul class="rs-oauth-list" data-rs-oauth-list></ul>
+</details>
+{% endif %}
+
 {% if enable_account_deletion %}
 <details class="rs-section rs-section-danger">
   <summary>Delete account</summary>

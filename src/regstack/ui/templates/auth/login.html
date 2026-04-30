@@ -2,6 +2,20 @@
 {% block title %}Sign in — {{ app_name }}{% endblock %}
 {% block content %}
 <h1 class="rs-title">Sign in</h1>
+
+{% if enable_oauth and oauth_providers %}
+<div class="rs-oauth-block" data-rs-oauth-block>
+  {% for provider in oauth_providers %}
+  <a class="rs-btn rs-btn-oauth rs-btn-oauth-{{ provider }}"
+     href="{{ api_prefix }}/oauth/{{ provider }}/start"
+     data-rs-oauth-link="{{ provider }}">
+    Sign in with {{ provider | capitalize }}
+  </a>
+  {% endfor %}
+  <p class="rs-or"><span>or</span></p>
+</div>
+{% endif %}
+
 <form class="rs-form" data-rs-form="login" autocomplete="on">
   <label class="rs-field">
     <span class="rs-label">Email</span>

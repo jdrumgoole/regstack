@@ -78,6 +78,10 @@ each time".
   Full template overrides are still possible per host.
 - **CLIs.** `regstack init` (interactive setup wizard),
   `regstack create-admin`, `regstack doctor`.
+- **OAuth — Sign in with Google** (opt-in, since 0.3.0). Authorization
+  Code with PKCE, ID-token verification, identity-linking with a
+  default-refuse policy hosts can opt out of. Connected-accounts
+  panel on the SSR `/account/me` page. See [the OAuth guide](oauth.md).
 - **Pluggable email and SMS.** Email backends: `console` (dev), SMTP,
   [Amazon SES](https://aws.amazon.com/ses/). SMS backends:
   [Amazon SNS](https://aws.amazon.com/sns/),
@@ -135,7 +139,7 @@ changelog
 
 ## Project status
 
-Alpha. Latest tagged release: `v0.2.1`. SQLite is the default and
+Alpha. Latest tagged release: `v0.3.0`. SQLite is the default and
 runs with no infrastructure; PostgreSQL and MongoDB pass the same
 parametrized integration suite. The full backend matrix runs in
 parallel against every test, so a green CI on `main` is a strong

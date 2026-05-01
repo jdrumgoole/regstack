@@ -54,11 +54,22 @@ async def _send_to_crm(user) -> None:
 @regstack.on("user_deleted")
 async def _purge_host_data(user) -> None:
     await my_app.delete_all_data_for(user.id)
+
+
+@regstack.on("oauth_signin_completed")
+async def _track_signin(*, user, provider, mode, was_new) -> None:
+    if was_new:
+        await analytics.track("signup", {"user": user.id, "provider": provider})
+    else:
+        await analytics.track("login", {"user": user.id, "provider": provider})
 ```
 
 Handlers can be sync or async. Exceptions are logged but never break
 the primary auth flow — see [`HookRegistry`](architecture.md#hooks).
-The full event list is in the architecture guide.
+The full event list (including the four OAuth events:
+``oauth_signin_started``, ``oauth_signin_completed``,
+``oauth_account_linked``, ``oauth_account_unlinked``) is in the
+architecture guide.
 
 ## Custom email or SMS backends
 
@@ -100,6 +111,48 @@ regstack.set_email_backend(PostmarkEmailService(server_token=os.environ["POSTMAR
 
 The same pattern applies for SMS via `SmsService` and
 `set_sms_backend(...)`.
+
+## Enabling OAuth
+
+Install the extra and configure a provider:
+
+```bash
+uv add 'regstack[oauth]'
+```
+
+```toml
+# regstack.toml
+enable_oauth = true
+
+[oauth]
+google_client_id = "12345.apps.googleusercontent.com"
+# google_client_secret in regstack.secrets.env
+auto_link_verified_emails = false  # security default — see oauth.md
+```
+
+The router mounts five JSON endpoints under `/oauth/` (start /
+callback / exchange / link-start / unlink) plus a `/oauth/providers`
+list. The bundled SSR pages pick up the rest automatically: a
+"Sign in with Google" button on `/account/login` and a Connected-
+accounts panel on `/account/me`.
+
+Hosts that need a custom provider (Apple, Microsoft, an internal
+OIDC) can register one programmatically on the registry:
+
+```python
+rs.oauth.register(MyCustomProvider(...))
+```
+
+Anything implementing :class:`~regstack.oauth.base.OAuthProvider`
+works — three abstract methods (`authorization_url`,
+`exchange_code`, `verify_id_token`). The router parametrizes its
+URL paths on the provider name, so a registered provider named
+``"github"`` is reachable at `/oauth/github/start` without any
+router changes.
+
+The full host guide — Google client setup, the linking-policy
+decision, OAuth-only-user knock-on effects — is in
+[OAuth](oauth.md).
 
 ## Overriding email and HTML templates
 
@@ -193,5 +246,7 @@ for production probes that need more than a TCP hit.
 - It does not enforce HTTPS. Run behind a TLS terminator.
 - It does not provision SES identities, Route 53 records, IAM users,
   or anything else outside the database.
-- It does not ship OAuth providers in v1 — `oauth/` reserves the
-  abstraction surface only, for a future milestone.
+- It does not ship OAuth providers other than Google. The
+  abstraction is shaped to take GitHub / Microsoft / Apple later;
+  hosts that want a different provider today can implement
+  :class:`~regstack.oauth.base.OAuthProvider` and register it.

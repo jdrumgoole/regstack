@@ -63,6 +63,12 @@ addressed in env using a `__` separator: `REGSTACK_EMAIL__FROM_ADDRESS`.
 * - `mfa_code_collection`
   - `"mfa_codes"`
   -
+* - `oauth_identity_collection`
+  - `"oauth_identities"`
+  -
+* - `oauth_state_collection`
+  - `"oauth_states"`
+  -
 ```
 
 ## Backends
@@ -165,7 +171,9 @@ The active backend exposes the same five repository protocols on
   - Mounts `/phone/*` routes and gates the MFA second step in `/login`.
 * - `enable_oauth`
   - `false`
-  - Reserved. No providers ship in v1.
+  - Mounts `/oauth/*` routes when at least one provider is registered
+    (currently Google). Requires the ``oauth`` extra
+    (``pip install 'regstack[oauth]'``).
 ```
 
 ## Lockout (login)
@@ -254,6 +262,31 @@ sns_region = "eu-west-1"
 # twilio
 twilio_account_sid = "AC…"
 # twilio_auth_token via REGSTACK_SMS__TWILIO_AUTH_TOKEN
+```
+
+`[oauth]` (`OAuthConfig`):
+
+```toml
+[oauth]
+google_client_id = "12345.apps.googleusercontent.com"
+# google_client_secret via REGSTACK_OAUTH__GOOGLE_CLIENT_SECRET
+# google_redirect_uri = "https://your.app/api/auth/oauth/google/callback"
+#                       (default: f"{base_url}{api_prefix}/oauth/google/callback")
+
+# Account-linking policy. Off by default — see docs/oauth.md and
+# docs/security.md for the threat model. On = a Google sign-in for an
+# existing email-registered user is auto-linked when Google's
+# email_verified=true. Hosts choosing on are accepting the email-
+# recycling-at-the-provider risk in exchange for less friction.
+auto_link_verified_emails = false
+
+# When true, an OAuth sign-in for a user with SMS MFA enabled still
+# goes through the second-factor step. Off by default — the OAuth
+# provider already authenticated the human.
+enforce_mfa_on_oauth_signin = false
+
+state_ttl_seconds = 300        # in-flight state row lifetime
+completion_ttl_seconds = 30    # /oauth/exchange window after callback
 ```
 
 ## SSR / theming

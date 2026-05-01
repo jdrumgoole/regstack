@@ -25,25 +25,22 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True, slots=True)
 class OAuthTokens:
-    """Tokens returned by a provider's token-exchange endpoint.
-
-    Attributes:
-        access_token: Bearer token usable against the provider's
-            APIs. regstack does not store or use this for anything
-            other than the (rare) call to a separate userinfo
-            endpoint. Most providers (including Google) put
-            everything we need in the ID token.
-        id_token: Signed JWT carrying the user's identity claims.
-            This is the trust anchor — its signature is verified
-            against the provider's JWKS.
-        refresh_token: Optional refresh token. regstack does NOT use
-            refresh tokens for anything in v1; if set, it is
-            discarded.
-    """
+    """Tokens returned by a provider's token-exchange endpoint."""
 
     access_token: str
+    """Bearer token usable against the provider's APIs. regstack does
+    not store or use this for anything other than the (rare) call to a
+    separate userinfo endpoint. Most providers (including Google) put
+    everything we need in the ID token."""
+
     id_token: str
+    """Signed JWT carrying the user's identity claims. This is the
+    trust anchor — its signature is verified against the provider's
+    JWKS."""
+
     refresh_token: str | None = None
+    """Optional refresh token. regstack does NOT use refresh tokens
+    for anything in v1; if set, it is discarded."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,25 +51,26 @@ class OAuthUserInfo:
     of these from its native claim shape. Routers downstream see only
     this — they don't care whether it came from Google's ``sub`` or
     GitHub's ``id``.
-
-    Attributes:
-        subject_id: The provider's stable, opaque user identifier.
-            For Google: the ``sub`` claim. NEVER an email address —
-            emails can change, subjects don't.
-        email: Optional email claim. May be ``None`` for providers
-            that don't always return one (some GitHub configurations).
-        email_verified: Whether the provider considers the email
-            verified. Auto-linking only happens when this is
-            ``True`` and ``email`` is non-``None``.
-        full_name: Display name. Optional.
-        picture_url: Avatar URL. Optional.
     """
 
     subject_id: str
+    """The provider's stable, opaque user identifier. For Google: the
+    ``sub`` claim. NEVER an email address — emails can change,
+    subjects don't."""
+
     email: str | None
+    """Optional email claim. May be ``None`` for providers that don't
+    always return one (some GitHub configurations)."""
+
     email_verified: bool
+    """Whether the provider considers the email verified. Auto-linking
+    only happens when this is ``True`` and ``email`` is non-``None``."""
+
     full_name: str | None
+    """Display name. Optional."""
+
     picture_url: str | None
+    """Avatar URL. Optional."""
 
 
 class OAuthProvider(ABC):

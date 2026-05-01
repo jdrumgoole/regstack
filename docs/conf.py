@@ -38,7 +38,14 @@ extensions = [
 source_suffix = {".md": "markdown", ".rst": "restructuredtext"}
 master_doc = "index"
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = [
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    # Daily security review reports — these are GitHub-rendered
+    # markdown, not part of the published Sphinx site.
+    "security-reports/**",
+]
 
 # Suppress noisy autodoc warnings on dynamically-typed pydantic helpers.
 suppress_warnings = ["autodoc.import_object"]

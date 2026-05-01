@@ -18,6 +18,7 @@ The handful of things you import from `regstack` directly:
 - [`RegStackConfig`](#regstack.config.schema.RegStackConfig) — top-level config.
 - [`EmailConfig`](#regstack.config.schema.EmailConfig) — email-backend sub-config.
 - [`SmsConfig`](#regstack.config.schema.SmsConfig) — SMS-backend sub-config.
+- [`OAuthConfig`](#regstack.config.schema.OAuthConfig) — OAuth provider sub-config.
 
 Most embeddings need only `RegStack` and `RegStackConfig`.
 
@@ -55,6 +56,11 @@ default.
    :exclude-members: model_config, model_fields, model_computed_fields
 
 .. autoclass:: regstack.config.schema.SmsConfig
+   :members:
+   :show-inheritance:
+   :exclude-members: model_config, model_fields, model_computed_fields
+
+.. autoclass:: regstack.config.schema.OAuthConfig
    :members:
    :show-inheritance:
    :exclude-members: model_config, model_fields, model_computed_fields
@@ -245,6 +251,73 @@ MessageBird, …) and pass the instance to `regstack.set_email_backend`
    :members:
 
 .. autofunction:: regstack.sms.factory.build_sms_service
+```
+
+## OAuth
+
+Opt-in subsystem behind `enable_oauth` and the `oauth` extra. v1
+ships Google; the abstraction is shaped so adding GitHub /
+Microsoft / Apple later is a new module under
+`regstack.oauth.providers` plus a registry entry. The full host
+guide is in [OAuth](oauth.md); the threat model is in
+[Security model](security.md#oauth-sign-in-with-google).
+
+### Provider abstraction
+
+```{eval-rst}
+.. autoclass:: regstack.oauth.base.OAuthProvider
+   :members:
+
+.. autoclass:: regstack.oauth.base.OAuthTokens
+   :members:
+
+.. autoclass:: regstack.oauth.base.OAuthUserInfo
+   :members:
+
+.. autoclass:: regstack.oauth.registry.OAuthRegistry
+   :members:
+
+.. autoexception:: regstack.oauth.errors.OAuthError
+
+.. autoexception:: regstack.oauth.errors.OAuthConfigError
+
+.. autoexception:: regstack.oauth.errors.OAuthTokenExchangeError
+
+.. autoexception:: regstack.oauth.errors.OAuthIdTokenError
+```
+
+### Google provider
+
+```{eval-rst}
+.. autoclass:: regstack.oauth.providers.google.GoogleProvider
+   :members:
+   :show-inheritance:
+```
+
+### Identity + state storage
+
+```{eval-rst}
+.. autoclass:: regstack.models.oauth_identity.OAuthIdentity
+   :members:
+   :exclude-members: model_config, model_fields, model_computed_fields
+
+.. autoclass:: regstack.models.oauth_state.OAuthState
+   :members:
+   :exclude-members: model_config, model_fields, model_computed_fields
+
+.. autoclass:: regstack.backends.protocols.OAuthIdentityRepoProtocol
+   :members:
+
+.. autoclass:: regstack.backends.protocols.OAuthStateRepoProtocol
+   :members:
+
+.. autoexception:: regstack.backends.protocols.OAuthIdentityAlreadyLinkedError
+```
+
+### Router
+
+```{eval-rst}
+.. autofunction:: regstack.routers.oauth.build_oauth_router
 ```
 
 ## Hooks

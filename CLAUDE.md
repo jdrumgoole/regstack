@@ -60,8 +60,23 @@ The full plan, including milestone scope and deferred items, lives at
   Phone setup uses a separate signed `phone_setup` JWT carrying the
   proposed phone as a custom claim — same per-purpose key derivation as
   password-reset and email-change.
-- **OAuth** — explicitly deferred. The `oauth/` package will hold a provider
-  ABC only; concrete providers (Google first) come post-v1.
+- **OAuth — done (0.3.0).** `OAuthProvider` ABC + `OAuthRegistry`,
+  Google provider (Authorization Code with PKCE, ID-token verification
+  via `pyjwt[crypto]` + `PyJWKClient`), 5 JSON endpoints,
+  `/account/oauth-complete` SSR token-handoff page, "Sign in with
+  Google" button on `/account/login`, Connected-accounts panel on
+  `/account/me`. Optional extra: `oauth = ["pyjwt[crypto]>=2.8"]`.
+- **OAuth setup wizard — done.** `regstack oauth setup` opens a native
+  pywebview window over a 127.0.0.1 FastAPI server (random port +
+  one-shot launch token). 12-step SPA, per-step server validation,
+  non-clobbering tomlkit merge into `regstack.toml` +
+  `regstack.secrets.env`. Lives in `src/regstack/wizard/oauth_google/`;
+  Click subcommand registered through a `_LazyOauthGroup` so
+  `regstack init` / `doctor` don't pay the pywebview/uvicorn import
+  cost. `--print-only` mode runs the same merge headlessly. Tested at
+  four layers: validators (unit), writer (golden-file), routes
+  (TestClient), full SPA flow (Playwright e2e). Run e2e with
+  `inv test-e2e`; `inv test-all` chains it after the backend matrix.
 
 ## Three kinds of single-use proof
 

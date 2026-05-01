@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>regstack — Google OAuth setup</title>
+    <link rel="stylesheet" href="/static/wizard.css" />
+  </head>
+  <body
+    data-wizard-token="{{ launch_token }}"
+    data-num-steps="{{ num_steps }}"
+  >
+    <header class="wiz-header">
+      <h1>Google OAuth setup</h1>
+      <div class="wiz-progress" id="wiz-progress" aria-label="Progress"></div>
+    </header>
+
+    <main id="wizard-root">
+      <!-- 0 -->
+      <section class="wiz-step" data-step="0">
+        <h2>Welcome</h2>
+        <p>
+          This wizard walks you through enabling
+          <strong>Sign in with Google</strong> on your regstack project.
+          You'll register an OAuth 2.0 client in the Google Cloud
+          Console, then paste the credentials back here. The wizard
+          merges them into your <code>regstack.toml</code> and
+          <code>regstack.secrets.env</code> without touching unrelated
+          settings.
+        </p>
+        <p>Allow about 5 minutes. You can use Back / Next at any time.</p>
+      </section>
+
+      <!-- 1 -->
+      <section class="wiz-step" data-step="1">
+        <h2>Detect existing configuration</h2>
+        <div data-when="no-existing">
+          <p>No existing <code>[oauth]</code> table was found in
+          <code id="wiz-config-path">regstack.toml</code>. Click Next
+          to begin.</p>
+        </div>
+        <div data-when="existing">
+          <p class="wiz-warn">
+            An <code>[oauth]</code> table already exists in your
+            config. Continuing will <strong>replace</strong> it.
+            Existing user accounts that signed in with Google are
+            unaffected — only the client credentials change.
+          </p>
+          <label class="wiz-check">
+            <input type="checkbox" name="replace_existing" />
+            Yes, replace the existing OAuth configuration.
+          </label>
+        </div>
+      </section>
+
+      <!-- 2 -->
+      <section class="wiz-step" data-step="2">
+        <h2>Confirm the public base URL</h2>
+        <p>
+          Google needs to know where to redirect users after they sign
+          in. The redirect URL is built from your application's public
+          base URL.
+        </p>
+        <label class="wiz-field">
+          <span>Base URL</span>
+          <input type="url" name="base_url" placeholder="http://localhost:8000" />
+        </label>
+        <p>Computed redirect URI:</p>
+        <pre id="wiz-redirect-preview" class="wiz-pre">—</pre>
+      </section>
+
+      <!-- 3 -->
+      <section class="wiz-step" data-step="3">
+        <h2>Open the Google Cloud Console</h2>
+        <p>
+          Sign in to the Google Cloud Console and select (or create) a
+          project to hold your OAuth client.
+        </p>
+        <p>
+          <a
+            class="wiz-btn"
+            href="https://console.cloud.google.com/projectselector2/home/dashboard"
+            target="_blank"
+            rel="noopener"
+          >Open console.cloud.google.com</a>
+        </p>
+        <p>
+          When a project is selected (its name appears in the top bar),
+          come back and click Next.
+        </p>
+      </section>
+
+      <!-- 4 -->
+      <section class="wiz-step" data-step="4">
+        <h2>Configure the OAuth consent screen</h2>
+        <ol>
+          <li>In the Cloud Console, navigate to
+            <strong>APIs &amp; Services → OAuth consent screen</strong>.</li>
+          <li>User Type = <strong>External</strong>.</li>
+          <li>Fill in app name, user support email, and developer email.</li>
+          <li>Save and continue. You can leave Scopes empty for now.</li>
+        </ol>
+        <p>
+          Testing mode is fine for small user counts; Publishing is
+          not required.
+        </p>
+      </section>
+
+      <!-- 5 -->
+      <section class="wiz-step" data-step="5">
+        <h2>Create an OAuth 2.0 Client ID</h2>
+        <ol>
+          <li>Navigate to <strong>APIs &amp; Services → Credentials</strong>.</li>
+          <li>Click <strong>Create Credentials → OAuth client ID</strong>.</li>
+          <li>Application type = <strong>Web application</strong>.</li>
+          <li>Give it a name (e.g. "regstack").</li>
+        </ol>
+        <p>Stop when you reach the <em>Authorized redirect URIs</em> box.</p>
+      </section>
+
+      <!-- 6 -->
+      <section class="wiz-step" data-step="6">
+        <h2>Add the redirect URI</h2>
+        <p>
+          In the <em>Authorized redirect URIs</em> section, click
+          <strong>+ Add URI</strong> and paste the URI below. Then
+          click <strong>Create</strong>.
+        </p>
+        <div class="wiz-copy">
+          <code id="wiz-redirect-copy">—</code>
+          <button type="button" class="wiz-btn-secondary" data-copy-target="#wiz-redirect-copy">Copy</button>
+        </div>
+        <p>
+          A modal pops up showing your client ID and client secret.
+          Leave it open — you'll paste those values on the next step.
+        </p>
+      </section>
+
+      <!-- 7 -->
+      <section class="wiz-step" data-step="7">
+        <h2>Paste the credentials</h2>
+        <label class="wiz-field">
+          <span>Client ID</span>
+          <input type="text" name="client_id" placeholder="123-abc.apps.googleusercontent.com" />
+        </label>
+        <label class="wiz-field">
+          <span>Client secret</span>
+          <input type="password" name="client_secret" placeholder="GOCSPX-…" />
+        </label>
+        <p class="wiz-hint">
+          Stored in <code>regstack.secrets.env</code> with mode 0600.
+        </p>
+      </section>
+
+      <!-- 8 -->
+      <section class="wiz-step" data-step="8">
+        <h2>Account-linking policy</h2>
+        <p>
+          When a user signs in with Google for the first time using an
+          email address that already has a regstack account, regstack
+          can either:
+        </p>
+        <ul>
+          <li><strong>Refuse (default).</strong> Safer — the user must
+            sign in with their existing password and link the Google
+            account from the account-management page.</li>
+          <li><strong>Auto-link verified emails.</strong> Smoother UX,
+            but trusts Google's <code>email_verified</code> claim.</li>
+        </ul>
+        <label class="wiz-check">
+          <input type="checkbox" name="auto_link_verified_emails" />
+          Auto-link Google sign-ins to existing accounts when the
+          email is verified.
+        </label>
+      </section>
+
+      <!-- 9 -->
+      <section class="wiz-step" data-step="9">
+        <h2>MFA on OAuth sign-in (optional)</h2>
+        <p>
+          When enabled, users with MFA configured will still be
+          challenged for their MFA code after a successful Google
+          sign-in.
+        </p>
+        <label class="wiz-check">
+          <input type="checkbox" name="enforce_mfa_on_oauth_signin" />
+          Require MFA on every Google sign-in (when the user has MFA
+          set up).
+        </label>
+      </section>
+
+      <!-- 10 -->
+      <section class="wiz-step" data-step="10">
+        <h2>Review</h2>
+        <table class="wiz-review">
+          <tbody>
+            <tr>
+              <th>Redirect URI</th>
+              <td><code id="wiz-rev-redirect">—</code></td>
+              <td><button type="button" class="wiz-link" data-goto="2">Edit</button></td>
+            </tr>
+            <tr>
+              <th>Client ID</th>
+              <td><code id="wiz-rev-client-id">—</code></td>
+              <td><button type="button" class="wiz-link" data-goto="7">Edit</button></td>
+            </tr>
+            <tr>
+              <th>Client secret</th>
+              <td>
+                <code id="wiz-rev-client-secret">—</code>
+                <button type="button" class="wiz-btn-secondary" id="wiz-toggle-secret">Show</button>
+              </td>
+              <td><button type="button" class="wiz-link" data-goto="7">Edit</button></td>
+            </tr>
+            <tr>
+              <th>Auto-link verified emails</th>
+              <td id="wiz-rev-auto-link">—</td>
+              <td><button type="button" class="wiz-link" data-goto="8">Edit</button></td>
+            </tr>
+            <tr>
+              <th>Enforce MFA on OAuth</th>
+              <td id="wiz-rev-mfa">—</td>
+              <td><button type="button" class="wiz-link" data-goto="9">Edit</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- 11 -->
+      <section class="wiz-step" data-step="11">
+        <h2>Write the configuration</h2>
+        <div data-when="pre-write">
+          <p>Click <strong>Write</strong> to merge the values into
+          <code id="wiz-write-target">regstack.toml</code> and
+          <code>regstack.secrets.env</code>.</p>
+          <button type="button" class="wiz-btn" id="wiz-write">Write</button>
+        </div>
+        <div data-when="post-write" hidden>
+          <h3 class="wiz-success">Done.</h3>
+          <p id="wiz-write-summary"></p>
+          <ul>
+            <li>Run <code>regstack doctor</code> to confirm the new
+              configuration loads cleanly.</li>
+            <li>Restart your application to pick up the changes.</li>
+          </ul>
+          <button type="button" class="wiz-btn" id="wiz-close">Close window</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="wiz-footer">
+      <button type="button" class="wiz-btn-secondary" id="wiz-back">Back</button>
+      <div class="wiz-spacer"></div>
+      <div id="wiz-errors" class="wiz-errors" role="alert"></div>
+      <button type="button" class="wiz-btn" id="wiz-next">Next</button>
+    </footer>
+
+    <script src="/static/wizard.js" defer></script>
+  </body>
+</html>

@@ -32,6 +32,11 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0",
     "aiosqlite>=0.20",
     "alembic>=1.13",
+    # OAuth setup wizard (regstack oauth setup) — needs a webview shell,
+    # a small in-process FastAPI server, and round-trip-safe TOML editing.
+    "pywebview>=5.0",
+    "tomlkit>=0.13",
+    "uvicorn[standard]>=0.29",
 ]
 
 [project.optional-dependencies]
@@ -65,6 +70,8 @@ dev = [
     "asyncpg>=0.29",
     # OAuth provider tests need the crypto bits to verify ID tokens.
     "pyjwt[crypto]>=2.8",
+    # E2E tests for the OAuth setup wizard (drives the SPA in headless Chromium).
+    "pytest-playwright>=0.5",
 ]
 
 [project.scripts]
@@ -98,11 +105,18 @@ markers = [
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning:passlib.*",
+    # uvicorn[standard] still imports websockets.legacy on shutdown,
+    # which fires a DeprecationWarning. The wizard's e2e fixture runs
+    # uvicorn in a thread and pytest's threadexception plugin promotes
+    # thread warnings to errors — silence at the source.
+    "ignore::DeprecationWarning:websockets.*",
+    "ignore::DeprecationWarning:uvicorn.*",
     # CI surfaces PytestUnraisableExceptionWarning when async fixtures
     # from a previous test leak sockets/event loops past their cleanup
     # window — the sync UI tests shouldn't fail just because asyncpg or
     # aiosqlite teardown was sloppy in a sibling test.
     "ignore::pytest.PytestUnraisableExceptionWarning",
+    "ignore::pytest.PytestUnhandledThreadExceptionWarning",
 ]
 
 [tool.ruff]

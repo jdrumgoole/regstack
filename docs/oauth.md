@@ -53,6 +53,25 @@ In the [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
 
 ## Configure regstack
 
+The fastest path is the **OAuth setup wizard**, which opens a native
+window and walks you through every step (registering the GCP client,
+pasting the redirect URI, picking your linking policy) and finally
+merges the credentials into your existing `regstack.toml` and
+`regstack.secrets.env` without disturbing other settings:
+
+```bash
+uv run regstack oauth setup
+```
+
+The wizard is **non-clobbering** — it preserves comments, unrelated
+top-level keys, and unrelated tables (`[email]`, `[sms]`, etc.). Re-run
+it any time you need to rotate credentials or change the linking
+policy. On a headless host (CI, server) use
+`regstack oauth setup --print-only --client-id=… --client-secret=…`
+to get the same merge with no GUI.
+
+If you'd rather edit by hand, the resulting files look like:
+
 ```toml
 # regstack.toml
 enable_oauth = true

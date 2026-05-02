@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>regstack theme designer</title>
+    <link rel="stylesheet" href="/static/designer.css" />
+  </head>
+  <body data-wizard-token="{{ launch_token }}">
+    <header class="d-header">
+      <h1>regstack theme designer</h1>
+      <div class="d-header-actions">
+        <span class="d-status" id="d-status"></span>
+        <button type="button" class="d-btn-secondary" id="d-reset">Reset to defaults</button>
+        <button type="button" class="d-btn-secondary" id="d-copy">Copy CSS</button>
+        <button type="button" class="d-btn" id="d-save">Save</button>
+      </div>
+    </header>
+
+    <main id="designer-root" class="d-layout">
+      <!-- Controls panel -->
+      <section class="d-controls">
+        <div class="d-tabs" role="tablist">
+          <button class="d-tab is-active" data-scope="light" role="tab">Light</button>
+          <button class="d-tab" data-scope="dark" role="tab">Dark</button>
+        </div>
+
+        <div class="d-control-group" data-group="colors">
+          <h2>Colours</h2>
+          <div id="d-color-fields"></div>
+        </div>
+
+        <div class="d-control-group" data-group="fonts">
+          <h2>Typography</h2>
+          <div id="d-font-fields"></div>
+        </div>
+
+        <div class="d-control-group" data-group="shape">
+          <h2>Shape</h2>
+          <div id="d-radius-fields"></div>
+        </div>
+
+        <p class="d-hint">
+          Saves to <code id="d-target-path">…</code>. Set
+          <code>theme_css_url</code> in <code>regstack.toml</code> to the
+          public URL where you serve this file.
+        </p>
+      </section>
+
+      <!-- Live preview -->
+      <section class="d-preview" id="d-preview">
+        <div class="d-preview-card rs-card">
+          <h2 class="rs-title">Sign in to your account</h2>
+          <form class="rs-form" onsubmit="event.preventDefault()">
+            <div class="rs-field">
+              <label class="rs-label" for="d-preview-email">Email</label>
+              <input class="rs-input" id="d-preview-email" type="email" value="alice@example.com" />
+            </div>
+            <div class="rs-field">
+              <label class="rs-label" for="d-preview-pw">Password</label>
+              <input class="rs-input" id="d-preview-pw" type="password" value="hunter2hunter2" />
+            </div>
+            <button type="button" class="rs-btn rs-btn-primary">Sign in</button>
+            <button type="button" class="rs-btn rs-btn-ghost">Cancel</button>
+          </form>
+
+          <p class="rs-message" data-rs-tone="success">
+            Account created. Check your inbox to verify.
+          </p>
+          <p class="rs-message" data-rs-tone="error">
+            Invalid email or password.
+          </p>
+
+          <div class="rs-section-danger">
+            <h3>Danger zone</h3>
+            <button type="button" class="rs-btn rs-btn-danger">Delete account</button>
+          </div>
+
+          <p class="rs-meta">
+            Powered by regstack ·
+            <a href="#" onclick="event.preventDefault()">Forgot password?</a>
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/designer.js" defer></script>
+  </body>
+</html>

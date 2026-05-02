@@ -28,6 +28,20 @@ class _LazyOauthGroup(click.Group):
         return setup_cmd
 
 
+class _LazyThemeGroup(click.Group):
+    """Same lazy-import pattern for the theme designer subtree."""
+
+    def list_commands(self, ctx: click.Context) -> list[str]:
+        return ["design"]
+
+    def get_command(self, ctx: click.Context, name: str) -> click.Command | None:
+        if name != "design":
+            return None
+        from regstack.wizard.theme_designer.cli import design as design_cmd
+
+        return design_cmd
+
+
 @click.group(help="regstack — embeddable account registration for FastAPI apps.")
 @click.version_option(__version__, prog_name="regstack")
 def cli() -> None:
@@ -39,6 +53,7 @@ cli.add_command(create_admin_cmd)
 cli.add_command(doctor_cmd)
 cli.add_command(migrate_cmd)
 cli.add_command(_LazyOauthGroup(name="oauth", help="OAuth provider setup wizards."))
+cli.add_command(_LazyThemeGroup(name="theme", help="Theme designer for the SSR pages."))
 
 
 def main() -> None:

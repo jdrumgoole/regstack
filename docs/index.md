@@ -63,6 +63,27 @@ and keep the user table in your own database** — not "stand up a
 separate auth product" and not "write the boring 80% from scratch
 each time".
 
+### What's distinctive about regstack
+
+- **Native pywebview setup tools, not just Click prompts.**
+  - `regstack oauth setup` opens a real desktop window that walks an
+    operator through registering a Google OAuth 2.0 client and
+    merging the credentials into `regstack.toml` non-clobberingly —
+    no copy-pasting the redirect URI four times.
+  - `regstack theme design` opens a live theme designer with a
+    real-time preview of the SSR auth pages: tweak a colour, see
+    the Sign-in card update on the right; click Save to write
+    `regstack-theme.css`. CSS-only re-skin in minutes, no template
+    editing required.
+  Both tools are local-only (`127.0.0.1` + per-launch token), have
+  a `--print-only` mode for headless CI, and ship under the same
+  test-from-the-outside Playwright suite the SSR pages do.
+- **Zero vendor lock-in.** Your user table is in your database, not
+  someone else's. Switch storage backends by changing one URL.
+- **Opt-in everything.** No SMS extra → no `twilio` / `aioboto3`
+  install. No SES → no AWS SDK. No SSR → no Jinja templates loaded.
+  The base install is small.
+
 ## What's in the box
 
 - **Three storage backends, one API.** SQLite (the default — single
@@ -76,9 +97,13 @@ each time".
   forgot, reset, MFA confirm, account dashboard. Themed via CSS
   custom properties — no template editing required for a re-skin.
   Full template overrides are still possible per host.
-- **CLIs.** `regstack init` (interactive setup wizard),
+- **CLIs + native pywebview tools.**
+  `regstack init` (interactive project bootstrap),
   `regstack oauth setup` (guided Google OAuth client configuration in
-  a native webview window), `regstack create-admin`, `regstack doctor`.
+  a native webview — see [OAuth guide](oauth.md)),
+  `regstack theme design` (live theme designer with a real-time preview
+  of the SSR widgets — see [theming guide](theming.md)),
+  `regstack create-admin`, `regstack doctor`.
 - **OAuth — Sign in with Google** (opt-in, since 0.3.0). Authorization
   Code with PKCE, ID-token verification, identity-linking with a
   default-refuse policy hosts can opt out of. Connected-accounts

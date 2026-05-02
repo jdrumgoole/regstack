@@ -34,8 +34,29 @@ Your `static/my-theme.css`:
 ```
 
 That's it — every regstack page picks up the new palette. See
-`examples/minimal/branding/theme.css` for a working wine-themed
+`examples/mongo/branding/theme.css` for a working wine-themed
 example.
+
+To support both light and dark mode, add a `prefers-color-scheme`
+block re-declaring whichever variables need to differ:
+
+```css
+:root {
+  --rs-accent:    #0d9488;
+  --rs-accent-bg: rgba(13, 148, 136, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --rs-accent:    #2dd4bf;
+    --rs-accent-bg: rgba(45, 212, 191, 0.12);
+  }
+}
+```
+
+The bundled `theme.css` already supplies dark-mode defaults for every
+variable, so you only need to override the ones whose dark variant
+differs from the auto-derived contrast.
 
 ## Variables
 

@@ -3,6 +3,24 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## Unreleased
+
+### Added
+
+- **OAuth setup wizard.** `regstack oauth setup` opens a native
+  webview window that walks an operator through registering a Google
+  OAuth 2.0 client and merges the credentials into `regstack.toml` +
+  `regstack.secrets.env` non-destructively (preserves comments, other
+  tables, unrelated keys). 12-step SPA inside a local-only
+  127.0.0.1 FastAPI server, gated by a per-launch random token. Each
+  Next click hits a server-side validator so the Write step can never
+  be reached with bad data. `--print-only` mode skips the GUI for
+  headless / CI use.
+- Three new base dependencies: `pywebview>=5.0`, `tomlkit>=0.13`,
+  `uvicorn[standard]>=0.29` (the wizard's local server).
+- `pytest-playwright` added to the `dev` extra; new `inv test-e2e`
+  task chained into `inv test-all`.
+
 ## 0.3.0 — 2026-04-30
 
 **OAuth — Sign in with Google.** Built across four PRs (M1–M4 of

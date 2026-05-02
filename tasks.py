@@ -78,12 +78,23 @@ def test_postgres(
 
 @task(name="test-all")
 def test_all(c: Context, verbose: bool = False, pg_url: str = _DEFAULT_PG_URL) -> None:
-    """Run the suite against all three backends. Needs local mongo + postgres."""
+    """Run the suite against all three backends + e2e wizard tests."""
     env = {
         "REGSTACK_TEST_BACKENDS": "sqlite,mongo,postgres",
         "REGSTACK_TEST_POSTGRES_URL": pg_url,
     }
     _pytest(c, env=env, verbose=verbose)
+    test_e2e(c, verbose=verbose)
+
+
+@task(name="test-e2e")
+def test_e2e(c: Context, verbose: bool = False) -> None:
+    """Run the OAuth-wizard Playwright e2e suite (serial, slow)."""
+    cmd = "uv run python -m pytest tests/e2e/ -p no:xdist"
+    if verbose:
+        cmd += " -vv"
+    env = {"REGSTACK_TEST_BACKENDS": "sqlite"}
+    c.run(cmd, env=env, pty=True)
 
 
 @task(name="test-serial")

@@ -115,7 +115,7 @@ register from the command line:
 ```bash
 curl -X POST http://localhost:8000/api/auth/register \
     -H 'content-type: application/json' \
-    -d '{"email":"alice@example.com","password":"hunter2hunter2","full_name":"Alice"}'
+    -d '{"email":"alice@app.example.com","password":"<password>","full_name":"Alice"}'
 ```
 
 The bundled example serves themed SSR pages at `/account/*`, prints

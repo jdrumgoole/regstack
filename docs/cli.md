@@ -14,7 +14,7 @@ checks if asked, never provisions infrastructure.
 
 ```bash
 uv run regstack init
-uv run regstack init --target /etc/myapp --force
+uv run regstack init --target /etc/app --force
 ```
 
 Options:
@@ -38,7 +38,7 @@ rotate credentials or change the linking policy.
 
 ```bash
 uv run regstack oauth setup
-uv run regstack oauth setup --target /etc/myapp
+uv run regstack oauth setup --target /etc/app
 ```
 
 Options:
@@ -106,9 +106,9 @@ only, every API call requires a per-launch random token.
 Create or promote a superuser. Idempotent.
 
 ```bash
-uv run regstack create-admin --email admin@example.com
-uv run regstack create-admin --email admin@example.com --password 'long-strong-password'
-uv run regstack create-admin --email admin@example.com --config /etc/myapp/regstack.toml
+uv run regstack create-admin --email admin@app.example.com
+uv run regstack create-admin --email admin@app.example.com --password 'long-strong-password'
+uv run regstack create-admin --email admin@app.example.com --config /etc/app/regstack.toml
 ```
 
 Options:
@@ -132,7 +132,7 @@ to roll the schema forward to a new regstack release.
 ```bash
 uv run regstack migrate
 uv run regstack migrate --target head
-uv run regstack migrate --config /etc/myapp/regstack.toml --target 0001
+uv run regstack migrate --config /etc/app/regstack.toml --target 0001
 ```
 
 Options:
@@ -155,9 +155,9 @@ suitable for use in container health checks.
 
 ```bash
 uv run regstack doctor
-uv run regstack doctor --config /etc/myapp/regstack.toml
+uv run regstack doctor --config /etc/app/regstack.toml
 uv run regstack doctor --check-dns
-uv run regstack doctor --send-test-email me@example.com
+uv run regstack doctor --send-test-email alice@app.example.com
 ```
 
 Options:

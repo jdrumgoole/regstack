@@ -85,6 +85,31 @@ keeps the existing password. If they don't exist, it creates the user
 with `is_active=True`, `is_verified=True`, `is_superuser=True` and the
 provided password.
 
+## `regstack migrate`
+
+Runs the bundled Alembic migrations against the configured
+`database_url`. Idempotent — re-running on a DB already at the target
+revision is a no-op. Use this on SQL backends (SQLite / PostgreSQL)
+to roll the schema forward to a new regstack release.
+
+```bash
+uv run regstack migrate
+uv run regstack migrate --target head
+uv run regstack migrate --config /etc/myapp/regstack.toml --target 0001
+```
+
+Options:
+
+- `--config PATH` — TOML file to load (default: cwd / `$REGSTACK_CONFIG`).
+- `--target REV` — revision to upgrade to (default `head`). Accepts
+  any Alembic revision spec: a revision id (`0001`), a relative step
+  (`+1`), or `head`.
+
+Mongo backends are silently skipped: TTL indexes are installed by
+`RegStack.install_schema()` on every app start, so there's no separate
+migration story to run. Output prints the before / after revision and
+exits non-zero if Alembic raises.
+
 ## `regstack doctor`
 
 Runs read-only validation against the loaded config and reports each

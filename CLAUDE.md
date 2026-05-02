@@ -77,6 +77,20 @@ The full plan, including milestone scope and deferred items, lives at
   four layers: validators (unit), writer (golden-file), routes
   (TestClient), full SPA flow (Playwright e2e). Run e2e with
   `inv test-e2e`; `inv test-all` chains it after the backend matrix.
+- **Theme designer — done.** `regstack theme design` opens a sibling
+  pywebview window with controls for every `--rs-*` variable and a
+  real-time preview of the bundled SSR widgets (renders the same
+  `.rs-*` classes the SSR pages render, so what you see is what
+  you'll ship). Save writes `regstack-theme.css`; the designer
+  round-trips values back into the form on next launch so iteration
+  is non-destructive. Lives in `src/regstack/wizard/theme_designer/`,
+  registered via a `_LazyThemeGroup` mirroring the OAuth pattern.
+  Same four-layer test stack (validators / writer / routes /
+  Playwright e2e). The shared scaffold (FastAPI app, uvicorn launcher,
+  pywebview shim, e2e fixture pattern) is duplicated rather than
+  abstracted into a base class — the two tools have meaningfully
+  different inputs and an early shared base would calcify the wrong
+  decisions. Refactor only when a third pywebview tool lands.
 
 ## Three kinds of single-use proof
 

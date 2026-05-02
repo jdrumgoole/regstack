@@ -4,6 +4,30 @@ The bundled UI ships a structural stylesheet (`core.css`) and a default
 theme stylesheet (`theme.css`). Hosts pick one of three integration
 levels depending on how much they want to override.
 
+## Quickest path: the live designer
+
+```bash
+uv run regstack theme design
+```
+
+Opens a native pywebview window with controls for every `--rs-*`
+variable on the left and a real-time preview of the bundled SSR
+widgets on the right. Tweak a colour, watch the Sign-in card update;
+click Save to write `regstack-theme.css`. There's a `--print-only`
+mode for headless / CI use:
+
+```bash
+uv run regstack theme design --print-only \
+    --var --rs-accent=#0d9488 \
+    --var --rs-radius=10 \
+    --var dark:--rs-accent=#2dd4bf
+```
+
+Re-running the designer reloads your previous values back into the
+form, so you can iterate without losing state. The rest of this guide
+explains the underlying override mechanisms — useful when you want
+to go beyond what the designer exposes.
+
 ## Level 1 — swap one stylesheet
 
 Set `config.theme_css_url` to a URL where your host serves a custom

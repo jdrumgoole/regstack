@@ -64,6 +64,43 @@ The wizard binds to `127.0.0.1` only and authenticates every API call
 with a per-launch random token, so a hostile process on the same host
 can't drive the write endpoint.
 
+## `regstack theme design`
+
+Opens a live designer for `regstack-theme.css` in a native pywebview
+window. The left pane has controls for every `--rs-*` CSS custom
+property; the right pane renders the bundled SSR widgets (sign-in
+form, success / error messages, danger-zone button) with your changes
+applied in real time. Click **Save** to write the file; **Reset to
+defaults** to start over; **Copy CSS** to put the generated
+stylesheet on the clipboard without writing.
+
+```bash
+uv run regstack theme design
+uv run regstack theme design --target /var/www/static
+```
+
+Options:
+
+- `--target DIR` — directory to write `regstack-theme.css` into
+  (default cwd).
+- `--filename NAME` — output filename
+  (default `regstack-theme.css`).
+- `--port N` — pin the designer's TCP port (default: random free
+  port on `127.0.0.1`).
+- `--print-only` — skip the GUI; write the file from `--var` pairs
+  and emit a JSON summary. For headless / CI use.
+- `--var NAME=VALUE` — repeatable. Used with `--print-only`. Prefix
+  with `dark:` to set the dark-scheme value, e.g.
+  `--var dark:--rs-accent=#2dd4bf`.
+
+Re-running the designer reloads the previous values out of the file,
+so iterating on a theme is non-destructive. Only the `:root` and
+`@media (prefers-color-scheme: dark)` blocks are managed by the
+designer — anything else in the file is left alone.
+
+Same security shape as `regstack oauth setup`: binds `127.0.0.1`
+only, every API call requires a per-launch random token.
+
 ## `regstack create-admin`
 
 Create or promote a superuser. Idempotent.

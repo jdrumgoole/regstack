@@ -3,6 +3,21 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## Unreleased
+
+### Added
+
+- **Theme designer.** `regstack theme design` opens a native pywebview
+  window with controls for every `--rs-*` CSS custom property and a
+  real-time preview of the bundled SSR widgets. Saving writes
+  `regstack-theme.css`; the designer round-trips values back into the
+  form on next launch so iteration is non-destructive. `--print-only`
+  mode takes repeatable `--var NAME=VALUE` pairs (with a `dark:`
+  prefix for dark-scheme overrides) and writes the file headlessly.
+- "Why use regstack" pitch in `docs/index.md` updated to surface the
+  two pywebview tools (`oauth setup` + `theme design`) as a
+  distinguishing feature vs. fastapi-users / Auth0 / Keycloak.
+
 ## 0.4.0 — 2026-05-02
 
 ### Added

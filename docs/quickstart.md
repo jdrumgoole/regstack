@@ -144,7 +144,7 @@ uv run uvicorn examples.sqlite.main:app --reload
 # In another terminal
 curl -X POST http://localhost:8000/api/auth/register \
     -H 'content-type: application/json' \
-    -d '{"email":"a@example.com","password":"hunter2hunter2","full_name":"A"}'
+    -d '{"email":"alice@cellar.example.com","password":"hunter2hunter2","full_name":"Alice"}'
 ```
 
 The SQLite demo enables verification by default. Look at the demo's

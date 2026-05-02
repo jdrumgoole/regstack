@@ -63,6 +63,32 @@ and keep the user table in your own database** — not "stand up a
 separate auth product" and not "write the boring 80% from scratch
 each time".
 
+## About the examples
+
+To keep URLs and config values consistent across the docs, every
+example pretends to embed regstack into a fictional app called
+**Acme Wine Cellar** — a small SaaS that helps people track what's
+in their cellar. Throughout the docs:
+
+| What | Value |
+|---|---|
+| Public host | `cellar.example.com` |
+| `base_url` | `https://cellar.example.com` |
+| Database host (prod) | `db.cellar.example.com` |
+| Database user | `acme` |
+| Database password | `hunter2hunter2` |
+| Database name | `cellar` |
+| Email sender | `noreply@cellar.example.com` |
+| Local dev port | `localhost:8000` |
+
+So a Postgres URL looks like
+`postgresql+asyncpg://acme:hunter2hunter2@db.cellar.example.com:5432/cellar`,
+a MongoDB URL like
+`mongodb://acme:hunter2hunter2@db.cellar.example.com:27017/cellar`,
+and the local SQLite path `sqlite+aiosqlite:///./cellar.db`. Substitute
+your own values when copying — the shape is the only thing that
+matters.
+
 ## What's in the box
 
 - **Three storage backends, one API.** SQLite (the default — single

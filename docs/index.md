@@ -77,7 +77,8 @@ each time".
   custom properties — no template editing required for a re-skin.
   Full template overrides are still possible per host.
 - **CLIs.** `regstack init` (interactive setup wizard),
-  `regstack create-admin`, `regstack doctor`.
+  `regstack oauth setup` (guided Google OAuth client configuration in
+  a native webview window), `regstack create-admin`, `regstack doctor`.
 - **OAuth — Sign in with Google** (opt-in, since 0.3.0). Authorization
   Code with PKCE, ID-token verification, identity-linking with a
   default-refuse policy hosts can opt out of. Connected-accounts

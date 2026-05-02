@@ -26,6 +26,44 @@ Re-running the wizard prompts before overwriting unless `--force` is
 passed; pre-existing answers aren't kept (the wizard is intentionally
 stateless).
 
+## `regstack oauth setup`
+
+Opens a guided 12-step wizard in a native webview window that walks you
+through registering a Google OAuth 2.0 client (project selection,
+consent screen, redirect URI, credentials) and merges the result into
+your existing `regstack.toml` and `regstack.secrets.env`. The merge is
+**non-clobbering** — comments, unrelated tables (`[email]`, `[sms]`,
+…), and unrelated top-level keys are preserved. Re-run any time to
+rotate credentials or change the linking policy.
+
+```bash
+uv run regstack oauth setup
+uv run regstack oauth setup --target /etc/myapp
+```
+
+Options:
+
+- `--target DIR` — directory containing (or to receive) `regstack.toml`
+  (default cwd).
+- `--api-prefix PREFIX` — router prefix the host mounts regstack under
+  (default `/api/auth`). Used to compute the suggested redirect URI.
+- `--port N` — pin the wizard server's TCP port (default: random free
+  port on `127.0.0.1`).
+- `--print-only` — skip the GUI; print the TOML + secrets diff that
+  *would* be written to stdout, then exit. Useful for headless hosts
+  (CI, servers without a webview backend) and dry-run smoke tests.
+  Pair with `--client-id`, `--client-secret`, `--base-url`,
+  `--auto-link/--no-auto-link`, `--mfa/--no-mfa`.
+
+The interactive mode requires a desktop environment with a webview
+backend (WebKit on macOS, GTK / QtWebEngine on Linux, Edge WebView2 on
+Windows). On a headless host it exits with a clear error pointing at
+`--print-only`.
+
+The wizard binds to `127.0.0.1` only and authenticates every API call
+with a per-launch random token, so a hostile process on the same host
+can't drive the write endpoint.
+
 ## `regstack create-admin`
 
 Create or promote a superuser. Idempotent.

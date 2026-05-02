@@ -72,7 +72,7 @@ result everywhere is what regstack is for.
 ✔ Server-rendered HTML pages, theme with one CSS file
 ✔ Pluggable email (console / SMTP / Amazon SES) and SMS (Amazon SNS / Twilio)
 ✔ Argon2 password hashing, CSP-friendly templates
-✔ Setup wizard (`regstack init`) and config validator (`regstack doctor`)
+✔ Setup wizards: `regstack init` (project bootstrap), `regstack oauth setup` (guided Google OAuth client config), and `regstack doctor` (config validator)
 ✔ Three storage backends: SQLite, PostgreSQL, MongoDB — chosen by URL
 ```
 

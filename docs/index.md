@@ -139,7 +139,7 @@ changelog
 
 ## Project status
 
-Alpha. Latest tagged release: `v0.3.0`. SQLite is the default and
+Alpha. Latest tagged release: `v0.4.0`. SQLite is the default and
 runs with no infrastructure; PostgreSQL and MongoDB pass the same
 parametrized integration suite. The full backend matrix runs in
 parallel against every test, so a green CI on `main` is a strong

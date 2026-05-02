@@ -54,10 +54,9 @@ multi-tenant deployments where a single FastAPI app serves multiple
 The backend is auto-built from `config.database_url` if not supplied
 explicitly. URL scheme decides:
 
-- `sqlite+aiosqlite:///./dbname.db` → SQLAlchemy backend in SQLite
-  mode. (Also `:///:memory:` for an ephemeral in-process DB and
-  `:////var/lib/app/dbname.db` — four slashes — for an absolute
-  path.)
+- `sqlite+aiosqlite:///PATH` → SQLAlchemy backend in SQLite mode.
+  `PATH` is `./dbname.db` for a relative file, `/var/lib/app/dbname.db`
+  for an absolute file, or `:memory:` for an ephemeral in-process DB.
 - `postgresql+asyncpg://<username>:<password>@dbhost.example.com:5432/dbname`
   → SQLAlchemy backend in Postgres mode.
 - `mongodb://<username>:<password>@dbhost.example.com:27017/dbname`

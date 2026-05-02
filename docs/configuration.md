@@ -107,28 +107,37 @@ The active backend exposes the same five repository protocols on
 ### SQLite URL forms
 
 SQLite is the default backend and the only one whose URL points at a
-file rather than a network host. Three useful idioms:
+file rather than a network host. The shape is always:
+
+```
+sqlite+aiosqlite:///PATH
+```
+
+…where the prefix is fixed and `PATH` is whatever you want SQLAlchemy
+to open. Three useful values for `PATH`:
+
+| `PATH` | Resolves to | When to use it |
+|---|---|---|
+| `./dbname.db` | `dbname.db` in the process working directory | Local dev and the bundled `examples/` apps. |
+| `/var/lib/app/dbname.db` | the absolute file at that path | Production. Point it at the host's persistent volume. |
+| `:memory:` | per-process in-memory DB | Per-test fixtures only — contents vanish at process exit. |
+
+So the three full URLs are:
 
 ```bash
-# Relative path — file lives under the process working directory.
-# Best for local dev and the bundled examples/ apps.
 sqlite+aiosqlite:///./dbname.db
-
-# Absolute path — note the FOUR slashes (three for the URL scheme,
-# one for the leading / of the absolute path). The single most
-# common SQLite-URL paper-cut.
 sqlite+aiosqlite:////var/lib/app/dbname.db
-
-# In-memory — per-process, contents vanish when the process exits.
-# Used by regstack's own per-test fixtures; never use in production.
 sqlite+aiosqlite:///:memory:
 ```
 
+The absolute form looks like it has four slashes, but it's the same
+three-slash prefix as the others — the fourth slash is the leading
+`/` of the absolute path. This is the single most common SQLite-URL
+paper-cut.
+
 Both file forms create the file on first connection, so a fresh
 checkout running `uv run regstack init && uv run uvicorn …` works
-with no `mkdir` or `touch` step. The absolute form is what most
-production deployments want — point it at a writable path under
-`/var/lib/<app>/` (or wherever the host's persistent volume mounts).
+with no `mkdir` or `touch` step.
 
 ## JWT
 

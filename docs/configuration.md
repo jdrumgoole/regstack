@@ -85,9 +85,10 @@ regstack picks a backend at construction time from the URL scheme of
   - Notes
 
 * - SQLite
-  - `sqlite+aiosqlite:///./dbname.db`
+  - Relative file: `sqlite+aiosqlite:///./dbname.db`
   - Default. Bundled in the base install — no extras needed.
-    `:memory:` works too (per-test).
+    See [SQLite URL forms](#sqlite-url-forms) below for absolute-path
+    and in-memory variants.
 * - Postgres
   - `postgresql+asyncpg://<username>:<password>@dbhost.example.com:5432/dbname`
   - Requires the `postgres` extra (pulls in `asyncpg`). The driver is
@@ -102,6 +103,41 @@ regstack picks a backend at construction time from the URL scheme of
 The active backend exposes the same five repository protocols on
 ``RegStack.users``, ``.pending``, ``.blacklist``, ``.attempts``,
 ``.mfa_codes``. Routers / hooks never branch on backend kind.
+
+### SQLite URL forms
+
+SQLite is the default backend and the only one whose URL points at a
+file rather than a network host. The shape is always:
+
+```
+sqlite+aiosqlite:///PATH
+```
+
+…where the prefix is fixed and `PATH` is whatever you want SQLAlchemy
+to open. Three useful values for `PATH`:
+
+| `PATH` | Resolves to | When to use it |
+|---|---|---|
+| `./dbname.db` | `dbname.db` in the process working directory | Local dev and the bundled `examples/` apps. |
+| `/var/lib/app/dbname.db` | the absolute file at that path | Production. Point it at the host's persistent volume. |
+| `:memory:` | per-process in-memory DB | Per-test fixtures only — contents vanish at process exit. |
+
+So the three full URLs are:
+
+```bash
+sqlite+aiosqlite:///./dbname.db
+sqlite+aiosqlite:////var/lib/app/dbname.db
+sqlite+aiosqlite:///:memory:
+```
+
+The absolute form looks like it has four slashes, but it's the same
+three-slash prefix as the others — the fourth slash is the leading
+`/` of the absolute path. This is the single most common SQLite-URL
+paper-cut.
+
+Both file forms create the file on first connection, so a fresh
+checkout running `uv run regstack init && uv run uvicorn …` works
+with no `mkdir` or `touch` step.
 
 ## JWT
 

@@ -180,8 +180,8 @@ The same docs are also browsable as Markdown in [`docs/`](https://github.com/jdr
 Alpha. Single-file SQLite is the default and runs with no infrastructure;
 PostgreSQL and MongoDB backends pass the same parametrized integration
 suite. OAuth (Google) shipped in `v0.3.0`; the `regstack oauth setup`
-guided wizard shipped in `v0.4.0`. Latest tagged release: `v0.4.0`.
-See the
+guided wizard in `v0.4.0`; the live `regstack theme design` tool in
+`v0.5.0`. Latest tagged release: `v0.5.0`. See the
 [changelog](https://regstack.readthedocs.io/en/latest/changelog.html)
 for the per-release breakdown.
 

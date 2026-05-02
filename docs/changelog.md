@@ -3,20 +3,32 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
-## Unreleased
+## 0.5.0 — 2026-05-02
 
 ### Added
 
 - **Theme designer.** `regstack theme design` opens a native pywebview
   window with controls for every `--rs-*` CSS custom property and a
-  real-time preview of the bundled SSR widgets. Saving writes
+  real-time preview of the bundled SSR widgets (sign-in form, success
+  / error banners, danger-zone button). Saving writes
   `regstack-theme.css`; the designer round-trips values back into the
   form on next launch so iteration is non-destructive. `--print-only`
   mode takes repeatable `--var NAME=VALUE` pairs (with a `dark:`
   prefix for dark-scheme overrides) and writes the file headlessly.
+  Lives in `regstack.wizard.theme_designer`; registered as a lazy
+  Click subgroup so `regstack init` / `doctor` don't pay the
+  pywebview/uvicorn import cost.
 - "Why use regstack" pitch in `docs/index.md` updated to surface the
   two pywebview tools (`oauth setup` + `theme design`) as a
   distinguishing feature vs. fastapi-users / Auth0 / Keycloak.
+
+### Docs
+
+- New "About the examples" convention block at the top of
+  `docs/index.md`. Every URL, email, smtp host, and admin command
+  across the docs now extrapolates from the same fictional app at
+  `app.example.com` with `<username>` / `<password>` placeholders —
+  no more `user:pw@host/dbname` / `db.internal/myapp` mishmash.
 
 ## 0.4.0 — 2026-05-02
 

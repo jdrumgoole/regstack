@@ -91,9 +91,13 @@ app.include_router(regstack.router, prefix=config.api_prefix)
 `RegStack` picks the right backend automatically from the URL scheme of
 `config.database_url`:
 
-- `sqlite+aiosqlite://` → SQLite via SQLAlchemy
-- `postgresql+asyncpg://` → Postgres via SQLAlchemy
-- `mongodb://` (or `mongodb+srv://`) → MongoDB
+- `sqlite+aiosqlite:///./dbname.db` → SQLite via SQLAlchemy
+  (file in cwd; see [SQLite URL forms](configuration.md#sqlite-url-forms)
+  for absolute and `:memory:` variants)
+- `postgresql+asyncpg://<username>:<password>@dbhost.example.com:5432/dbname`
+  → Postgres via SQLAlchemy
+- `mongodb://<username>:<password>@dbhost.example.com:27017/dbname`
+  (or `mongodb+srv://…`) → MongoDB
 
 `install_schema()` is idempotent. On SQL backends it runs Alembic
 migrations to head; on MongoDB it ensures the indexes exist. Calling

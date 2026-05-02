@@ -85,9 +85,10 @@ regstack picks a backend at construction time from the URL scheme of
   - Notes
 
 * - SQLite
-  - `sqlite+aiosqlite:///./dbname.db`
+  - Relative file: `sqlite+aiosqlite:///./dbname.db`
   - Default. Bundled in the base install — no extras needed.
-    `:memory:` works too (per-test).
+    See [SQLite URL forms](#sqlite-url-forms) below for absolute-path
+    and in-memory variants.
 * - Postgres
   - `postgresql+asyncpg://<username>:<password>@dbhost.example.com:5432/dbname`
   - Requires the `postgres` extra (pulls in `asyncpg`). The driver is
@@ -102,6 +103,32 @@ regstack picks a backend at construction time from the URL scheme of
 The active backend exposes the same five repository protocols on
 ``RegStack.users``, ``.pending``, ``.blacklist``, ``.attempts``,
 ``.mfa_codes``. Routers / hooks never branch on backend kind.
+
+### SQLite URL forms
+
+SQLite is the default backend and the only one whose URL points at a
+file rather than a network host. Three useful idioms:
+
+```bash
+# Relative path — file lives under the process working directory.
+# Best for local dev and the bundled examples/ apps.
+sqlite+aiosqlite:///./dbname.db
+
+# Absolute path — note the FOUR slashes (three for the URL scheme,
+# one for the leading / of the absolute path). The single most
+# common SQLite-URL paper-cut.
+sqlite+aiosqlite:////var/lib/app/dbname.db
+
+# In-memory — per-process, contents vanish when the process exits.
+# Used by regstack's own per-test fixtures; never use in production.
+sqlite+aiosqlite:///:memory:
+```
+
+Both file forms create the file on first connection, so a fresh
+checkout running `uv run regstack init && uv run uvicorn …` works
+with no `mkdir` or `touch` step. The absolute form is what most
+production deployments want — point it at a writable path under
+`/var/lib/<app>/` (or wherever the host's persistent volume mounts).
 
 ## JWT
 

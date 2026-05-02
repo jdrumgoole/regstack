@@ -16,13 +16,13 @@ a working backend with no infrastructure. To switch:
 # regstack.toml
 
 # SQLite (default — file lives wherever the path points)
-database_url = "sqlite+aiosqlite:///./cellar.db"
+database_url = "sqlite+aiosqlite:///./dbname.db"
 
 # Postgres (needs the `postgres` extra → asyncpg)
-database_url = "postgresql+asyncpg://acme:hunter2hunter2@db.cellar.example.com:5432/cellar"
+database_url = "postgresql+asyncpg://<username>:<password>@dbhost.example.com:5432/dbname"
 
 # MongoDB (needs the `mongo` extra → pymongo)
-database_url = "mongodb://acme:hunter2hunter2@db.cellar.example.com:27017/cellar"
+database_url = "mongodb://<username>:<password>@dbhost.example.com:27017/dbname"
 ```
 
 Hosts that already manage their own connection pool — for example, an
@@ -210,7 +210,7 @@ one does not validate against the other. The
 ## Bootstrapping the first admin
 
 ```bash
-uv run regstack create-admin --email admin@cellar.example.com
+uv run regstack create-admin --email admin@app.example.com
 ```
 
 The CLI prompts for a password (with confirmation). Re-running with
@@ -220,7 +220,7 @@ their password.
 In code:
 
 ```python
-await regstack.bootstrap_admin("admin@cellar.example.com", "long-strong-password")
+await regstack.bootstrap_admin("admin@app.example.com", "long-strong-password")
 ```
 
 This is idempotent — promotes an existing user, creates one if not

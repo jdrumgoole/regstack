@@ -85,16 +85,16 @@ regstack picks a backend at construction time from the URL scheme of
   - Notes
 
 * - SQLite
-  - `sqlite+aiosqlite:///./cellar.db`
+  - `sqlite+aiosqlite:///./dbname.db`
   - Default. Bundled in the base install — no extras needed.
     `:memory:` works too (per-test).
 * - Postgres
-  - `postgresql+asyncpg://acme:hunter2hunter2@db.cellar.example.com:5432/cellar`
+  - `postgresql+asyncpg://<username>:<password>@dbhost.example.com:5432/dbname`
   - Requires the `postgres` extra (pulls in `asyncpg`). The driver is
     pinned to `+asyncpg` — sync drivers won't work.
 * - MongoDB
-  - `mongodb://acme:hunter2hunter2@db.cellar.example.com:27017/cellar`
-    (or `mongodb+srv://acme:hunter2hunter2@cellar.abc123.mongodb.net/cellar`)
+  - `mongodb://<username>:<password>@dbhost.example.com:27017/dbname`
+    (or `mongodb+srv://<username>:<password>@app.abc123.mongodb.net/dbname`)
   - Requires the `mongo` extra (pulls in `pymongo`). Database is taken
     from the URL path; falls back to ``mongodb_database`` if absent.
 ```
@@ -235,14 +235,14 @@ The active backend exposes the same five repository protocols on
 ```toml
 [email]
 backend = "console"             # console | smtp | ses
-from_address = "noreply@cellar.example.com"
-from_name    = "Acme Wine Cellar"
+from_address = "noreply@app.example.com"
+from_name    = "Example App"
 
 # smtp
-smtp_host = "smtp.cellar.example.com"
+smtp_host = "smtp.app.example.com"
 smtp_port = 587
 smtp_starttls = true
-smtp_username = "acme"
+smtp_username = "<username>"
 # smtp_password is a SecretStr — set via REGSTACK_EMAIL__SMTP_PASSWORD
 
 # ses

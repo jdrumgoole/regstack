@@ -5,7 +5,7 @@ import socket
 import subprocess
 import time
 
-from invoke import Context, task
+from invoke import Context, Exit, task
 
 
 @task
@@ -124,6 +124,21 @@ def coverage(
     Set ``--fail-under=N`` to make the task exit non-zero when total
     line coverage drops below N percent — useful in CI.
     """
+    # Pre-flight: every backend in the matrix must be reachable. A coverage
+    # number computed against a partial backend matrix is meaningless — the
+    # entire mongo backend tree would be marked uncovered purely because
+    # mongod wasn't running, not because of any code change. Fail fast with
+    # a distinct marker so scheduled runs can recognise an infra problem
+    # instead of filing a coverage-regression issue.
+    missing = [f"{_NAMES[k]} (:{p})" for k, p in _PORTS.items() if not _port_open(p)]
+    if missing:
+        raise Exit(
+            "COVERAGE_INFRA_UNAVAILABLE: required backends not reachable: "
+            f"{', '.join(missing)}. Bring services up with `inv db-up` "
+            "(or run `python scripts/ccr_coverage_setup.py` in a fresh CCR "
+            "container) and re-run. No coverage number was produced.",
+            code=2,
+        )
     # Wipe stale coverage state so partial reruns don't leave double-counted
     # data files behind.
     c.run("uv run coverage erase", pty=True, warn=True)

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import Row, delete, func, select
 
 from regstack.backends.sql.schema import pending_table
 from regstack.models.pending_registration import PendingRegistration
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine
 
 
-def _row_to_pending(row) -> PendingRegistration:
+def _row_to_pending(row: Row[Any]) -> PendingRegistration:
     data = dict(row._mapping)
     return PendingRegistration.model_validate(data)
 
@@ -26,8 +26,6 @@ class SqlPendingRepo:
     async def upsert(self, pending: PendingRegistration) -> PendingRegistration:
         if pending.id is None:
             pending.id = uuid.uuid4().hex
-        if pending.created_at is None:
-            pending.created_at = datetime.now(UTC)
         values = _pending_values(pending)
         async with self._engine.begin() as conn:
             await conn.execute(delete(self._t).where(self._t.c.email == pending.email))
@@ -65,7 +63,7 @@ class SqlPendingRepo:
         return int(result.scalar_one())
 
 
-def _pending_values(p: PendingRegistration) -> dict:
+def _pending_values(p: PendingRegistration) -> dict[str, Any]:
     return {
         "id": p.id,
         "email": p.email,

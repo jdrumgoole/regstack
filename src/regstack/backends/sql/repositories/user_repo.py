@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import and_, delete, desc, func, select, update
+from sqlalchemy import Row, and_, delete, desc, func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from regstack.backends.protocols import UserAlreadyExistsError
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from regstack.auth.clock import Clock
 
 
-def _row_to_user(row) -> BaseUser:
+def _row_to_user(row: Row[Any]) -> BaseUser:
     data = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
     return BaseUser.model_validate(data)
 
@@ -179,7 +179,7 @@ class SqlUserRepo:
         return [_row_to_user(r) for r in rows]
 
 
-def _user_values(user: BaseUser) -> dict:
+def _user_values(user: BaseUser) -> dict[str, Any]:
     """Materialise a BaseUser into a column-value dict suitable for insert."""
     return {
         "id": user.id,

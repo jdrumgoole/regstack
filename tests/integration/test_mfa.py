@@ -5,6 +5,7 @@ from datetime import timedelta
 
 import pytest
 
+from regstack.models.user import BaseUser
 from regstack.sms.null import NullSmsService
 
 REGISTER = "/api/auth/register"
@@ -137,6 +138,54 @@ async def test_phone_disable_clears_state(make_client) -> None:
         assert user is not None
         assert user.phone_number is None
         assert user.is_mfa_enabled is False
+
+
+@pytest.mark.asyncio
+async def test_phone_start_rejects_oauth_only_user(make_client) -> None:
+    """OAuth-only users (hashed_password=None) must get a 400 with a clear
+    error, not a 500 from PasswordHasher choking on None.
+    """
+    async with make_client(enable_sms_2fa=True) as (rs, client):
+        oauth_user = await rs.users.create(
+            BaseUser(
+                email="oauth-only@example.com",
+                hashed_password=None,
+                is_active=True,
+                is_verified=True,
+            )
+        )
+        assert oauth_user.id is not None
+        token, _ = rs.jwt.encode(oauth_user.id)
+        r = await client.post(
+            PHONE_START,
+            json={"phone_number": PHONE, "current_password": "irrelevant"},
+            headers={"authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 400, r.text
+        assert "No password set" in r.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_phone_disable_rejects_oauth_only_user(make_client) -> None:
+    async with make_client(enable_sms_2fa=True) as (rs, client):
+        oauth_user = await rs.users.create(
+            BaseUser(
+                email="oauth-only-disable@example.com",
+                hashed_password=None,
+                is_active=True,
+                is_verified=True,
+            )
+        )
+        assert oauth_user.id is not None
+        token, _ = rs.jwt.encode(oauth_user.id)
+        r = await client.request(
+            "DELETE",
+            PHONE_DELETE,
+            json={"current_password": "irrelevant"},
+            headers={"authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 400, r.text
+        assert "No password set" in r.json()["detail"]
 
 
 @pytest.mark.asyncio

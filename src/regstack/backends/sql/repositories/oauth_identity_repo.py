@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import and_, delete, select, update
+from sqlalchemy import Row, and_, delete, select, update
 from sqlalchemy.exc import IntegrityError
 
 from regstack.backends.protocols import OAuthIdentityAlreadyLinkedError
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine
 
 
-def _row_to_identity(row) -> OAuthIdentity:
+def _row_to_identity(row: Row[Any]) -> OAuthIdentity:
     data = dict(row._mapping)
     return OAuthIdentity.model_validate(data)
 
@@ -28,8 +28,6 @@ class SqlOAuthIdentityRepo:
     async def create(self, identity: OAuthIdentity) -> OAuthIdentity:
         if identity.id is None:
             identity.id = uuid.uuid4().hex
-        if identity.linked_at is None:
-            identity.linked_at = datetime.now(UTC)
         values = {
             "id": identity.id,
             "user_id": identity.user_id,

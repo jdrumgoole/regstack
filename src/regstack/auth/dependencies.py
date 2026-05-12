@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
 from fastapi import Depends, HTTPException, Request, status
@@ -11,6 +12,8 @@ if TYPE_CHECKING:
     from regstack.auth.jwt import JwtCodec
     from regstack.backends.protocols import BlacklistRepoProtocol, UserRepoProtocol
     from regstack.models.user import BaseUser
+
+UserDependency = Callable[..., Awaitable["BaseUser"]]
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -55,7 +58,7 @@ class AuthDependencies:
         self._users = users
         self._blacklist = blacklist
 
-    def current_user(self) -> object:
+    def current_user(self) -> UserDependency:
         """Return a FastAPI dependency that yields the authenticated user.
 
         The returned callable validates the ``Authorization: Bearer
@@ -79,7 +82,7 @@ class AuthDependencies:
 
         return _dep
 
-    def current_admin(self) -> object:
+    def current_admin(self) -> UserDependency:
         """Return a FastAPI dependency that yields a *superuser*.
 
         Same checks as :meth:`current_user`, plus a 403 if the
@@ -105,7 +108,7 @@ class AuthDependencies:
 
         return _dep
 
-    async def _authenticate(self, creds: HTTPAuthorizationCredentials | None):
+    async def _authenticate(self, creds: HTTPAuthorizationCredentials | None) -> BaseUser:
         if creds is None or creds.scheme.lower() != "bearer":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

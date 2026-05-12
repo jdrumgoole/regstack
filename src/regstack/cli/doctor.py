@@ -4,6 +4,7 @@ import asyncio
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 import dns.resolver
@@ -11,6 +12,9 @@ import dns.resolver
 from regstack.backends.factory import build_backend, detect_backend_kind
 from regstack.cli._runtime import load_runtime_config
 from regstack.email.factory import build_email_service
+
+if TYPE_CHECKING:
+    from regstack.config.schema import RegStackConfig
 
 
 @dataclass(slots=True)
@@ -85,7 +89,7 @@ async def _run(
     return out
 
 
-async def _check_backend(config) -> CheckResult:
+async def _check_backend(config: RegStackConfig) -> CheckResult:
     kind = detect_backend_kind(config.database_url.get_secret_value())
     backend = build_backend(config)
     try:
@@ -97,7 +101,7 @@ async def _check_backend(config) -> CheckResult:
         await backend.aclose()
 
 
-async def _check_schema(config) -> CheckResult:
+async def _check_schema(config: RegStackConfig) -> CheckResult:
     """Confirm the schema/indexes are installed.
 
     For Mongo we look for the canonical email_unique + jti_unique indexes;
@@ -151,7 +155,7 @@ async def _check_schema(config) -> CheckResult:
         await backend.aclose()
 
 
-def _check_email_factory(config) -> CheckResult:
+def _check_email_factory(config: RegStackConfig) -> CheckResult:
     try:
         service = build_email_service(config.email)
     except Exception as exc:
@@ -161,7 +165,7 @@ def _check_email_factory(config) -> CheckResult:
     return CheckResult("email backend", True, f"{config.email.backend} → {type(service).__name__}")
 
 
-def _check_dns(config) -> list[CheckResult]:
+def _check_dns(config: RegStackConfig) -> list[CheckResult]:
     sender = config.email.from_address
     try:
         domain = sender.split("@", 1)[1]
@@ -188,7 +192,7 @@ def _dig(name: str, rtype: str, label: str, *, needle: str | None = None) -> Che
     return CheckResult(label, True, f"{name} ok ({len(answers)} record(s))")
 
 
-async def _send_test_email(config, to: str) -> CheckResult:
+async def _send_test_email(config: RegStackConfig, to: str) -> CheckResult:
     from regstack.email.base import EmailMessage
 
     try:

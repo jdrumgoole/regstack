@@ -9,6 +9,7 @@ from regstack.routers._schemas import MessageResponse
 
 if TYPE_CHECKING:
     from regstack.app import RegStack
+    from regstack.models.user import BaseUser
 
 
 def build_logout_router(rs: RegStack) -> APIRouter:
@@ -22,7 +23,7 @@ def build_logout_router(rs: RegStack) -> APIRouter:
     )
     async def logout(
         request: Request,
-        _user=Depends(rs.deps.current_user()),
+        _user: BaseUser = Depends(rs.deps.current_user()),
     ) -> MessageResponse:
         # Re-decode the token (the dep already validated it) to grab jti+exp
         # so we can record the revocation. The auth header was already proven

@@ -8,9 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from regstack.auth.jwt import TokenError
 from regstack.auth.mfa import generate_mfa_code
-from regstack.backends.protocols import MfaVerifyOutcome
+from regstack.backends.protocols import MfaVerifyOutcome, MfaVerifyResult
 from regstack.models.mfa_code import MfaCode
 from regstack.models.user import BaseUser, UserPublic
+from regstack.routers._helpers import require_password_set
 from regstack.routers._schemas import MessageResponse
 from regstack.sms.base import SmsMessage, is_valid_e164
 
@@ -62,6 +63,8 @@ def build_phone_router(rs: RegStack) -> APIRouter:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Phone number must be in E.164 format (e.g. +14155552671).",
             )
+        require_password_set(user)
+        assert user.hashed_password is not None  # narrowed by require_password_set
         if not rs.password_hasher.verify(payload.current_password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -146,6 +149,8 @@ def build_phone_router(rs: RegStack) -> APIRouter:
         payload: PhoneDisableRequest,
         user: BaseUser = Depends(rs.deps.current_user()),
     ) -> MessageResponse:
+        require_password_set(user)
+        assert user.hashed_password is not None  # narrowed by require_password_set
         if not rs.password_hasher.verify(payload.current_password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -216,7 +221,7 @@ def _decode_phone_setup_token(rs: RegStack, token: str) -> tuple[str, str]:
     return str(claims["sub"]), str(claims["phone"])
 
 
-def _outcome_to_http(result):
+def _outcome_to_http(result: MfaVerifyResult) -> HTTPException:
     code = result.outcome
     if code is MfaVerifyOutcome.MISSING:
         detail = "No pending verification code — request a new one."

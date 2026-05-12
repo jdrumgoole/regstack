@@ -8,9 +8,11 @@ from regstack.models.login_attempt import LoginAttempt
 if TYPE_CHECKING:
     from pymongo.asynchronous.database import AsyncDatabase
 
+    from regstack.backends.mongo.client import MongoDoc
+
 
 class LoginAttemptRepo:
-    def __init__(self, db: AsyncDatabase, collection_name: str) -> None:
+    def __init__(self, db: AsyncDatabase[MongoDoc], collection_name: str) -> None:
         self._collection = db[collection_name]
 
     async def record_failure(

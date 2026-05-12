@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import Row, delete, select, update
 
 from regstack.backends.sql.schema import oauth_states_table
 from regstack.models.oauth_state import OAuthState
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine
 
 
-def _row_to_state(row) -> OAuthState:
+def _row_to_state(row: Row[Any]) -> OAuthState:
     data = dict(row._mapping)
     return OAuthState.model_validate(data)
 

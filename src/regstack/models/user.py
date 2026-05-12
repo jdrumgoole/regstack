@@ -95,7 +95,7 @@ class UserPublic(BaseModel):
         if user.id is None:
             raise ValueError("Cannot serialise a user without an id")
         return cls(
-            _id=user.id,
+            id=user.id,
             email=user.email,
             is_active=user.is_active,
             is_verified=user.is_verified,

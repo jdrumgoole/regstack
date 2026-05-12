@@ -15,7 +15,7 @@ class SesEmailService(EmailService):
 
     def __init__(self, config: EmailConfig) -> None:
         try:
-            import aioboto3  # noqa: F401  (import-time check)
+            import aioboto3  # type: ignore[import-not-found]  # noqa: F401  (import-time check)
         except ImportError as exc:
             raise RuntimeError(
                 "The SES email backend requires the 'ses' extra. "

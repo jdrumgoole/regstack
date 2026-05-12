@@ -409,7 +409,7 @@ async def _begin_flow(
         code_verifier=code_verifier,
         nonce=nonce,
         redirect_to=redirect_to,
-        mode=mode,  # type: ignore[arg-type]
+        mode=mode,
         linking_user_id=linking_user_id,
         created_at=rs.clock.now(),
         expires_at=rs.clock.now() + _td(seconds=rs.config.oauth.state_ttl_seconds),

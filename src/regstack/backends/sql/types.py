@@ -14,7 +14,7 @@ from typing import Any
 from sqlalchemy import DateTime, TypeDecorator
 
 
-class UtcDateTime(TypeDecorator):
+class UtcDateTime(TypeDecorator[datetime]):
     impl = DateTime(timezone=True)
     cache_ok = True
 
@@ -30,8 +30,10 @@ class UtcDateTime(TypeDecorator):
     def process_result_value(self, value: Any, dialect: Any) -> datetime | None:
         if value is None:
             return None
+        # impl=DateTime(timezone=True) guarantees SQLAlchemy hands us a datetime;
+        # anything else is a driver/dialect bug and shouldn't be silently passed.
         if not isinstance(value, datetime):
-            return value
+            raise TypeError(f"UtcDateTime expects datetime from driver, got {type(value).__name__}")
         if value.tzinfo is None:
             return value.replace(tzinfo=UTC)
         return value

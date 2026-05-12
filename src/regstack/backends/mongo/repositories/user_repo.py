@@ -13,6 +13,8 @@ from regstack.models.user import BaseUser
 if TYPE_CHECKING:
     from pymongo.asynchronous.database import AsyncDatabase
 
+    from regstack.backends.mongo.client import MongoDoc
+
 
 def _bulk_revoke_cutoff(now: datetime) -> datetime:
     """The cutoff timestamp recorded on the user document. Stored at full
@@ -27,7 +29,7 @@ def _bulk_revoke_cutoff(now: datetime) -> datetime:
 class UserRepo:
     def __init__(
         self,
-        db: AsyncDatabase,
+        db: AsyncDatabase[MongoDoc],
         collection_name: str,
         *,
         clock: Clock | None = None,

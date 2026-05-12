@@ -6,7 +6,14 @@ from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
-from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PackageLoader, select_autoescape
+from jinja2 import (
+    BaseLoader,
+    ChoiceLoader,
+    Environment,
+    FileSystemLoader,
+    PackageLoader,
+    select_autoescape,
+)
 
 if TYPE_CHECKING:
     from regstack.app import RegStack
@@ -61,7 +68,7 @@ def build_ui_environment(host_template_dirs: list[Path] | None = None) -> Enviro
         A configured :class:`jinja2.Environment` with autoescape on
         for HTML.
     """
-    loaders = [FileSystemLoader(str(p)) for p in (host_template_dirs or [])]
+    loaders: list[BaseLoader] = [FileSystemLoader(str(p)) for p in (host_template_dirs or [])]
     loaders.append(PackageLoader(_PACKAGE, _TEMPLATE_DIR))
     return Environment(
         loader=ChoiceLoader(loaders),

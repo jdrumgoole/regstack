@@ -4,7 +4,14 @@ from importlib import resources
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PackageLoader, select_autoescape
+from jinja2 import (
+    BaseLoader,
+    ChoiceLoader,
+    Environment,
+    FileSystemLoader,
+    PackageLoader,
+    select_autoescape,
+)
 
 from regstack.email.base import EmailMessage
 
@@ -46,7 +53,7 @@ class MailComposer:
         self._env = self._build_env()
 
     def _build_env(self) -> Environment:
-        loaders = [FileSystemLoader(str(p)) for p in self._host_dirs]
+        loaders: list[BaseLoader] = [FileSystemLoader(str(p)) for p in self._host_dirs]
         loaders.append(PackageLoader(_DEFAULT_PACKAGE, _DEFAULT_TEMPLATE_DIR))
         return Environment(
             loader=ChoiceLoader(loaders),

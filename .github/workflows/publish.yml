@@ -61,4 +61,9 @@ jobs:
         with:
           name: dist
           path: dist/
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      # Pinned to a commit SHA, not the mutable `release/v1` branch — the
+      # publish job has `id-token: write`, so a tag/branch swap in the
+      # action repo would let an attacker push a malicious wheel under our
+      # OIDC identity. Update by resolving the latest SHA on `release/v1`
+      # and bumping the trailing comment to match.
+      - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b  # release/v1

@@ -21,6 +21,22 @@ CREDS = {
 
 
 @pytest.mark.asyncio
+async def test_logout_fires_user_logged_out_hook(client: AsyncClient, regstack: RegStack) -> None:
+    """user_logged_out is listed in KNOWN_EVENTS — must actually fire."""
+    payloads: list[dict] = []
+    regstack.hooks.on("user_logged_out", lambda **kw: payloads.append(kw))
+
+    await client.post(REGISTER, json=CREDS)
+    r = await client.post(LOGIN, json={"email": CREDS["email"], "password": CREDS["password"]})
+    token = r.json()["access_token"]
+    r = await client.post(LOGOUT, headers={"authorization": f"Bearer {token}"})
+    assert r.status_code == 200
+
+    assert len(payloads) == 1
+    assert payloads[0]["user"].email == CREDS["email"]
+
+
+@pytest.mark.asyncio
 async def test_register_login_me_logout(client: AsyncClient, regstack: RegStack) -> None:
     r = await client.post(REGISTER, json=CREDS)
     assert r.status_code == 201, r.text

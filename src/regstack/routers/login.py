@@ -159,7 +159,10 @@ async def _start_mfa_step(rs: RegStack, user: BaseUser) -> MfaPendingResponse:
     )
     pending_ttl = rs.config.mfa_pending_token_ttl_seconds
     pending_token = _encode_mfa_token(rs, user.id, pending_ttl)
-    await rs.hooks.fire("mfa_login_started", user=user, code=raw_code)
+    # No `code=` in the hook payload — see the matching comment in
+    # phone.py. Hooks are observability-only; SMS delivery overrides
+    # belong on `SmsService`.
+    await rs.hooks.fire("mfa_login_started", user=user)
     return MfaPendingResponse(mfa_pending_token=pending_token, expires_in=pending_ttl)
 
 

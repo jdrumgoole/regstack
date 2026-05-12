@@ -99,11 +99,15 @@ def build_phone_router(rs: RegStack) -> APIRouter:
 
         pending_ttl = rs.config.mfa_pending_token_ttl_seconds
         token = _encode_phone_setup_token(rs, user.id, payload.phone_number, pending_ttl)
+        # No `code=` in the hook payload — hooks are best-effort
+        # observability (and may be wired into logging / analytics by
+        # hosts), so the raw OTP must not travel through them. Hosts
+        # that need to take over SMS delivery should override
+        # `SmsService`, not subscribe to this hook.
         await rs.hooks.fire(
             "phone_setup_started",
             user=user,
             phone=payload.phone_number,
-            code=raw_code,
         )
         return PhoneStartResponse(pending_token=token, expires_in=pending_ttl)
 

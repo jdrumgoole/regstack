@@ -47,6 +47,67 @@ async def _register_and_login(client) -> str:
 
 
 @pytest.mark.asyncio
+async def test_phone_setup_hook_omits_otp(make_client) -> None:
+    """phone_setup_started hook must never receive the raw OTP. Hooks are
+    best-effort observability and may be wired into logging/analytics;
+    plaintext OTPs in that path are a leak waiting to happen.
+    """
+    payloads: list[dict] = []
+
+    async with make_client(enable_sms_2fa=True) as (rs, client):
+        rs.hooks.on("phone_setup_started", lambda **kw: payloads.append(kw))
+        token = await _register_and_login(client)
+        r = await client.post(
+            PHONE_START,
+            json={"phone_number": PHONE, "current_password": CREDS["password"]},
+            headers={"authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 202, r.text
+
+    assert len(payloads) == 1
+    assert "code" not in payloads[0]
+    # The non-secret fields must still be present.
+    assert payloads[0]["phone"] == PHONE
+    assert payloads[0]["user"].email == CREDS["email"]
+
+
+@pytest.mark.asyncio
+async def test_mfa_login_hook_omits_otp(make_client) -> None:
+    """mfa_login_started must not include the raw OTP either — same threat
+    model as phone_setup_started.
+    """
+    payloads: list[dict] = []
+
+    async with make_client(enable_sms_2fa=True) as (rs, client):
+        token = await _register_and_login(client)
+        sms = _capture_sms(rs)
+
+        # Set up MFA so the next login goes through the MFA branch.
+        r = await client.post(
+            PHONE_START,
+            json={"phone_number": PHONE, "current_password": CREDS["password"]},
+            headers={"authorization": f"Bearer {token}"},
+        )
+        pending_token = r.json()["pending_token"]
+        setup_code = _extract_code(sms.outbox[-1].body)
+        await client.post(
+            PHONE_CONFIRM,
+            json={"pending_token": pending_token, "code": setup_code},
+        )
+
+        # Subscribe AFTER setup so we only capture the MFA login event.
+        rs.hooks.on("mfa_login_started", lambda **kw: payloads.append(kw))
+        sms.outbox.clear()
+        r = await client.post(LOGIN, json={"email": CREDS["email"], "password": CREDS["password"]})
+        assert r.status_code == 200
+        assert r.json()["status"] == "mfa_required"
+
+    assert len(payloads) == 1
+    assert "code" not in payloads[0]
+    assert payloads[0]["user"].email == CREDS["email"]
+
+
+@pytest.mark.asyncio
 async def test_phone_routes_unmounted_when_2fa_disabled(client) -> None:
     token = await _register_and_login(client)
     r = await client.post(

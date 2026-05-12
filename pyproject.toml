@@ -1,6 +1,6 @@
 [project]
 name = "regstack"
-version = "0.5.4"
+version = "0.5.5"
 description = "Embeddable user registration, login, and account management for FastAPI apps. SQLite / Postgres / MongoDB."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -26,7 +26,9 @@ dependencies = [
     "jinja2>=3.1",
     "click>=8.1",
     "dnspython>=2.6",
-    "python-multipart>=0.0.9",
+    # python-multipart>=0.0.26 picks up CVE-2026-40347 (DoS via oversized
+    # multipart preamble).
+    "python-multipart>=0.0.26",
     "email-validator>=2.1",
     "aiosmtplib>=3.0",
     # SQL stack — bundled by default because SQLite is the default backend.

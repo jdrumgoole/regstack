@@ -128,6 +128,10 @@ def build_admin_router(rs: RegStack) -> APIRouter:
     ) -> MessageResponse:
         user = await _require_user(rs, user_id)
         assert user.id is not None
+        # Cascade OAuth identities first so a brief race window can't
+        # leave orphan identity rows pointing at a deleted user_id. Matches
+        # the user-initiated DELETE /account flow in routers/account.py.
+        await rs.oauth_identities.delete_by_user_id(user.id)
         await rs.users.delete(user.id)
         await rs.pending.delete_by_email(user.email)
         await rs.lockout.clear(user.email)

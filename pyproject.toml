@@ -1,6 +1,6 @@
 [project]
 name = "regstack"
-version = "0.5.3"
+version = "0.5.4"
 description = "Embeddable user registration, login, and account management for FastAPI apps. SQLite / Postgres / MongoDB."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -49,6 +49,12 @@ twilio = ["twilio>=9.0"]
 # cryptography>=46.0.7 picks up CVE-2026-26007 (ECC subgroup attack on the
 # JWKS code path) plus CVE-2026-34073 and CVE-2026-39892.
 oauth = ["pyjwt[crypto]>=2.12.1", "cryptography>=46.0.7"]
+# Per-route rate limiting on the auth router. The limiter itself can be
+# host-supplied (so hosts that already use slowapi share the same Limiter
+# state), otherwise regstack constructs an in-memory one.
+rate_limit = [
+    "slowapi>=0.1.9",
+]
 docs = [
     "sphinx>=7.3",
     "myst-parser>=3.0",
@@ -76,6 +82,8 @@ dev = [
     "cryptography>=46.0.7",
     # E2E tests for the OAuth setup wizard (drives the SPA in headless Chromium).
     "pytest-playwright>=0.5",
+    # Rate-limit tests exercise the slowapi integration.
+    "slowapi>=0.1.9",
 ]
 
 [project.scripts]

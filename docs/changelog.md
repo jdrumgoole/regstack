@@ -3,6 +3,40 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## Unreleased
+
+### Added
+
+- **Per-route IP rate limits.** Opt-in via the new `rate_limit` extra
+  (or a host-supplied `slowapi.Limiter`) plus any of the new
+  `RegStackConfig.*_rate_limit` fields (`login_rate_limit`,
+  `register_rate_limit`, `forgot_password_rate_limit`,
+  `reset_password_rate_limit`, `verify_rate_limit`,
+  `resend_verification_rate_limit`, `change_password_rate_limit`,
+  `change_email_rate_limit`, `confirm_email_change_rate_limit`,
+  `delete_account_rate_limit`). Each accepts a slowapi-syntax string
+  (`"5/minute"`, `"5/minute;20/hour"`).
+- New constructor argument `RegStack(rate_limiter=...)`. When at
+  least one `*_rate_limit` field is set, regstack expects either
+  this argument or the `rate_limit` extra; failure to provide one
+  raises `RuntimeError` on first access to `regstack.router` —
+  failing closed beats silently disabling the protection.
+- Hosts remain responsible for `app.state.limiter` and the
+  `RateLimitExceeded` exception handler; slowapi owns the 429
+  response shape.
+
+### Notes
+
+- `LockoutService` (per-account, sliding-window failure counter) is
+  unchanged and continues to defend `/login` against
+  credential-stuffing against a single account. Per-route IP limits
+  are orthogonal: they defend each endpoint against a single source
+  IP spamming requests across many accounts.
+- The previously-reserved `login_max_per_minute` /
+  `login_max_per_hour` config fields are kept for back-compat but
+  no longer have any effect. Switch to the per-route fields when
+  you next touch your config.
+
 ## 0.5.0 — 2026-05-02
 
 ### Added

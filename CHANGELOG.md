@@ -5,6 +5,33 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
+## Unreleased
+
+**Per-route IP rate limits.** Opt-in via the new `rate_limit` extra
+(or a host-supplied `slowapi.Limiter`) plus any of the new
+`RegStackConfig.*_rate_limit` fields (`login_rate_limit`,
+`register_rate_limit`, `forgot_password_rate_limit`,
+`reset_password_rate_limit`, `verify_rate_limit`,
+`resend_verification_rate_limit`, `change_password_rate_limit`,
+`change_email_rate_limit`, `confirm_email_change_rate_limit`,
+`delete_account_rate_limit`). Each accepts a slowapi-syntax string
+(`"5/minute"`, `"5/minute;20/hour"`). Empty / unset means no limit
+on that route — `LockoutService` still defends `/login` against
+credential stuffing per-account.
+
+When `*_rate_limit` strings are configured but neither a
+`rate_limiter=` argument is passed nor the `rate_limit` extra is
+installed, `RegStack.router` raises `RuntimeError` on first access
+— failing closed beats silently disabling the protection. The
+host is still responsible for `app.state.limiter` and
+`app.add_exception_handler(RateLimitExceeded, ...)` — slowapi
+itself owns the 429 response shape.
+
+The previously-reserved `login_max_per_minute` /
+`login_max_per_hour` fields are kept for back-compat but
+unwired; remove them from your config in favour of the new
+per-route fields.
+
 ## 0.3.0 — 2026-04-30
 
 **OAuth — Sign in with Google.** Opt-in via the new `oauth` extra

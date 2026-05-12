@@ -144,7 +144,24 @@ class RegStackConfig(BaseSettings):
     login_lockout_threshold: Annotated[int, Field(ge=1)] = 5
     login_lockout_window_seconds: Annotated[int, Field(ge=10)] = 900
 
-    # Reserved for future route-level rate limiting (slowapi-style).
+    # Per-route IP-based rate limits, slowapi syntax (``"5/minute"`` or
+    # composite ``"5/minute;20/hour"``). Independent of the per-account
+    # lockout — those are about credential-stuffing one account, these are
+    # about a single source IP hammering an endpoint. None means "no
+    # limit on this route". The Limiter is either host-supplied via
+    # ``RegStack(rate_limiter=...)`` or built from the ``rate_limit`` extra.
+    login_rate_limit: str | None = None
+    register_rate_limit: str | None = None
+    forgot_password_rate_limit: str | None = None
+    reset_password_rate_limit: str | None = None
+    verify_rate_limit: str | None = None
+    resend_verification_rate_limit: str | None = None
+    change_password_rate_limit: str | None = None
+    change_email_rate_limit: str | None = None
+    confirm_email_change_rate_limit: str | None = None
+    delete_account_rate_limit: str | None = None
+    # DEPRECATED in favour of the per-route fields above; kept for
+    # back-compat with configs that set them. Unused by the router.
     login_max_per_minute: Annotated[int, Field(ge=1)] = 5
     login_max_per_hour: Annotated[int, Field(ge=1)] = 20
 

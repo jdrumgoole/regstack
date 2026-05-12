@@ -94,6 +94,7 @@ class RegStack:
         email_service: EmailService | None = None,
         mail_composer: MailComposer | None = None,
         sms_service: SmsService | None = None,
+        rate_limiter: object | None = None,
     ) -> None:
         """Construct the façade and wire its collaborators.
 
@@ -118,6 +119,18 @@ class RegStack:
             sms_service: Optional pre-built SMS backend. When ``None``,
                 one is built from ``config.sms`` via
                 :func:`~regstack.sms.factory.build_sms_service`.
+            rate_limiter: Optional ``slowapi.Limiter`` for per-route IP
+                rate limiting. When supplied alongside non-empty
+                ``*_rate_limit`` config strings, regstack decorates each
+                configured route with ``limiter.limit(...)``. Hosts that
+                already use slowapi should pass their own Limiter so it
+                shares state with the rest of the app; otherwise install
+                the ``rate_limit`` extra and let regstack build one
+                lazily on first router access. Note: the host is still
+                responsible for registering slowapi's exception handler
+                (``app.add_exception_handler(RateLimitExceeded, ...)``)
+                and assigning ``app.state.limiter`` — regstack just
+                wires the decorators.
         """
         self.config = config
         self.clock: Clock = clock or SystemClock()
@@ -145,6 +158,7 @@ class RegStack:
         self.hooks = HookRegistry()
         self.deps = AuthDependencies(jwt=self.jwt, users=self.users, blacklist=self.blacklist)
         self.oauth = self._build_oauth_registry()
+        self.rate_limiter = rate_limiter
         self._template_dirs: list[Path] = list(config.extra_template_dirs)
         self._ui_env: Environment | None = None
         self._router: APIRouter | None = None
@@ -187,11 +201,50 @@ class RegStack:
         (forgot/reset), ``phone`` + MFA, and ``admin`` based on
         ``config.enable_*`` flags.
 
-        Built lazily on first access.
+        Built lazily on first access. If any
+        ``RegStackConfig.*_rate_limit`` is set, a ``slowapi.Limiter`` is
+        also required — either via the ``rate_limiter=`` constructor
+        argument or auto-built from the ``rate_limit`` extra. Each
+        listed route is then decorated with ``limiter.limit(...)``
+        before the router is returned.
         """
         if self._router is None:
-            self._router = build_router(self)
+            router = build_router(self)
+            self._maybe_apply_rate_limits(router)
+            self._router = router
         return self._router
+
+    def _maybe_apply_rate_limits(self, router: APIRouter) -> None:
+        """Wire slowapi-style per-route limits onto the assembled router.
+
+        Skips silently when no ``*_rate_limit`` strings are configured —
+        per-account lockout still applies to ``/login`` regardless.
+        Raises ``RuntimeError`` when limits *are* configured but neither
+        a host-supplied Limiter nor the ``rate_limit`` extra is available
+        — failing closed beats silently disabling the protections.
+        """
+        from regstack.auth.rate_limit import (
+            apply_route_limits,
+            build_default_limiter,
+            collect_route_limits,
+        )
+
+        path_to_limit = collect_route_limits(self.config)
+        if not path_to_limit:
+            return
+
+        limiter = self.rate_limiter
+        if limiter is None:
+            try:
+                limiter = build_default_limiter()
+            except ImportError as exc:
+                raise RuntimeError(
+                    "Per-route rate limits are configured but slowapi is not "
+                    "installed. Either pass a Limiter via "
+                    "RegStack(rate_limiter=...) or install regstack[rate_limit]."
+                ) from exc
+            self.rate_limiter = limiter
+        apply_route_limits(router, limiter, path_to_limit)
 
     @property
     def ui_env(self) -> Environment:

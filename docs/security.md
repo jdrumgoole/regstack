@@ -104,6 +104,51 @@ visible to logged-out users only.
   failures.
 - Disabled in tests via `rate_limit_disabled=True`.
 
+## Per-route IP rate limits
+
+Lockout defends each *account* against credential-stuffing. It does
+nothing for an IP that hammers `/forgot-password`, `/register`, or
+`/verify` against many accounts. For that, regstack supports
+slowapi-backed per-route IP rate limits:
+
+- Opt in by installing the `rate_limit` extra (`pip install
+  regstack[rate_limit]`) **or** by passing a host-built
+  `slowapi.Limiter` to `RegStack(rate_limiter=...)`. Hosts already
+  using slowapi should pass their own Limiter so it shares state
+  with the rest of the app.
+- Set any of the `*_rate_limit` config fields to a slowapi-syntax
+  string. Each empty / unset field means "no limit on this route":
+
+  ```toml
+  login_rate_limit = "30/minute;200/hour"
+  register_rate_limit = "10/minute;50/hour"
+  forgot_password_rate_limit = "5/minute;20/hour"
+  reset_password_rate_limit = "5/minute;20/hour"
+  verify_rate_limit = "10/minute;60/hour"
+  resend_verification_rate_limit = "5/minute;30/hour"
+  change_password_rate_limit = "5/minute;20/hour"
+  ```
+
+- Hosts still own slowapi's app-level wiring:
+
+  ```python
+  from slowapi import Limiter, _rate_limit_exceeded_handler
+  from slowapi.errors import RateLimitExceeded
+  from slowapi.util import get_remote_address
+
+  limiter = Limiter(key_func=get_remote_address)
+  app.state.limiter = limiter
+  app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+  rs = RegStack(config=cfg, rate_limiter=limiter)
+  app.include_router(rs.router, prefix="/api/auth")
+  ```
+
+- Failing closed: if `*_rate_limit` is set but neither a Limiter
+  nor the extra is available, `regstack.router` raises
+  `RuntimeError` on first access. We never silently disable a
+  configured protection.
+
 ## Email verification (durable, hashed token)
 
 - Random 32-byte URL-safe token, SHA-256 hashed in
@@ -267,9 +312,11 @@ avoids that:
 - **Content Security Policy headers.** regstack's SSR layer is
   CSP-friendly but the host emits the `Content-Security-Policy`
   response header.
-- **Rate-limiting beyond the per-account login lockout.** A future
-  milestone may add a `slowapi`-style middleware; for now host-level
-  rate limits are the right place to push back broad attack traffic.
+- **Rate-limiting beyond the per-account login lockout.** Per-route
+  IP limits ship as the optional `rate_limit` extra (see *Per-route
+  IP rate limits* above). Host-level rate limiting (nginx, Cloudfront,
+  …) is still the right place to push back broad attack traffic that
+  isn't worth letting hit Python at all.
 - **Backups, MongoDB user permissions, network-level isolation** between
   the app and the database.
 

@@ -2310,7 +2310,7 @@ wheels = [
 
 [[package]]
 name = "regstack"
-version = "0.5.3"
+version = "0.5.5"
 source = { editable = "." }
 dependencies = [
     { name = "aiosmtplib" },
@@ -2419,7 +2419,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
     { name = "pytest-playwright", marker = "extra == 'dev'", specifier = ">=0.5" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.5" },
-    { name = "python-multipart", specifier = ">=0.0.9" },
+    { name = "python-multipart", specifier = ">=0.0.26" },
     { name = "pywebview", specifier = ">=5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
     { name = "slowapi", marker = "extra == 'dev'", specifier = ">=0.1.9" },

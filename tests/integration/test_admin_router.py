@@ -126,6 +126,45 @@ async def test_admin_delete_user(make_client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_admin_delete_cascades_oauth_identities(make_client) -> None:
+    """Admin delete must cascade `oauth_identities` like the self-delete path
+    does. Orphan identity rows block the Google subject from ever being
+    reused, because find_by_subject still returns the (now-dangling) link.
+    """
+    from regstack.models.oauth_identity import OAuthIdentity
+
+    async with make_client(enable_admin_router=True) as (rs, client):
+        await rs.bootstrap_admin("admin@example.com", "adminadminadmin")
+        await client.post(REGISTER, json=ALICE)
+        admin_token = await _login(client, "admin@example.com", "adminadminadmin")
+
+        alice = await rs.users.get_by_email(ALICE["email"])
+        assert alice is not None and alice.id is not None
+        await rs.oauth_identities.create(
+            OAuthIdentity(
+                user_id=alice.id,
+                provider="google",
+                subject_id="g-orphan-001",
+                email=ALICE["email"],
+                linked_at=rs.clock.now(),
+            )
+        )
+        assert await rs.oauth_identities.list_for_user(alice.id) != []
+
+        r = await client.delete(
+            f"{ADMIN_USERS}/{alice.id}",
+            headers={"authorization": f"Bearer {admin_token}"},
+        )
+        assert r.status_code == 200
+        assert await rs.users.get_by_email(ALICE["email"]) is None
+        # The identity row must be gone, not orphaned.
+        assert (
+            await rs.oauth_identities.find_by_subject(provider="google", subject_id="g-orphan-001")
+            is None
+        )
+
+
+@pytest.mark.asyncio
 async def test_admin_resend_verification(make_client) -> None:
     async with make_client(enable_admin_router=True) as (rs, client):
         await rs.bootstrap_admin("admin@example.com", "adminadminadmin")

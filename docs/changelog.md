@@ -3,7 +3,11 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
-## Unreleased
+## 0.5.6 — 2026-05-13
+
+A rollup release that consolidates 11 days of security-review
+remediation, supply-chain hardening, a full `mypy --strict` pass,
+and the per-route rate-limits feature.
 
 ### Added
 
@@ -20,10 +24,93 @@ All notable changes to this project are documented here. Versions follow
   least one `*_rate_limit` field is set, regstack expects either
   this argument or the `rate_limit` extra; failure to provide one
   raises `RuntimeError` on first access to `regstack.router` —
-  failing closed beats silently disabling the protection.
-- Hosts remain responsible for `app.state.limiter` and the
+  failing closed beats silently disabling the protection. Hosts
+  remain responsible for `app.state.limiter` and the
   `RateLimitExceeded` exception handler; slowapi owns the 429
   response shape.
+- **`user_logged_out` hook now fires.** The event was listed in
+  `KNOWN_EVENTS` since M1 but no router ever emitted it.
+  `routers/logout.py` now fires `user_logged_out` (with a `user=`
+  kwarg) immediately after the bearer token is revoked.
+
+### Changed (security)
+
+- **JWT 401 responses no longer leak the pyjwt error reason.**
+  Replaced `f"Invalid token: {exc}"` with the static `"Invalid or
+  expired token."`. The pyjwt error text disclosed *why* a token was
+  rejected (signature mismatch, expired, malformed, audience
+  mismatch) — useful signal for an attacker probing the auth
+  surface.
+- **OAuth sign-in honours `allow_registration=False`.** `/register`
+  already did; the OAuth `_resolve_user` "brand-new account" branch
+  did not, so an operator who disabled self-service signup still got
+  accounts created via "Sign in with Google". The OAuth callback now
+  redirects with `?error=registration_disabled` if no existing
+  account matches and registration is disabled.
+- **Admin `DELETE /admin/users/{id}` now cascades
+  `oauth_identities`.** Matches the user-initiated `DELETE
+  /account` flow; previously left orphan rows that blocked the
+  Google subject from re-registering.
+- **`POST /phone/start` and `DELETE /phone` guard against OAuth-only
+  users.** Both endpoints previously crashed with HTTP 500 for
+  users with `hashed_password=None`. Both now return 400 with a
+  message pointing to forgot-password (which doubles as a "set
+  initial password" path).
+
+### Changed (BREAKING — hook contracts)
+
+- **`mfa_login_started` and `phone_setup_started` no longer include
+  the raw OTP code in their kwargs.** Hooks are best-effort
+  observability and are the documented integration surface for
+  analytics / logging / Slack notifications, so a plaintext OTP in
+  `**kwargs` is a leak waiting to happen — a host adding
+  `logger.info(kw)` to a hook handler is enough to put OTPs in a
+  log stream. Hosts that subscribed to either event to take over
+  SMS delivery should migrate to a custom `SmsService` subclass
+  (the supported delivery override). The other kwargs (`user`,
+  `phone`) remain.
+
+### Changed (deps)
+
+- `pyjwt>=2.12.1` (was `>=2.8`). Picks up CVE-2026-32597 (`crit`
+  header bypass, CVSS 7.5).
+- `cryptography>=46.0.7` added explicitly to the `oauth` extra
+  (was pulled transitively, unbounded). Picks up CVE-2026-26007
+  (ECC subgroup attack on the JWKS code path, CVSS 8.2) plus
+  CVE-2026-34073 and CVE-2026-39892.
+- `python-multipart>=0.0.26` (was `>=0.0.9`). Picks up
+  CVE-2026-40347 (DoS via oversized multipart preamble).
+- `pypa/gh-action-pypi-publish` in `publish.yml` pinned to a commit
+  SHA instead of the mutable `release/v1` branch. The publish job
+  holds `id-token: write`, so a tag/branch swap upstream would let
+  an attacker push a malicious wheel under our OIDC identity.
+
+### Removed
+
+- `PasswordHasher.needs_rehash` — called pwdlib's non-existent
+  `check_needs_rehash` and would `AttributeError` if anyone invoked
+  it. No callers in src or tests. If you were planning to use it,
+  call `pwdlib.PasswordHash.verify_and_update` directly.
+
+### Internal
+
+- 72 `mypy --strict` errors cleared across 35 files. `inv lint` is
+  green end-to-end (ruff + mypy). Still local-only — not yet a CI
+  gate.
+- Mongo `BlacklistRepo.purge_expired` added (was missing from the
+  Mongo impl; SQL impl already had it). Mongo's TTL index still
+  reaps automatically; the explicit `delete_many` is for protocol
+  parity and for tests that can't wait for the 60-second TTL
+  monitor.
+- `KNOWN_EVENTS` reconciled with reality: 7 previously-undeclared
+  events added (`verification_requested`, `email_change_requested`,
+  `email_changed`, `phone_setup_started`, `mfa_login_started`,
+  `mfa_enabled`, `mfa_disabled`).
+- `routers/_helpers.require_password_set` factored out of
+  `routers/account.py` and reused in `routers/phone.py`.
+- `AsyncDatabase[MongoDoc]` / `AsyncMongoClient[MongoDoc]`
+  parameterized across the Mongo backend so pymongo's typed stubs
+  are satisfied.
 
 ### Notes
 

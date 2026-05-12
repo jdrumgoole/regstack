@@ -5,7 +5,11 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
-## Unreleased
+## 0.5.6 — 2026-05-13
+
+Eleven days of security-review remediation, supply-chain hardening,
+a full `mypy --strict` cleanup pass, and the per-route rate-limits
+feature rolled up into a single release.
 
 **Per-route IP rate limits.** Opt-in via the new `rate_limit` extra
 (or a host-supplied `slowapi.Limiter`) plus any of the new
@@ -17,20 +21,70 @@ Sphinx docs.
 `delete_account_rate_limit`). Each accepts a slowapi-syntax string
 (`"5/minute"`, `"5/minute;20/hour"`). Empty / unset means no limit
 on that route — `LockoutService` still defends `/login` against
-credential stuffing per-account.
+credential stuffing per-account. When `*_rate_limit` strings are
+configured but neither a `rate_limiter=` argument is passed nor
+the `rate_limit` extra is installed, `RegStack.router` raises
+`RuntimeError` on first access — failing closed beats silently
+disabling the protection. Hosts remain responsible for
+`app.state.limiter` and `app.add_exception_handler(RateLimitExceeded, ...)`;
+slowapi owns the 429 response shape. The previously-reserved
+`login_max_per_minute` / `login_max_per_hour` fields are kept for
+back-compat but unwired.
 
-When `*_rate_limit` strings are configured but neither a
-`rate_limiter=` argument is passed nor the `rate_limit` extra is
-installed, `RegStack.router` raises `RuntimeError` on first access
-— failing closed beats silently disabling the protection. The
-host is still responsible for `app.state.limiter` and
-`app.add_exception_handler(RateLimitExceeded, ...)` — slowapi
-itself owns the 429 response shape.
+**Security fixes.**
 
-The previously-reserved `login_max_per_minute` /
-`login_max_per_hour` fields are kept for back-compat but
-unwired; remove them from your config in favour of the new
-per-route fields.
+- JWT 401 detail now returns a static `"Invalid or expired token."`;
+  no longer leaks the pyjwt failure reason (signature mismatch /
+  expired / malformed / audience mismatch).
+- OAuth sign-in now honours `allow_registration=False`. Previously,
+  `/register` respected the flag but the OAuth `_resolve_user`
+  "brand-new account" branch did not, creating accounts even when
+  self-service signup was disabled.
+- Admin `DELETE /admin/users/{id}` now cascades `oauth_identities`,
+  matching the user-initiated `DELETE /account` path. Previously
+  left orphan rows that blocked re-registration of the same Google
+  subject.
+- `POST /phone/start` and `DELETE /phone` now return 400 (not crash
+  with HTTP 500) for OAuth-only users who have no `hashed_password`.
+
+**Breaking change — hook contracts.** `mfa_login_started` and
+`phone_setup_started` no longer include the raw OTP code in their
+kwargs. Hooks are best-effort observability and are the documented
+integration surface for analytics / logging / Slack notifications,
+so a plaintext OTP in `**kwargs` is a leak waiting to happen.
+Hosts that subscribed to either event to take over SMS delivery
+should migrate to a custom `SmsService` subclass — the supported
+delivery override.
+
+**Dependency floors raised for CVEs.**
+
+- `pyjwt>=2.12.1` for CVE-2026-32597 (`crit` header bypass, CVSS 7.5).
+- `cryptography>=46.0.7` added explicitly to the `oauth` extra for
+  CVE-2026-26007 (ECC subgroup attack on the JWKS code path, CVSS
+  8.2) plus CVE-2026-34073 and CVE-2026-39892.
+- `python-multipart>=0.0.26` for CVE-2026-40347 (DoS via oversized
+  multipart preamble).
+
+**Supply chain.** `pypa/gh-action-pypi-publish` in `publish.yml`
+pinned to a commit SHA instead of the mutable `release/v1` branch.
+The publish job holds `id-token: write`, so a tag/branch swap
+upstream would let an attacker push a malicious wheel under our
+OIDC identity.
+
+**Removed.** `PasswordHasher.needs_rehash` — called pwdlib's
+non-existent `check_needs_rehash` and would `AttributeError` if
+anyone invoked it. No callers in src or tests. If you were planning
+to use it, call `pwdlib.PasswordHash.verify_and_update` directly.
+
+**Internal.** 72 `mypy --strict` errors cleared across 35 files;
+`inv lint` is now green end-to-end. Mongo
+`BlacklistRepo.purge_expired` added (protocol parity with SQL).
+`KNOWN_EVENTS` reconciled — 7 previously-undeclared events added
+(`verification_requested`, `email_change_requested`, `email_changed`,
+`phone_setup_started`, `mfa_login_started`, `mfa_enabled`,
+`mfa_disabled`). `user_logged_out` now actually fires from
+`routers/logout.py` (was listed in `KNOWN_EVENTS` but no router
+emitted it).
 
 ## 0.3.0 — 2026-04-30
 

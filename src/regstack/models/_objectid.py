@@ -21,7 +21,7 @@ from pydantic_core import CoreSchema, core_schema
 # only consumer of bson). When the Mongo backend is in use, bson is
 # always present.
 try:
-    from bson import ObjectId as _BsonObjectId  # type: ignore[import-not-found]
+    from bson import ObjectId as _BsonObjectId
 except ImportError:  # pragma: no cover — exercised only without the mongo extra
     _BsonObjectId = None  # type: ignore[assignment,misc]
 

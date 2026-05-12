@@ -28,8 +28,8 @@ class PasswordHasher:
 
         Returns:
             The Argon2 PHC-formatted hash string. Includes algorithm,
-            parameters, salt, and digest, so :meth:`verify` and
-            :meth:`needs_rehash` can recover everything they need.
+            parameters, salt, and digest, so :meth:`verify` can
+            recover everything it needs.
         """
         return self._hasher.hash(password)
 
@@ -45,21 +45,3 @@ class PasswordHasher:
             exception is raised on mismatch.
         """
         return self._hasher.verify(password, hashed)
-
-    def needs_rehash(self, hashed: str) -> bool:
-        """Whether a stored hash should be re-computed with newer params.
-
-        When Argon2id parameters change (more memory, more iterations,
-        different parallelism), existing hashes are still valid but
-        weaker than newly-issued ones. After a successful login,
-        re-hash the user's password if this returns ``True`` so
-        existing accounts upgrade silently.
-
-        Args:
-            hashed: A previously stored :meth:`hash` result.
-
-        Returns:
-            ``True`` if the parameters baked into ``hashed`` differ
-            from the hasher's current defaults.
-        """
-        return self._hasher.check_needs_rehash(hashed)

@@ -23,8 +23,6 @@ class SqlMfaCodeRepo:
         self._t = mfa_codes_table
 
     async def put(self, code: MfaCode) -> None:
-        if code.created_at is None:
-            code.created_at = datetime.now(UTC)
         async with self._engine.begin() as conn:
             # Upsert by (user_id, kind) — overwrite any outstanding row so a
             # re-issued code invalidates the old one.

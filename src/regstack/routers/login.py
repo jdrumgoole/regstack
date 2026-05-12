@@ -9,13 +9,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from regstack.auth.jwt import TokenError
 from regstack.auth.mfa import generate_mfa_code
-from regstack.backends.protocols import MfaVerifyOutcome
+from regstack.backends.protocols import MfaVerifyOutcome, MfaVerifyResult
 from regstack.models.mfa_code import MfaCode
 from regstack.routers._schemas import LoginRequest, TokenResponse
 from regstack.sms.base import SmsMessage
 
 if TYPE_CHECKING:
     from regstack.app import RegStack
+    from regstack.models.user import BaseUser
 
 
 _INVALID = HTTPException(
@@ -51,7 +52,7 @@ def build_login_router(rs: RegStack) -> APIRouter:
         },
         summary="Exchange credentials for a JWT — or start the MFA second step",
     )
-    async def login(payload: LoginRequest):
+    async def login(payload: LoginRequest) -> TokenResponse | MfaPendingResponse | JSONResponse:
         decision = await rs.lockout.check(payload.email)
         if decision.locked:
             return JSONResponse(
@@ -132,10 +133,13 @@ def build_login_router(rs: RegStack) -> APIRouter:
     return router
 
 
-async def _start_mfa_step(rs: RegStack, user) -> MfaPendingResponse:
+async def _start_mfa_step(rs: RegStack, user: BaseUser) -> MfaPendingResponse:
     raw_code, code_hash = generate_mfa_code(rs.config)
     ttl = rs.config.sms_code_ttl_seconds
+    # Caller guarantees both fields are set (login.py checks them before
+    # entering the MFA branch); narrow for mypy.
     assert user.id is not None
+    assert user.phone_number is not None
     await rs.mfa_codes.put(
         MfaCode(
             user_id=user.id,
@@ -212,7 +216,7 @@ def _decode_mfa_token(rs: RegStack, token: str) -> str:
     return str(claims["sub"])
 
 
-def _mfa_outcome(result):
+def _mfa_outcome(result: MfaVerifyResult) -> HTTPException:
     code = result.outcome
     if code is MfaVerifyOutcome.MISSING:
         detail = "No pending sign-in code — start the login flow again."

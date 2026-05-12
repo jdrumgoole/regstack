@@ -14,11 +14,15 @@ async drivers — no psycopg required for Postgres migrations.
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 
 from alembic import context
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from regstack.backends.sql.schema import metadata
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Connection
 
 config = context.config
 target_metadata = metadata
@@ -28,7 +32,7 @@ def _is_sqlite(url: str) -> bool:
     return url.startswith("sqlite")
 
 
-def _do_run_migrations(connection) -> None:
+def _do_run_migrations(connection: Connection) -> None:
     url = config.get_main_option("sqlalchemy.url") or ""
     context.configure(
         connection=connection,

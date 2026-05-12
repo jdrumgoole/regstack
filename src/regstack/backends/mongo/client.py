@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
 from pymongo import AsyncMongoClient
@@ -8,14 +8,20 @@ from pymongo import AsyncMongoClient
 if TYPE_CHECKING:
     from regstack.config.schema import RegStackConfig
 
+# Default Mongo document type — BSON documents round-trip as dict[str, Any].
+# Used to parameterize AsyncMongoClient / AsyncDatabase / AsyncCollection so
+# pymongo's typed generic stubs are satisfied.
+MongoDoc = dict[str, Any]
+MongoClient = AsyncMongoClient[MongoDoc]
 
-def make_client(config: RegStackConfig) -> AsyncMongoClient:
+
+def make_client(config: RegStackConfig) -> MongoClient:
     """Build an AsyncMongoClient with the settings regstack expects.
 
     ``tz_aware=True`` makes BSON datetimes round-trip as UTC-aware values; the
     JWT and bulk-revocation comparisons assume aware datetimes throughout.
     """
-    return AsyncMongoClient(
+    return AsyncMongoClient[MongoDoc](
         config.database_url.get_secret_value(),
         tz_aware=True,
     )

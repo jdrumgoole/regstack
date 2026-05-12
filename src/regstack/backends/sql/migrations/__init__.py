@@ -24,6 +24,8 @@ from sqlalchemy.ext.asyncio import create_async_engine
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from sqlalchemy.engine import Connection
+
 # Bundled alembic env lives next to this file.
 _MIGRATIONS_DIR = Path(__file__).parent
 _VERSIONS_DIR = _MIGRATIONS_DIR / "versions"
@@ -96,7 +98,7 @@ async def _current_async_impl(database_url: str) -> str | None:
         await engine.dispose()
 
 
-def _current_sync(connection) -> str | None:
+def _current_sync(connection: Connection) -> str | None:
     from alembic.runtime.migration import MigrationContext
 
     return MigrationContext.configure(connection).get_current_revision()

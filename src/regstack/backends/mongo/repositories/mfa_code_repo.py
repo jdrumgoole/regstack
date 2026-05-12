@@ -11,10 +11,11 @@ if TYPE_CHECKING:
     from pymongo.asynchronous.database import AsyncDatabase
 
     from regstack.auth.clock import Clock
+    from regstack.backends.mongo.client import MongoDoc
 
 
 class MfaCodeRepo:
-    def __init__(self, db: AsyncDatabase, collection_name: str, *, clock: Clock) -> None:
+    def __init__(self, db: AsyncDatabase[MongoDoc], collection_name: str, *, clock: Clock) -> None:
         self._collection = db[collection_name]
         self._clock = clock
 

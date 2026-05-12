@@ -8,12 +8,13 @@ from pymongo import ASCENDING, IndexModel
 if TYPE_CHECKING:
     from pymongo.asynchronous.database import AsyncDatabase
 
+    from regstack.backends.mongo.client import MongoDoc
     from regstack.config.schema import RegStackConfig
 
 log = logging.getLogger(__name__)
 
 
-async def install_indexes(db: AsyncDatabase, config: RegStackConfig) -> None:
+async def install_indexes(db: AsyncDatabase[MongoDoc], config: RegStackConfig) -> None:
     """Create the indexes regstack relies on. Safe to call repeatedly."""
     users = db[config.user_collection]
     await users.create_indexes(

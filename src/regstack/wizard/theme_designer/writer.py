@@ -157,9 +157,7 @@ def _clean(vars_: dict[str, str]) -> dict[str, str]:
     for name, raw in vars_.items():
         if name not in ALL_VARS:
             continue
-        if raw is None:
-            continue
-        value = raw.strip() if isinstance(raw, str) else str(raw).strip()
+        value = raw.strip()
         if not value:
             continue
         if name in RADIUS_VARS and value.isdigit():

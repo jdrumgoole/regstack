@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from regstack.backends.base import Backend, BackendKind
-from regstack.backends.mongo.client import make_client, parse_database_name
+from regstack.backends.mongo.client import MongoClient, MongoDoc, make_client, parse_database_name
 from regstack.backends.mongo.indexes import install_indexes
 from regstack.backends.mongo.repositories.blacklist_repo import BlacklistRepo
 from regstack.backends.mongo.repositories.login_attempt_repo import LoginAttemptRepo
@@ -16,7 +16,6 @@ from regstack.backends.mongo.repositories.pending_repo import PendingRepo
 from regstack.backends.mongo.repositories.user_repo import UserRepo
 
 if TYPE_CHECKING:
-    from pymongo import AsyncMongoClient
     from pymongo.asynchronous.database import AsyncDatabase
 
     from regstack.auth.clock import Clock
@@ -32,8 +31,8 @@ class MongoBackend(Backend):
 
     def __init__(self, *, config: RegStackConfig, clock: Clock) -> None:
         super().__init__(config=config, clock=clock)
-        self._client: AsyncMongoClient = make_client(config)
-        self._db: AsyncDatabase = self._client[parse_database_name(config)]
+        self._client: MongoClient = make_client(config)
+        self._db: AsyncDatabase[MongoDoc] = self._client[parse_database_name(config)]
 
         self.users = UserRepo(self._db, config.user_collection, clock=clock)
         self.pending = PendingRepo(self._db, config.pending_collection)
@@ -55,9 +54,9 @@ class MongoBackend(Backend):
     # --- Mongo-specific helpers (used by tests + doctor) -----------------
 
     @property
-    def database(self) -> AsyncDatabase:
+    def database(self) -> AsyncDatabase[MongoDoc]:
         return self._db
 
     @property
-    def client(self) -> AsyncMongoClient:
+    def client(self) -> MongoClient:
         return self._client

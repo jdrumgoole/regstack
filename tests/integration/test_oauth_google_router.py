@@ -63,6 +63,7 @@ async def _oauth_app(
     *,
     auto_link_verified_emails: bool = False,
     enforce_mfa_on_oauth_signin: bool = False,
+    allow_registration: bool = True,
 ):
     """Build a RegStack + FastAPI app with a FakeGoogleProvider registered.
 
@@ -78,6 +79,7 @@ async def _oauth_app(
         database_url=url,
         mongo_db_name=mongo_db,
         enable_oauth=True,
+        allow_registration=allow_registration,
         oauth=OAuthConfig(
             google_client_id="fake-google-client-id",
             google_client_secret="fake-secret",
@@ -296,6 +298,37 @@ async def test_autolink_refused_when_email_unverified(
         s, _ = await _start_signin(client)
         cb = await _callback(client, state=s)
         assert "error=email_in_use" in cb.headers["location"]
+
+
+# ---------------------------------------------------------------------------
+# 5b — OAuth signup honours allow_registration=False
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_oauth_signup_blocked_when_registration_disabled(
+    config, backend_kind, jwt_secret, database_url, frozen_clock
+) -> None:
+    """`/register` honours `allow_registration=False`; OAuth must too. An
+    operator who disabled self-service signup should not get new accounts
+    created via "Sign in with Google".
+    """
+    async with _oauth_app(
+        config,
+        backend_kind,
+        jwt_secret,
+        database_url,
+        frozen_clock,
+        allow_registration=False,
+    ) as (rs, fake, client):
+        fake.queue_user(subject_id="g-005-blocked", email="walkin@example.com")
+        s, _ = await _start_signin(client)
+        cb = await _callback(client, state=s)
+        assert cb.status_code == 302
+        assert "error=registration_disabled" in cb.headers["location"]
+
+        # No user or identity row should have been created.
+        assert await rs.users.get_by_email("walkin@example.com") is None
 
 
 # ---------------------------------------------------------------------------

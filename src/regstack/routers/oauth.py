@@ -500,6 +500,11 @@ async def _resolve_user(
         raise _LinkConflictError("email_in_use")
 
     # 4. Brand-new account.
+    # `/register` honours `allow_registration=False`; OAuth must too or
+    # operators who disabled self-service signup still get accounts
+    # created via "Sign in with <provider>".
+    if not rs.config.allow_registration:
+        raise _LinkConflictError("registration_disabled")
     new_user = BaseUser(
         email=info.email or _placeholder_email(provider_name, info.subject_id),
         hashed_password=None,

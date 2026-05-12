@@ -118,9 +118,14 @@ class AuthDependencies:
         try:
             payload = self._jwt.decode(creds.credentials)
         except TokenError as exc:
+            # Never echo the pyjwt exception text — it discloses *why* the
+            # token was rejected ("signature verification failed",
+            # "expired", "malformed", "audience mismatch"), which is useful
+            # to an attacker probing the auth surface. One static 401 for
+            # every decode failure.
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Invalid token: {exc}",
+                detail="Invalid or expired token.",
                 headers={"WWW-Authenticate": "Bearer"},
             ) from exc
 

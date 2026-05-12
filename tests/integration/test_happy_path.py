@@ -73,6 +73,30 @@ async def test_me_without_token_returns_401(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "bad_token",
+    [
+        "not-a-jwt-at-all",
+        "a.b.c",
+        "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.invalid-signature",
+    ],
+)
+async def test_invalid_token_returns_generic_detail(client: AsyncClient, bad_token: str) -> None:
+    """The 401 detail must not echo the pyjwt exception text. The pyjwt
+    error string discloses *why* a token was rejected ("signature
+    verification failed", "not enough segments", "audience mismatch"),
+    which gives an attacker free signal on the auth surface.
+    """
+    r = await client.get(ME, headers={"authorization": f"Bearer {bad_token}"})
+    assert r.status_code == 401
+    detail = r.json()["detail"]
+    assert detail == "Invalid or expired token."
+    # Belt-and-braces: assert no pyjwt-leak substrings ever appear.
+    forbidden = ["Signature", "segments", "audience", "decode", "Not enough"]
+    assert not any(needle in detail for needle in forbidden), detail
+
+
+@pytest.mark.asyncio
 async def test_password_too_short_rejected(client: AsyncClient) -> None:
     r = await client.post(
         REGISTER, json={"email": "x@example.com", "password": "short", "full_name": "x"}

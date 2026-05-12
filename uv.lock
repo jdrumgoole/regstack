@@ -2284,7 +2284,7 @@ wheels = [
 
 [[package]]
 name = "regstack"
-version = "0.5.0"
+version = "0.5.2"
 source = { editable = "." }
 dependencies = [
     { name = "aiosmtplib" },
@@ -2310,6 +2310,7 @@ dependencies = [
 dev = [
     { name = "anyio" },
     { name = "asyncpg" },
+    { name = "cryptography" },
     { name = "httpx" },
     { name = "invoke" },
     { name = "mypy" },
@@ -2337,6 +2338,7 @@ mongo = [
     { name = "pymongo" },
 ]
 oauth = [
+    { name = "cryptography" },
     { name = "pyjwt", extra = ["crypto"] },
 ]
 postgres = [
@@ -2363,6 +2365,8 @@ requires-dist = [
     { name = "asyncpg", marker = "extra == 'dev'", specifier = ">=0.29" },
     { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.29" },
     { name = "click", specifier = ">=8.1" },
+    { name = "cryptography", marker = "extra == 'dev'", specifier = ">=46.0.7" },
+    { name = "cryptography", marker = "extra == 'oauth'", specifier = ">=46.0.7" },
     { name = "dnspython", specifier = ">=2.6" },
     { name = "email-validator", specifier = ">=2.1" },
     { name = "fastapi", specifier = ">=0.110" },
@@ -2375,9 +2379,9 @@ requires-dist = [
     { name = "pwdlib", extras = ["argon2"], specifier = ">=0.2.1" },
     { name = "pydantic", specifier = ">=2.6" },
     { name = "pydantic-settings", specifier = ">=2.2" },
-    { name = "pyjwt", specifier = ">=2.8" },
-    { name = "pyjwt", extras = ["crypto"], marker = "extra == 'dev'", specifier = ">=2.8" },
-    { name = "pyjwt", extras = ["crypto"], marker = "extra == 'oauth'", specifier = ">=2.8" },
+    { name = "pyjwt", specifier = ">=2.12.1" },
+    { name = "pyjwt", extras = ["crypto"], marker = "extra == 'dev'", specifier = ">=2.12.1" },
+    { name = "pyjwt", extras = ["crypto"], marker = "extra == 'oauth'", specifier = ">=2.12.1" },
     { name = "pymongo", marker = "extra == 'dev'", specifier = ">=4.9" },
     { name = "pymongo", marker = "extra == 'mongo'", specifier = ">=4.9" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },

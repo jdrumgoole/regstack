@@ -23,7 +23,7 @@ def build_logout_router(rs: RegStack) -> APIRouter:
     )
     async def logout(
         request: Request,
-        _user: BaseUser = Depends(rs.deps.current_user()),
+        user: BaseUser = Depends(rs.deps.current_user()),
     ) -> MessageResponse:
         # Re-decode the token (the dep already validated it) to grab jti+exp
         # so we can record the revocation. The auth header was already proven
@@ -35,6 +35,7 @@ def build_logout_router(rs: RegStack) -> APIRouter:
         except TokenError:
             return MessageResponse(message="Logged out.")
         await rs.blacklist.revoke(payload.jti, payload.exp)
+        await rs.hooks.fire("user_logged_out", user=user)
         return MessageResponse(message="Logged out.")
 
     return router

@@ -44,8 +44,17 @@ class SqlOAuthStateRepo:
             row = (await conn.execute(stmt)).first()
         return _row_to_state(row) if row else None
 
-    async def set_result_token(self, state_id: str, token: str) -> None:
-        stmt = update(self._t).where(self._t.c.id == state_id).values(result_token=token)
+    async def set_result_token(
+        self,
+        state_id: str,
+        token: str,
+        *,
+        new_expires_at: datetime | None = None,
+    ) -> None:
+        values: dict[str, Any] = {"result_token": token}
+        if new_expires_at is not None:
+            values["expires_at"] = new_expires_at
+        stmt = update(self._t).where(self._t.c.id == state_id).values(**values)
         async with self._engine.begin() as conn:
             await conn.execute(stmt)
 

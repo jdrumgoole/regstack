@@ -36,5 +36,8 @@ class BlacklistRepo:
         # sweep — useful in tests and on Mongos where the TTL monitor's 60-second
         # cycle hasn't fired yet.
         reference = now or datetime.now(UTC)
-        result = await self._collection.delete_many({"exp": {"$lte": reference}})
+        # Strict `<` matches the rest of the purge_expired family across both
+        # backends — a token whose exp is the reference instant is still
+        # nominally valid for one more microsecond.
+        result = await self._collection.delete_many({"exp": {"$lt": reference}})
         return int(result.deleted_count)

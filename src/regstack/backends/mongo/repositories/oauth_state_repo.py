@@ -25,10 +25,19 @@ class MongoOAuthStateRepo:
         doc = await self._collection.find_one({"_id": state_id})
         return self._hydrate(doc)
 
-    async def set_result_token(self, state_id: str, token: str) -> None:
+    async def set_result_token(
+        self,
+        state_id: str,
+        token: str,
+        *,
+        new_expires_at: datetime | None = None,
+    ) -> None:
+        updates: dict[str, Any] = {"result_token": token}
+        if new_expires_at is not None:
+            updates["expires_at"] = new_expires_at
         await self._collection.update_one(
             {"_id": state_id},
-            {"$set": {"result_token": token}},
+            {"$set": updates},
         )
 
     async def consume(self, state_id: str) -> OAuthState | None:

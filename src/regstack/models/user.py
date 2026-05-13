@@ -23,6 +23,12 @@ class BaseUser(BaseModel):
     mixin via ``RegStack.extend_user_model``.
     """
 
+    # `extra="allow"` here (and only here) is deliberate: hosts that
+    # add their own user fields via subclassing or
+    # `RegStack.extend_user_model` need those fields to round-trip
+    # through the DB cleanly. Every request/response model
+    # (UserCreate, UserUpdate, UserPublic) uses `extra="forbid"`
+    # because those are the external API contract.
     model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     id: IdStr | None = Field(default=None, alias="_id")
@@ -88,7 +94,12 @@ class UserPublic(BaseModel):
     phone_number: str | None = None
     is_mfa_enabled: bool = False
     created_at: datetime
+    updated_at: datetime
     last_login: datetime | None = None
+    tokens_invalidated_after: datetime | None = None
+    """Bulk-revoke cutoff. SPAs comparing this to their session JWT's
+    `iat` can tell when the token they hold has been invalidated by a
+    password change / email change without making another request."""
 
     @classmethod
     def from_user(cls, user: BaseUser) -> UserPublic:
@@ -104,5 +115,7 @@ class UserPublic(BaseModel):
             phone_number=user.phone_number,
             is_mfa_enabled=user.is_mfa_enabled,
             created_at=user.created_at,
+            updated_at=user.updated_at,
             last_login=user.last_login,
+            tokens_invalidated_after=user.tokens_invalidated_after,
         )

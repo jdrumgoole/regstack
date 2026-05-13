@@ -563,6 +563,74 @@ async def test_exchange_window_shrinks_after_callback(oauth_client, frozen_clock
 
 
 # ---------------------------------------------------------------------------
+# 13b — enforce_mfa_on_oauth_signin routes the SPA through MFA confirm
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_enforce_mfa_on_oauth_signin_returns_pending_token(
+    config, backend_kind, jwt_secret, database_url, frozen_clock
+) -> None:
+    """When `oauth.enforce_mfa_on_oauth_signin=True` and the user has
+    SMS MFA set up, /oauth/exchange must return `mfa_required=True`
+    with a pending token instead of a session JWT. The SPA then
+    completes via the existing /login/mfa-confirm endpoint.
+    """
+    from regstack.models.oauth_identity import OAuthIdentity
+    from regstack.sms.null import NullSmsService
+
+    async with _oauth_app(
+        config,
+        backend_kind,
+        jwt_secret,
+        database_url,
+        frozen_clock,
+        enforce_mfa_on_oauth_signin=True,
+    ) as (rs, fake, client):
+        # Pre-build an OAuth-linked user with MFA enabled. We attach
+        # the identity by hand so /callback uses the "already linked"
+        # branch and lands on a known user — no need to set up the
+        # password-login + phone-confirm dance.
+        user = BaseUser(
+            email="mfa-oauth@example.com",
+            hashed_password=None,
+            is_active=True,
+            is_verified=True,
+            is_mfa_enabled=True,
+            phone_number="+14155552671",
+        )
+        user = await rs.users.create(user)
+        assert user.id is not None
+        await rs.oauth_identities.create(
+            OAuthIdentity(
+                user_id=user.id,
+                provider="google",
+                subject_id="g-mfa-001",
+                email=user.email,
+                linked_at=rs.clock.now(),
+            )
+        )
+
+        fake.queue_user(subject_id="g-mfa-001", email=user.email)
+        state, _ = await _start_signin(client)
+        cb = await _callback(client, state=state)
+        assert cb.status_code == 302
+
+        sms = rs.sms
+        assert isinstance(sms, NullSmsService)
+        assert len(sms.outbox) == 1
+        assert sms.outbox[0].to == "+14155552671"
+
+        # /exchange returns MFA-required, not a session token.
+        r = await _exchange(client, state)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["mfa_required"] is True
+        assert body["mfa_pending_token"]
+        assert body.get("access_token", "") == ""
+
+
+# ---------------------------------------------------------------------------
 # 14 — bulk-revoke applies to OAuth-issued sessions too
 # ---------------------------------------------------------------------------
 

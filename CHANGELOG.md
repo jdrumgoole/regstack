@@ -5,6 +5,41 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
+## 0.5.9 — 2026-05-13
+
+**`OAuthConfig.enforce_mfa_on_oauth_signin` is now wired.** The flag
+has been on the config since the OAuth router shipped (0.3.0) and the
+wizard surfaced it, but the callback never read it — operators who
+flipped it on still got OAuth sign-ins that bypassed the SMS second
+factor. The High #1 finding from the post-0.5.6 consistency audit.
+
+Now, when the flag is `true` and the resolved user has SMS MFA set
+up (`is_mfa_enabled=True` plus a `phone_number`):
+
+- The OAuth callback sends the SMS code and stashes a short-lived
+  `login_mfa` pending JWT in the state row (instead of a session
+  token).
+- `POST /oauth/exchange` returns `mfa_required=True` and
+  `mfa_pending_token=...` (with no `access_token`) so the SPA knows
+  to redirect to `/account/mfa-confirm`.
+- The SPA's bundled `regstack.js` `oauth-complete` handler stashes
+  the pending token under `regstack.mfa_pending` (same key the
+  password-login MFA flow uses) and redirects.
+- The user enters the SMS code and hits the existing
+  `POST /login/mfa-confirm` endpoint — same downstream path as the
+  password-login second factor.
+
+Link flows (`mode="link"`) are exempt: the user was already
+authenticated when they kicked off the link, so adding SMS friction
+on top of an already-authenticated link operation has no
+threat-model win.
+
+The `ExchangeResponse` model grew two optional fields
+(`mfa_required: bool = False`, `mfa_pending_token: str | None = None`)
+and `access_token` is now defaulted to `""` so the MFA branch can
+return cleanly. Existing handlers reading `access_token` keep
+working — they just need to check `mfa_required` first.
+
 ## 0.5.8 — 2026-05-13
 
 Audit-driven consistency cleanup — small fixes across the API surface

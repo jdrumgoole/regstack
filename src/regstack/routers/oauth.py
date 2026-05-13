@@ -31,7 +31,7 @@ import hashlib
 import logging
 import secrets as _secrets
 from datetime import timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -58,11 +58,25 @@ class ExchangeRequest(BaseModel):
 
 
 class ExchangeResponse(BaseModel):
-    access_token: str
+    """SPA payload after a successful OAuth callback.
+
+    Two shapes, distinguished by ``mfa_required``:
+
+    - Normal: ``mfa_required=False``, ``access_token`` is the session
+      JWT, ``mfa_pending_token`` is ``None``.
+    - MFA required (only when ``config.oauth.enforce_mfa_on_oauth_signin``
+      is on and the user has SMS MFA set up): ``mfa_required=True``,
+      ``access_token`` is empty, ``mfa_pending_token`` is what the SPA
+      forwards to ``POST /login/mfa-confirm`` along with the SMS code.
+    """
+
+    access_token: str = ""
     redirect_to: str
     was_new_account: bool
     token_type: str = "bearer"
     expires_in: int
+    mfa_required: bool = False
+    mfa_pending_token: str | None = None
 
 
 class LinkStartResponse(BaseModel):
@@ -144,6 +158,20 @@ def build_oauth_router(rs: RegStack) -> APIRouter:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="OAuth state has expired.",
+            )
+        # When the callback hits the MFA branch (controlled by
+        # `config.oauth.enforce_mfa_on_oauth_signin`), the result_token
+        # we stored is a short-lived MFA pending JWT, not a session
+        # token. Peek at the purpose claim — we minted this token
+        # ourselves, so trusting the unverified payload is fine; the
+        # state-row read is what authenticates it.
+        if _is_mfa_pending_token(state.result_token):
+            return ExchangeResponse(
+                redirect_to=state.redirect_to,
+                was_new_account=False,
+                expires_in=rs.config.mfa_pending_token_ttl_seconds,
+                mfa_required=True,
+                mfa_pending_token=state.result_token,
             )
         return ExchangeResponse(
             access_token=state.result_token,
@@ -303,21 +331,45 @@ def build_oauth_router(rs: RegStack) -> APIRouter:
         except Exception:  # pragma: no cover — best-effort
             log.exception("touch_last_used failed for %s/%s", provider_name, user_info.subject_id)
 
-        # Mint the session JWT, stash it on the state row for the
-        # SPA's exchange call, and redirect. Shorten the row's expiry
-        # to `oauth.completion_ttl_seconds` (default 30s) so the
-        # window during which a stolen state_id could yield a session
-        # token is bounded — the full `state_ttl_seconds` only had to
-        # cover the user's round-trip with the provider.
         assert user.id is not None
-        token, _payload = rs.jwt.encode(user.id)
-        await rs.users.set_last_login(user.id, _payload.iat)
-        await rs.oauth_states.set_result_token(
-            state_row.id,
-            token,
-            new_expires_at=rs.clock.now()
-            + timedelta(seconds=rs.config.oauth.completion_ttl_seconds),
+
+        # MFA gate: if the operator enabled `enforce_mfa_on_oauth_signin`
+        # and this user has SMS MFA set up, stash a short-lived MFA
+        # pending token in the state row instead of the session JWT.
+        # The SPA's /oauth/exchange sees `mfa_required=True` and
+        # forwards the pending token to POST /login/mfa-confirm with
+        # the SMS code. Link flows are exempt — the user was already
+        # authenticated when they started the link, and re-MFAing for
+        # an attachment step is pointless friction.
+        mfa_required = (
+            rs.config.oauth.enforce_mfa_on_oauth_signin
+            and state_row.mode == "signin"
+            and user.is_mfa_enabled
+            and user.phone_number is not None
         )
+        if mfa_required:
+            pending_token = await _start_oauth_mfa_step(rs, user)
+            await rs.oauth_states.set_result_token(
+                state_row.id,
+                pending_token,
+                new_expires_at=rs.clock.now()
+                + timedelta(seconds=rs.config.mfa_pending_token_ttl_seconds),
+            )
+        else:
+            # Mint the session JWT, stash it on the state row for the
+            # SPA's exchange call, and redirect. Shorten the row's expiry
+            # to `oauth.completion_ttl_seconds` (default 30s) so the
+            # window during which a stolen state_id could yield a session
+            # token is bounded — the full `state_ttl_seconds` only had to
+            # cover the user's round-trip with the provider.
+            token, _payload = rs.jwt.encode(user.id)
+            await rs.users.set_last_login(user.id, _payload.iat)
+            await rs.oauth_states.set_result_token(
+                state_row.id,
+                token,
+                new_expires_at=rs.clock.now()
+                + timedelta(seconds=rs.config.oauth.completion_ttl_seconds),
+            )
 
         await rs.hooks.fire(
             "oauth_signin_completed",
@@ -325,6 +377,7 @@ def build_oauth_router(rs: RegStack) -> APIRouter:
             provider=provider_name,
             mode=state_row.mode,
             was_new=was_new,
+            mfa_required=mfa_required,
         )
         if state_row.mode == "link" and not was_new:
             await rs.hooks.fire("oauth_account_linked", user=user, provider=provider_name)
@@ -338,6 +391,95 @@ def build_oauth_router(rs: RegStack) -> APIRouter:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+_LOGIN_MFA_PURPOSE = "login_mfa"
+
+
+def _is_mfa_pending_token(token: str) -> bool:
+    """Peek at a JWT's ``purpose`` claim without verifying the signature.
+
+    We minted this token ourselves and just read it out of our own state
+    row — the trust anchor is the state-row read, not the JWT signature.
+    `/login/mfa-confirm` re-verifies the signature properly before
+    acting on it. Returns ``False`` on any decode failure so a
+    malformed value falls through to the regular session-token path.
+    """
+    import base64
+    import json
+
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            return False
+        body = parts[1]
+        body += "=" * (-len(body) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(body))
+        return bool(payload.get("purpose") == _LOGIN_MFA_PURPOSE)
+    except Exception:
+        return False
+
+
+async def _start_oauth_mfa_step(rs: RegStack, user: BaseUser) -> str:
+    """Send the SMS second factor and return a short-lived pending JWT.
+
+    Mirrors :func:`regstack.routers.login._start_mfa_step` but returns
+    just the pending token (no FastAPI response). The pending JWT has
+    purpose ``login_mfa`` so the SPA can hand it straight to
+    ``POST /login/mfa-confirm`` — same downstream entry point as the
+    password-login MFA flow.
+    """
+    import secrets as _secrets
+
+    import jwt as pyjwt
+
+    from regstack.auth.mfa import generate_mfa_code
+    from regstack.config.secrets import derive_secret
+    from regstack.models.mfa_code import MfaCode
+    from regstack.sms.base import SmsMessage
+
+    assert user.id is not None
+    assert user.phone_number is not None
+
+    raw_code, code_hash = generate_mfa_code(rs.config)
+    ttl = rs.config.sms_code_ttl_seconds
+    await rs.mfa_codes.put(
+        MfaCode(
+            user_id=user.id,
+            kind="login_mfa",
+            code_hash=code_hash,
+            expires_at=rs.clock.now() + timedelta(seconds=ttl),
+            max_attempts=rs.config.sms_code_max_attempts,
+        )
+    )
+    body = rs.mail.sms_body(
+        kind="login_mfa",
+        code=raw_code,
+        ttl_minutes=max(ttl // 60, 1),
+    )
+    await rs.sms.send(
+        SmsMessage(
+            to=user.phone_number,
+            body=body,
+            from_number=rs.config.sms.from_number,
+        )
+    )
+    # No `code=` in the hook payload — same rationale as login.py.
+    await rs.hooks.fire("mfa_login_started", user=user)
+
+    pending_ttl = rs.config.mfa_pending_token_ttl_seconds
+    now = rs.clock.now()
+    claims: dict[str, Any] = {
+        "sub": user.id,
+        "jti": _secrets.token_urlsafe(16),
+        "iat": now.timestamp(),
+        "exp": int((now + timedelta(seconds=pending_ttl)).timestamp()),
+        "purpose": _LOGIN_MFA_PURPOSE,
+    }
+    if rs.config.jwt_audience is not None:
+        claims["aud"] = rs.config.jwt_audience
+    key = derive_secret(rs.config.jwt_secret.get_secret_value(), _LOGIN_MFA_PURPOSE)
+    return pyjwt.encode(claims, key, algorithm=rs.config.jwt_algorithm)
 
 
 class _LinkConflictError(Exception):

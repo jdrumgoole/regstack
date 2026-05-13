@@ -522,6 +522,15 @@
       showMessage(msg, "error");
       return;
     }
+    // MFA branch — server-side `enforce_mfa_on_oauth_signin` redirected
+    // us through the SMS second factor. Stash the pending token like
+    // the password-login MFA path does and hand off to /mfa-confirm.
+    if (res.body && res.body.mfa_required) {
+      window.sessionStorage.setItem(MFA_PENDING_KEY, res.body.mfa_pending_token);
+      if (status) status.textContent = "MFA required. Redirecting…";
+      window.location.href = uiPrefix + "/mfa-confirm";
+      return;
+    }
     setToken(res.body.access_token);
     const target = res.body.redirect_to || (uiPrefix + "/me");
     if (status) status.textContent = "Signed in. Redirecting…";

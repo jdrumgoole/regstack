@@ -3,6 +3,44 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## 0.5.9 — 2026-05-13
+
+### Security
+
+- **`OAuthConfig.enforce_mfa_on_oauth_signin` is now wired.** The flag
+  has been on the config since 0.3.0 and surfaced through the OAuth
+  setup wizard, but the callback never read it — operators who
+  enabled it still got OAuth sign-ins that bypassed the SMS second
+  factor. The High #1 finding from the post-0.5.6 consistency audit.
+
+  When the flag is `true` and the resolved user has SMS MFA set up
+  (`is_mfa_enabled=True` plus a `phone_number`), the OAuth callback
+  now sends the SMS code, stashes a short-lived `login_mfa` pending
+  JWT in the state row instead of a session token, and the SPA's
+  `regstack.js` `oauth-complete` handler reroutes through the
+  existing `/account/mfa-confirm` page → `POST /login/mfa-confirm`
+  flow.
+
+  Link flows (`mode="link"`) are intentionally exempt: the user was
+  already authenticated when they kicked off the link, so re-MFAing
+  is friction without a threat-model win.
+
+### Changed
+
+- `ExchangeResponse` gained two optional fields:
+  - `mfa_required: bool = False`
+  - `mfa_pending_token: str | None = None`
+
+  `access_token` defaults to `""` (instead of being required) so the
+  MFA branch can return without one. Existing SPAs that read
+  `access_token` keep working — they just need to branch on
+  `mfa_required` first.
+
+- `oauth_signin_completed` hook now carries `mfa_required=<bool>`
+  alongside the existing `user`, `provider`, `mode`, `was_new` kwargs
+  so observability handlers can distinguish "session minted" from
+  "MFA second-step in progress" outcomes.
+
 ## 0.5.8 — 2026-05-13
 
 Audit-driven consistency cleanup — small fixes across the API surface

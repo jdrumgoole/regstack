@@ -3,6 +3,23 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## 0.5.7 — 2026-05-13
+
+Documentation-only follow-up to 0.5.6 — no runtime code changes.
+
+### Docs
+
+- `docs/configuration.md` now documents the per-route `*_rate_limit`
+  family (added in 0.5.4) instead of pointing at
+  `login_max_per_minute` / `login_max_per_hour` as reserved future
+  fields.
+- `docs/security.md` no longer references
+  `PasswordHasher.needs_rehash` (removed in 0.5.6). Replacement
+  guidance points hosts at `pwdlib.PasswordHash.verify_and_update`
+  inside a `user_logged_in` hook.
+- Root `CHANGELOG.md` backfilled with 0.4.0 and 0.5.0 entries so it
+  matches this file. The two changelogs are now in sync.
+
 ## 0.5.6 — 2026-05-13
 
 A rollup release that consolidates 11 days of security-review

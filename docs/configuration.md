@@ -234,11 +234,73 @@ with no `mkdir` or `touch` step.
   - Sliding window for failures, also TTL on the `login_attempts` collection.
 * - `login_max_per_minute`
   - `5`
-  - Reserved for a future route-level rate limiter.
+  - Deprecated since 0.5.4; kept for back-compat but no longer
+    wired. Use `login_rate_limit` (see "Per-route rate limits" below).
 * - `login_max_per_hour`
   - `20`
-  - Same reservation.
+  - Same as above. Use a slowapi-syntax limit string on
+    `login_rate_limit` like `"5/minute;20/hour"`.
 ```
+
+## Per-route rate limits
+
+New in 0.5.4. Opt-in: install the `rate_limit` extra (`pip install
+'regstack[rate_limit]'` — pulls in `slowapi`) or pass your own
+`slowapi.Limiter` instance as `RegStack(rate_limiter=...)`.
+
+Each field is a slowapi-syntax string. Empty / unset = no limit on
+that route. The per-account `LockoutService` (see "Lockout (login)"
+above) is unchanged and stacks on top of `login_rate_limit` — they
+defend different axes: lockout defends one account against
+credential-stuffing; the IP rate limits defend each endpoint
+against one IP spamming requests across many accounts.
+
+```{list-table}
+:header-rows: 1
+:widths: 35 15 50
+
+* - Field
+  - Default
+  - Notes
+
+* - `login_rate_limit`
+  - `""`
+  - Per-IP on `POST /login` (and the MFA confirm step).
+* - `register_rate_limit`
+  - `""`
+  - Per-IP on `POST /register`.
+* - `forgot_password_rate_limit`
+  - `""`
+  - Per-IP on `POST /forgot-password`.
+* - `reset_password_rate_limit`
+  - `""`
+  - Per-IP on `POST /reset-password`.
+* - `verify_rate_limit`
+  - `""`
+  - Per-IP on `POST /verify`.
+* - `resend_verification_rate_limit`
+  - `""`
+  - Per-IP on `POST /resend-verification`.
+* - `change_password_rate_limit`
+  - `""`
+  - Per-IP on `POST /change-password`.
+* - `change_email_rate_limit`
+  - `""`
+  - Per-IP on `POST /change-email`.
+* - `confirm_email_change_rate_limit`
+  - `""`
+  - Per-IP on `POST /confirm-email-change`.
+* - `delete_account_rate_limit`
+  - `""`
+  - Per-IP on `DELETE /account`.
+```
+
+If any `*_rate_limit` is set but neither a `rate_limiter=` argument
+nor the `rate_limit` extra is available, `RegStack.router` raises
+`RuntimeError` on first access — failing closed beats silently
+disabling the protection. The host owns `app.state.limiter` and
+the `RateLimitExceeded` exception handler; slowapi itself defines
+the 429 response shape.
 
 ## SMS / 2FA
 

@@ -5,6 +5,20 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
+## 0.5.7 — 2026-05-13
+
+Documentation-only follow-up to 0.5.6.
+
+- `docs/configuration.md` now documents the per-route `*_rate_limit`
+  family (added in 0.5.4) instead of pointing at
+  `login_max_per_minute` / `login_max_per_hour` as reserved future
+  fields.
+- `docs/security.md` no longer references
+  `PasswordHasher.needs_rehash` (removed in 0.5.6). Replacement
+  guidance points hosts at `pwdlib.PasswordHash.verify_and_update`.
+- Root `CHANGELOG.md` backfilled with 0.4.0 and 0.5.0 entries so it
+  matches `docs/changelog.md`.
+
 ## 0.5.6 — 2026-05-13
 
 Eleven days of security-review remediation, supply-chain hardening,
@@ -85,6 +99,42 @@ to use it, call `pwdlib.PasswordHash.verify_and_update` directly.
 `mfa_disabled`). `user_logged_out` now actually fires from
 `routers/logout.py` (was listed in `KNOWN_EVENTS` but no router
 emitted it).
+
+## 0.5.0 — 2026-05-02
+
+**Theme designer.** `regstack theme design` opens a native pywebview
+window with controls for every `--rs-*` CSS custom property and a
+real-time preview of the bundled SSR widgets (sign-in form, success /
+error banners, danger-zone button). Saving writes `regstack-theme.css`;
+the designer round-trips values back into the form on next launch so
+iteration is non-destructive. `--print-only` mode takes repeatable
+`--var NAME=VALUE` pairs (with a `dark:` prefix for dark-scheme
+overrides) and writes the file headlessly. Lives in
+`regstack.wizard.theme_designer`; registered as a lazy Click subgroup
+so `regstack init` / `doctor` don't pay the pywebview/uvicorn import
+cost.
+
+**Docs.** New "About the examples" convention block at the top of
+`docs/index.md`. Every URL, email, smtp host, and admin command across
+the docs now extrapolates from the same fictional app at
+`app.example.com` with `<username>` / `<password>` placeholders.
+
+## 0.4.0 — 2026-05-02
+
+**OAuth setup wizard.** `regstack oauth setup` opens a native webview
+window that walks an operator through registering a Google OAuth 2.0
+client and merges the credentials into `regstack.toml` +
+`regstack.secrets.env` non-destructively (preserves comments, other
+tables, unrelated keys). 12-step SPA inside a local-only 127.0.0.1
+FastAPI server, gated by a per-launch random token. Each "Next" click
+hits a server-side validator so the Write step can never be reached
+with bad data. `--print-only` mode skips the GUI for headless / CI
+use.
+
+Three new base dependencies — `pywebview>=5.0`, `tomlkit>=0.13`,
+`uvicorn[standard]>=0.29` — for the wizard's local server.
+`pytest-playwright` added to the `dev` extra; new `inv test-e2e` task
+chained into `inv test-all`.
 
 ## 0.3.0 — 2026-04-30
 

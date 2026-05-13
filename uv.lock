@@ -2310,7 +2310,7 @@ wheels = [
 
 [[package]]
 name = "regstack"
-version = "0.5.6"
+version = "0.5.7"
 source = { editable = "." }
 dependencies = [
     { name = "aiosmtplib" },

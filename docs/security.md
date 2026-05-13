@@ -10,10 +10,13 @@ are tradeoffs, they're documented here rather than buried in code.
 
 ## Passwords
 
-- **Hashing.** Argon2id with library defaults.
-  `PasswordHasher.needs_rehash(...)` is available so a future
-  parameter bump can quietly upgrade existing hashes on a user's next
-  successful login.
+- **Hashing.** Argon2id with library defaults via `pwdlib`.
+  regstack does not expose a standalone "needs rehash?" method —
+  if the Argon2 parameters change later and you want existing
+  hashes upgraded on next login, call
+  `pwdlib.PasswordHash.verify_and_update(password, hashed)`
+  directly inside a host-side `user_logged_in` hook (it returns
+  both `(verified, new_hash_or_None)` in one pass).
 - **Length.** Minimum 8, maximum 128 (UTF-8). Validated by the
   pydantic input model on every create / change endpoint.
 - **Storage.** Plaintext is never logged or returned. The

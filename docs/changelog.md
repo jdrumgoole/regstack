@@ -3,6 +3,63 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## 0.5.8 — 2026-05-13
+
+Audit-driven consistency cleanup — small fixes across the API surface
+flagged by the post-0.5.6 consistency review.
+
+### Security
+
+- **`oauth.completion_ttl_seconds` is now enforced.** This flag has
+  been on `OAuthConfig` since the OAuth router shipped, but the
+  callback never used it. A state row stayed valid for the full
+  `state_ttl_seconds` (300s default) between callback completion and
+  the SPA's `/oauth/exchange` call. The callback now shortens the
+  row's `expires_at` to `now + completion_ttl_seconds` (30s default)
+  when it stashes the result token, so the blast radius of a stolen
+  state_id post-callback is the documented 30-second window.
+
+### Changed (UserPublic surface)
+
+- `UserPublic` now serialises `updated_at` and
+  `tokens_invalidated_after`. SPAs comparing the latter against their
+  cached session JWT's `iat` can detect a forced sign-out after a
+  password / email change without an extra round-trip.
+
+### Changed (hook payloads)
+
+- `oauth_signin_started` in `mode="link"` now carries the
+  authenticated `user=` kwarg, matching `oauth_signin_completed` and
+  `oauth_account_linked`. The `mode="signin"` call site stays
+  user-less (there isn't one yet — sign-in is what produces it).
+
+### Internal
+
+- `OAuthStateRepoProtocol.set_result_token` grew an optional
+  `new_expires_at=` kwarg so the callback can re-set the row's
+  expiry atomically with the token write. Both Mongo and SQL impls
+  updated.
+- `MessageResponse` in `routers/oauth.py` deleted; the router now
+  uses the shared one from `routers/_schemas.py`. OpenAPI no longer
+  carries two identically-named schemas.
+- `MongoBlacklistRepo.purge_expired` switched from `$lte` to `$lt`
+  to match the rest of the `purge_expired` family. Bulk-revoke
+  (which DOES use `<=` for the conservative same-instant
+  interpretation) is unchanged.
+- Dead `create()` / `delete_by_id()` methods removed from
+  `MongoPendingRepo` — neither was in the protocol or the SQL impl.
+- OAuth `start` and `callback` endpoints now declare
+  `response_class=RedirectResponse` and `status_code=302`.
+- Custom-claim JWT encoder in `routers/account.py` (email-change
+  token) now emits `iat` as a float instead of `int`, matching the
+  three other custom-claim encoders.
+- `routers/verify.py` `created_at` for resent pending registrations
+  now goes through `rs.clock.now()` instead of wall-clock
+  `datetime.now(UTC)`.
+- `BaseUser.model_config = ConfigDict(extra="allow")` is now
+  documented inline (it's the only model in the package that
+  doesn't `extra="forbid"`, on purpose).
+
 ## 0.5.7 — 2026-05-13
 
 Documentation-only follow-up to 0.5.6 — no runtime code changes.

@@ -237,7 +237,7 @@ def _encode_email_change_token(rs: RegStack, user_id: str, new_email: str, ttl: 
     payload: dict[str, Any] = {
         "sub": user_id,
         "jti": _secrets.token_urlsafe(16),
-        "iat": int(now.timestamp()),
+        "iat": now.timestamp(),
         "exp": int((now + timedelta(seconds=ttl)).timestamp()),
         "purpose": _EMAIL_CHANGE_PURPOSE,
         _NEW_EMAIL_CLAIM: new_email,

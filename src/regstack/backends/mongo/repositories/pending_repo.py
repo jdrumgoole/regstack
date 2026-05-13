@@ -4,9 +4,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from bson import ObjectId
-from pymongo.errors import DuplicateKeyError
 
-from regstack.backends.protocols import PendingAlreadyExistsError
 from regstack.models.pending_registration import PendingRegistration
 
 if TYPE_CHECKING:
@@ -36,14 +34,6 @@ class PendingRepo:
             pending.id = str(result["_id"])
         return pending
 
-    async def create(self, pending: PendingRegistration) -> PendingRegistration:
-        try:
-            result = await self._collection.insert_one(pending.to_mongo())
-        except DuplicateKeyError as exc:
-            raise PendingAlreadyExistsError(pending.email) from exc
-        pending.id = str(result.inserted_id)
-        return pending
-
     async def find_by_token_hash(self, token_hash: str) -> PendingRegistration | None:
         doc = await self._collection.find_one({"token_hash": token_hash})
         return self._hydrate(doc)
@@ -51,11 +41,6 @@ class PendingRepo:
     async def find_by_email(self, email: str) -> PendingRegistration | None:
         doc = await self._collection.find_one({"email": email})
         return self._hydrate(doc)
-
-    async def delete_by_id(self, pending_id: str) -> None:
-        if not ObjectId.is_valid(pending_id):
-            return
-        await self._collection.delete_one({"_id": ObjectId(pending_id)})
 
     async def delete_by_email(self, email: str) -> None:
         await self._collection.delete_one({"email": email})

@@ -30,6 +30,7 @@ import base64
 import hashlib
 import logging
 import secrets as _secrets
+from datetime import timedelta
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
@@ -42,6 +43,7 @@ from regstack.models.oauth_identity import OAuthIdentity
 from regstack.models.oauth_state import OAuthState
 from regstack.models.user import BaseUser
 from regstack.oauth.errors import OAuthError, OAuthIdTokenError, OAuthTokenExchangeError
+from regstack.routers._schemas import MessageResponse
 
 if TYPE_CHECKING:
     from regstack.app import RegStack
@@ -65,10 +67,6 @@ class ExchangeResponse(BaseModel):
 
 class LinkStartResponse(BaseModel):
     authorization_url: str
-
-
-class MessageResponse(BaseModel):
-    message: str
 
 
 class LinkedIdentitySummary(BaseModel):
@@ -157,6 +155,8 @@ def build_oauth_router(rs: RegStack) -> APIRouter:
     @router.get(
         "/{provider_name}/start",
         summary="Start an OAuth sign-in flow",
+        response_class=RedirectResponse,
+        status_code=status.HTTP_302_FOUND,
     )
     async def oauth_start(
         provider_name: str,
@@ -194,7 +194,12 @@ def build_oauth_router(rs: RegStack) -> APIRouter:
             redirect_to=validated_redirect,
             linking_user_id=user.id,
         )
-        await rs.hooks.fire("oauth_signin_started", provider=provider_name, mode="link")
+        await rs.hooks.fire(
+            "oauth_signin_started",
+            provider=provider_name,
+            mode="link",
+            user=user,
+        )
         return LinkStartResponse(authorization_url=url)
 
     @router.delete(
@@ -233,6 +238,8 @@ def build_oauth_router(rs: RegStack) -> APIRouter:
     @router.get(
         "/{provider_name}/callback",
         summary="Provider redirects the browser here after authorization",
+        response_class=RedirectResponse,
+        status_code=status.HTTP_302_FOUND,
     )
     async def oauth_callback(
         provider_name: str,
@@ -297,11 +304,20 @@ def build_oauth_router(rs: RegStack) -> APIRouter:
             log.exception("touch_last_used failed for %s/%s", provider_name, user_info.subject_id)
 
         # Mint the session JWT, stash it on the state row for the
-        # SPA's exchange call, and redirect.
+        # SPA's exchange call, and redirect. Shorten the row's expiry
+        # to `oauth.completion_ttl_seconds` (default 30s) so the
+        # window during which a stolen state_id could yield a session
+        # token is bounded — the full `state_ttl_seconds` only had to
+        # cover the user's round-trip with the provider.
         assert user.id is not None
         token, _payload = rs.jwt.encode(user.id)
         await rs.users.set_last_login(user.id, _payload.iat)
-        await rs.oauth_states.set_result_token(state_row.id, token)
+        await rs.oauth_states.set_result_token(
+            state_row.id,
+            token,
+            new_expires_at=rs.clock.now()
+            + timedelta(seconds=rs.config.oauth.completion_ttl_seconds),
+        )
 
         await rs.hooks.fire(
             "oauth_signin_completed",
@@ -401,8 +417,6 @@ async def _begin_flow(
     nonce = _secrets.token_urlsafe(16)
     state_id = _secrets.token_urlsafe(32)
 
-    from datetime import timedelta as _td
-
     state = OAuthState(
         id=state_id,
         provider=provider.name,
@@ -412,7 +426,7 @@ async def _begin_flow(
         mode=mode,
         linking_user_id=linking_user_id,
         created_at=rs.clock.now(),
-        expires_at=rs.clock.now() + _td(seconds=rs.config.oauth.state_ttl_seconds),
+        expires_at=rs.clock.now() + timedelta(seconds=rs.config.oauth.state_ttl_seconds),
     )
     await rs.oauth_states.create(state)
     return provider.authorization_url(

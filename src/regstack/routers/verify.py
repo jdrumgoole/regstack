@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, status
@@ -80,15 +80,19 @@ def build_verify_router(rs: RegStack) -> APIRouter:
 
         raw, token_hash_value = generate_verification_token()
         ttl = rs.config.verification_token_ttl_seconds
+        # Set created_at via rs.clock so FrozenClock-driven tests see
+        # the same instant on both sides of the resend; the model's
+        # default factory uses wall-clock `datetime.now(UTC)` which
+        # would drift under a frozen clock.
         new_pending = PendingRegistration(
             id=None,
             email=pending.email,
             hashed_password=pending.hashed_password,
             full_name=pending.full_name,
             token_hash=token_hash_value,
+            created_at=rs.clock.now(),
             expires_at=rs.clock.now() + timedelta(seconds=ttl),
         )
-        new_pending.created_at = datetime.now(UTC)
         await rs.pending.upsert(new_pending)
 
         url = _verification_url(rs, raw)

@@ -537,6 +537,31 @@ async def test_exchange_is_single_use(oauth_client) -> None:
     assert second.status_code == 404
 
 
+@pytest.mark.asyncio
+async def test_exchange_window_shrinks_after_callback(oauth_client, frozen_clock) -> None:
+    """After the callback completes, the SPA gets only
+    `oauth.completion_ttl_seconds` (default 30s) to call /exchange —
+    not the full `state_ttl_seconds` (default 300s). Bounds the
+    blast radius of a stolen state_id between callback and exchange.
+    """
+    from datetime import timedelta
+
+    rs, fake, client = oauth_client
+    fake.queue_user(subject_id="g-013-tight", email="alice@example.com")
+
+    state, _ = await _start_signin(client)
+    await _callback(client, state=state)
+
+    # Advance past `completion_ttl_seconds` but well within the
+    # original `state_ttl_seconds` window — would have succeeded
+    # before; must fail now.
+    frozen_clock.advance(timedelta(seconds=rs.config.oauth.completion_ttl_seconds + 5))
+
+    r = await _exchange(client, state)
+    assert r.status_code == 400, r.text
+    assert "expired" in r.json()["detail"].lower()
+
+
 # ---------------------------------------------------------------------------
 # 14 — bulk-revoke applies to OAuth-issued sessions too
 # ---------------------------------------------------------------------------

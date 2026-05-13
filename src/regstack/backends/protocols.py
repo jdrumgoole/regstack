@@ -289,9 +289,22 @@ class OAuthStateRepoProtocol(Protocol):
 
     async def find(self, state_id: str) -> OAuthState | None: ...
 
-    async def set_result_token(self, state_id: str, token: str) -> None:
+    async def set_result_token(
+        self,
+        state_id: str,
+        token: str,
+        *,
+        new_expires_at: datetime | None = None,
+    ) -> None:
         """Stash the session JWT after a successful callback so the
         SPA can pick it up via :meth:`consume`.
+
+        If ``new_expires_at`` is given, the row's ``expires_at`` is
+        bumped to that timestamp at the same time — this is how
+        callers shorten the redemption window from
+        ``oauth.state_ttl_seconds`` (covering the round-trip with
+        the provider) to ``oauth.completion_ttl_seconds`` (covering
+        only the SPA's exchange call after the callback lands).
         """
         ...
 

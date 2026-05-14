@@ -5,6 +5,31 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
+## 0.5.11 — 2026-05-14
+
+CI / workflow hygiene. No runtime code changes.
+
+- **All third-party GitHub Actions pinned to commit SHAs.**
+  `actions/checkout@v4`, `astral-sh/setup-uv@v3`,
+  `actions/upload-artifact@v4`, and `actions/download-artifact@v4` now
+  use commit SHAs in `.github/workflows/publish.yml` and
+  `.github/workflows/test.yml`, with `# v4` / `# v3` trailing comments
+  so future operators can resolve and bump. `pypa/gh-action-pypi-publish`
+  was already SHA-pinned (#37). A tag swap upstream can no longer
+  substitute a malicious version.
+- **`permissions:` blocks added to every workflow + job.** Both
+  workflows now declare a `permissions: contents: read` default at
+  the workflow level and re-state it per job (so a future addition of
+  a write-needing action doesn't silently inherit elevated scopes).
+  The `publish` job continues to declare `id-token: write` (OIDC
+  trusted-publisher exchange) — that's the only scope above
+  read-only anywhere in the workflows.
+- **`.gitignore` defensive additions.** `.env`, `.env.*`, and the
+  common credential-file patterns (`*.pem`, `*.key`, `*.p12`,
+  `*.pfx`, `*.jks`, `*.crt`) are now ignored at the repo root. None
+  are present today; this is belt-and-braces for misconfigured local
+  dev environments. A recurring audit recommendation.
+
 ## 0.5.10 — 2026-05-14
 
 Security fixes from the 2026-05-13 / 2026-05-14 daily reviews. All

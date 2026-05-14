@@ -3,6 +3,32 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## 0.5.11 — 2026-05-14
+
+CI / workflow hygiene. No runtime code changes.
+
+### Security
+
+- **All third-party GitHub Actions pinned to commit SHAs.**
+  `actions/checkout@v4`, `astral-sh/setup-uv@v3`,
+  `actions/upload-artifact@v4`, and `actions/download-artifact@v4`
+  now use commit SHAs across both workflows (`pypa/gh-action-pypi-publish`
+  was already SHA-pinned in 0.5.6). Tag swaps upstream can no longer
+  substitute a malicious version.
+- **`permissions:` blocks declared on every workflow + job.** Both
+  workflows declare a `permissions: contents: read` default at the
+  workflow level and re-state it per job. The `publish` job
+  continues to add `id-token: write` for the OIDC trusted-publisher
+  exchange — that's the only scope above read-only anywhere in
+  the workflows.
+
+### Internal
+
+- `.gitignore` gained `.env`, `.env.*`, and the common credential-file
+  patterns (`*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.crt`).
+  Belt-and-braces for misconfigured local dev envs; nothing tracked
+  today depends on these.
+
 ## 0.5.10 — 2026-05-14
 
 Security fixes from the 2026-05-13 / 2026-05-14 daily review reports.

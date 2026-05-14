@@ -10,9 +10,19 @@ concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: true
 
+# Workflow-level default — every job in this workflow gets read-only
+# permissions unless it overrides explicitly. Third-party actions are
+# pinned to commit SHAs so a tag swap upstream can't substitute a
+# malicious version; update by resolving the latest SHA for the
+# version you want and bumping the trailing `# vN` comment.
+permissions:
+  contents: read
+
 jobs:
   pytest:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -47,9 +57,9 @@ jobs:
       # Connect as superuser so the per-test fixture can CREATE/DROP DATABASE.
       REGSTACK_TEST_POSTGRES_URL: postgresql+asyncpg://regstack:regstack@localhost:5432
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39  # v3
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
@@ -71,16 +81,18 @@ jobs:
 
   docs:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39  # v3
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
       - run: uv python pin 3.11
       - run: uv sync --extra docs --extra dev
       - run: uv run sphinx-build -b html -W --keep-going docs docs/_build/html
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: docs-html
           path: docs/_build/html
@@ -93,9 +105,11 @@ jobs:
     # equivalent in-process via meta_path blocking; this job verifies the
     # actual built wheel installs and imports against a clean Python.
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39  # v3
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"

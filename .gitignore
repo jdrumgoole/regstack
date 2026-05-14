@@ -32,3 +32,15 @@ docs/_autosummary/
 /regstack-bootstrap.json
 **/regstack.secrets.env
 **/regstack-bootstrap.json
+
+# Defensive: keep credential material out of any commit, even from a
+# misconfigured local dev env. None of these are checked in today, but
+# the .env / *.pem / etc. patterns are recurring audit recommendations.
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.crt

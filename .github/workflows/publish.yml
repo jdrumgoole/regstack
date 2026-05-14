@@ -4,6 +4,11 @@ name: publish
 # Configure the PyPI project (https://pypi.org/manage/account/publishing/)
 # with the publisher: this repository, environment name `pypi`, workflow
 # `publish.yml`. No PyPI tokens live in GitHub Actions secrets.
+#
+# Third-party actions are pinned to commit SHAs (not mutable tags) so a
+# tag swap upstream can't substitute a malicious version. Update by
+# resolving the latest SHA for the version you want and bumping the
+# trailing `# vN` comment to match.
 
 on:
   push:
@@ -11,15 +16,22 @@ on:
       - "v*"
   workflow_dispatch:
 
+# Workflow-level default. Individual jobs override where they need
+# extra scopes (the `publish` job adds `id-token: write` for OIDC).
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           fetch-depth: 0
 
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39  # v3
         with:
           enable-cache: true
 
@@ -42,7 +54,7 @@ jobs:
       - name: Build sdist + wheel
         run: uv build
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: dist
           path: dist/
@@ -55,9 +67,10 @@ jobs:
       name: pypi
       url: https://pypi.org/p/regstack
     permissions:
-      id-token: write   # OIDC trusted-publisher
+      id-token: write   # OIDC trusted-publisher exchange
+      contents: read
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
         with:
           name: dist
           path: dist/

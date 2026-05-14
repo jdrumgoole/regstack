@@ -2310,7 +2310,7 @@ wheels = [
 
 [[package]]
 name = "regstack"
-version = "0.5.9"
+version = "0.5.10"
 source = { editable = "." }
 dependencies = [
     { name = "aiosmtplib" },
@@ -2399,11 +2399,11 @@ requires-dist = [
     { name = "cryptography", marker = "extra == 'oauth'", specifier = ">=46.0.7" },
     { name = "dnspython", specifier = ">=2.6" },
     { name = "email-validator", specifier = ">=2.1" },
-    { name = "fastapi", specifier = ">=0.110" },
+    { name = "fastapi", specifier = ">=0.120.0" },
     { name = "furo", marker = "extra == 'docs'", specifier = ">=2024.1" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
     { name = "invoke", marker = "extra == 'dev'", specifier = ">=2.2" },
-    { name = "jinja2", specifier = ">=3.1" },
+    { name = "jinja2", specifier = ">=3.1.6" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=3.0" },
     { name = "pwdlib", extras = ["argon2"], specifier = ">=0.2.1" },

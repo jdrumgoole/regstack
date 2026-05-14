@@ -3,6 +3,40 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## 0.5.10 — 2026-05-14
+
+Security fixes from the 2026-05-13 / 2026-05-14 daily review reports.
+
+### Security
+
+- **Open-redirect bypass in OAuth `redirect_to`.** `_validate_redirect`
+  was forwarding `urlsplit`'s judgment, but browsers normalize values
+  like `/\evil.com` and `////evil.com` into the protocol-relative
+  `//evil.com`. Both forms now rejected.
+- **CVE-2025-62727 — `fastapi>=0.120.0`** (was `>=0.110`). Starlette
+  DoS via large request bodies after multipart processing.
+- **CVE-2025-27516 — `jinja2>=3.1.6`** (was `>=3.1`). Sandbox breakout
+  via the `|attr` filter.
+- **Login lockout coverage extended.** `POST /login` was returning
+  HTTP 403 for `is_active=False` and (when `require_verification=True`)
+  unverified accounts **without** recording a failure — an attacker
+  guessing passwords against either category had unbounded probing.
+  The endpoint now:
+  - Verifies the password **before** the active/verified checks (so
+    an unauthenticated attacker can't distinguish disabled vs active
+    accounts by HTTP code).
+  - Records a failure before raising 403 in either branch.
+- **`POST /change-email` anti-enumeration.** An authenticated
+  attacker could walk the registered-email namespace via the 409 vs
+  202 distinction. The endpoint now always returns 202; clashes are
+  logged server-side and the confirmation email is silently skipped.
+  Matches the existing stance on `/forgot-password` and
+  `/resend-verification`.
+- **Admin resend-verification rejects OAuth-only users** with a clear
+  400 instead of attempting to construct a `PendingRegistration` with
+  `hashed_password=None` (which corrupted the pending-registrations
+  row).
+
 ## 0.5.9 — 2026-05-13
 
 ### Security

@@ -70,11 +70,11 @@ def build_login_router(rs: RegStack) -> APIRouter:
         if user is None or user.id is None:
             await rs.lockout.record_failure(payload.email)
             raise _INVALID
-        if not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Account is disabled.",
-            )
+        # Password verification runs first so the is_active and
+        # is_verified branches below are only reachable by an attacker
+        # who already knows the password. Without this ordering, an
+        # unauthenticated probe could distinguish disabled / unverified
+        # / non-existent accounts by HTTP code alone.
         # An OAuth-only user (hashed_password=None) returns the same
         # generic 401 as a wrong-password attempt — never reveal that
         # the account exists but has no password set, so an attacker
@@ -84,7 +84,19 @@ def build_login_router(rs: RegStack) -> APIRouter:
         ):
             await rs.lockout.record_failure(payload.email)
             raise _INVALID
+        # Even with the right password, disabled / unverified accounts
+        # must still increment the lockout counter — otherwise a
+        # password-stuffing attacker who happens to be holding the
+        # correct credentials for a disabled account gets unbounded
+        # probing.
+        if not user.is_active:
+            await rs.lockout.record_failure(payload.email)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is disabled.",
+            )
         if rs.config.require_verification and not user.is_verified:
+            await rs.lockout.record_failure(payload.email)
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Email address has not been verified.",

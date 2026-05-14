@@ -201,6 +201,37 @@ async def test_admin_resend_verification(make_client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_admin_resend_verification_rejects_oauth_only_user(make_client) -> None:
+    """OAuth-only users have `hashed_password=None`; the verification
+    flow's `PendingRegistration` requires `hashed_password: str` and
+    would either fail validation or write the literal `"None"` into
+    the pending-registrations row, corrupting the table. Reject the
+    resend with a clear 400 instead of attempting it.
+    """
+    from regstack.models.user import BaseUser
+
+    async with make_client(enable_admin_router=True) as (rs, client):
+        await rs.bootstrap_admin("admin@example.com", "adminadminadmin")
+        oauth_only = await rs.users.create(
+            BaseUser(
+                email="oauth-unverified@example.com",
+                hashed_password=None,
+                is_active=True,
+                is_verified=False,
+            )
+        )
+        assert oauth_only.id is not None
+        admin_token = await _login(client, "admin@example.com", "adminadminadmin")
+
+        r = await client.post(
+            f"{ADMIN_USERS}/{oauth_only.id}/resend-verification",
+            headers={"authorization": f"Bearer {admin_token}"},
+        )
+        assert r.status_code == 400, r.text
+        assert "OAuth-only" in r.json()["detail"]
+
+
+@pytest.mark.asyncio
 async def test_stats_pending_registrations_count_unexpired(make_client) -> None:
     """Admin stats must report pending-registration count correctly on every backend.
 

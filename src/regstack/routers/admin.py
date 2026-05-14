@@ -154,6 +154,21 @@ def build_admin_router(rs: RegStack) -> APIRouter:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="User is already verified.",
             )
+        # OAuth-only users (no password) shouldn't be unverified — their
+        # OAuth identity was the verification. If somehow one ended up
+        # unverified, the password-bearing verification flow can't help:
+        # PendingRegistration requires a `hashed_password: str` and
+        # would store the literal string "None" (or fail validation,
+        # depending on the pydantic config). Surface this clearly
+        # instead of silently corrupting the pending-registrations row.
+        if user.hashed_password is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "User has no password (OAuth-only). Verify them directly "
+                    "via the user record instead of resending verification email."
+                ),
+            )
 
         # Move the user to a pending registration row so the standard verify
         # endpoint completes the flow. Less special-case code, one path.

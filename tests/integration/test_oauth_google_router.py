@@ -697,6 +697,32 @@ async def test_start_rejects_offsite_redirect(oauth_client) -> None:
     assert "same-origin" in r.json()["detail"]
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "bad_redirect",
+    [
+        "//evil.example",  # protocol-relative
+        "////evil.example",  # extra slashes — browsers collapse
+        r"/\evil.example",  # browsers normalize \\ to /
+        "/\\evil.example/path",
+        " //evil.example",  # leading whitespace + protocol-relative
+    ],
+)
+async def test_start_rejects_normalization_bypasses(oauth_client, bad_redirect) -> None:
+    """`/\\evil.com`, `////evil.com`, and `//evil.com` all become
+    protocol-relative URLs after browser URL normalization. The
+    validator must reject them before they make it into the state row.
+    """
+    _, _, client = oauth_client
+    r = await client.get(
+        OAUTH_START,
+        params={"redirect_to": bad_redirect},
+        follow_redirects=False,
+    )
+    assert r.status_code == 400, r.text
+    assert "same-origin" in r.json()["detail"]
+
+
 # ---------------------------------------------------------------------------
 # 16 — start endpoint requires a configured provider name
 # ---------------------------------------------------------------------------

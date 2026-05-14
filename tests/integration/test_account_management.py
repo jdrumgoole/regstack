@@ -162,18 +162,38 @@ async def test_login_immediately_after_password_change_is_valid(make_client, fro
 
 
 @pytest.mark.asyncio
-async def test_change_email_rejects_taken_address(client) -> None:
-    # Register two users; user A tries to take user B's email.
-    await client.post(
-        REGISTER, json={"email": "b@example.com", "password": "passpasspass1", "full_name": "B"}
-    )
-    token = await _register_and_login(client)
-    r = await client.post(
-        CHANGE_EMAIL,
-        json={"new_email": "b@example.com", "current_password": CREDS["password"]},
-        headers={"authorization": f"Bearer {token}"},
-    )
-    assert r.status_code == 409
+async def test_change_email_clash_returns_same_shape_as_clean(make_client) -> None:
+    """Anti-enumeration: an authenticated attacker could otherwise walk
+    the registered-email namespace by alternating 202 (free) vs 409
+    (taken) responses. /change-email now always returns 202; if the
+    address is taken, no confirmation email is sent (the legitimate
+    user finds out by not receiving the mail). Same anti-enumeration
+    stance as /forgot-password and /resend-verification.
+    """
+    async with make_client() as (rs, client):
+        # Two registered users; user A tries to migrate to user B's email.
+        await client.post(
+            REGISTER,
+            json={"email": "b@example.com", "password": "passpasspass1", "full_name": "B"},
+        )
+        await client.post(REGISTER, json=CREDS)
+        login = await client.post(
+            LOGIN, json={"email": CREDS["email"], "password": CREDS["password"]}
+        )
+        token = login.json()["access_token"]
+        assert isinstance(rs.email, ConsoleEmailService)
+        rs.email.outbox.clear()
+
+        r = await client.post(
+            CHANGE_EMAIL,
+            json={"new_email": "b@example.com", "current_password": CREDS["password"]},
+            headers={"authorization": f"Bearer {token}"},
+        )
+        # The shape that a clean change-email request would return.
+        assert r.status_code == 202, r.text
+        # No confirmation email was sent — the clash blocked the send
+        # without surfacing the conflict to the caller.
+        assert rs.email.outbox == []
 
 
 @pytest.mark.asyncio

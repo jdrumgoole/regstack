@@ -504,11 +504,36 @@ def _resolve_provider(rs: RegStack, name: str) -> OAuthProvider:
 
 
 def _validate_redirect(rs: RegStack, redirect_to: str) -> str:
-    """Reject anything that isn't a same-origin path or full URL."""
+    """Reject anything that isn't a same-origin path or full URL.
+
+    `urlsplit` is too forgiving for our purposes: a value like
+    ``/\\evil.com`` parses with an empty netloc but browsers normalize
+    the backslash to a slash, producing the protocol-relative
+    ``//evil.com``. Similarly, ``////evil.com`` collapses in the
+    browser. Both are open-redirect vectors. We pre-screen the raw
+    string for those shapes before trusting `urlsplit`.
+    """
+    if not redirect_to:
+        return "/account/me"
+    redirect_to = redirect_to.strip()
+    # Browsers normalize backslashes to forward slashes; treat any
+    # backslash anywhere as hostile.
+    if "\\" in redirect_to:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="redirect_to must be same-origin.",
+        )
     parts = urlsplit(redirect_to)
     if not parts.scheme and not parts.netloc:
-        # Plain path like "/account/me" — fine.
-        return redirect_to or "/account/me"
+        # Plain path like "/account/me" — fine, but reject anything
+        # that looks like a protocol-relative URL (``//host``) or
+        # doesn't start with a single leading slash.
+        if not redirect_to.startswith("/") or redirect_to.startswith("//"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="redirect_to must be same-origin.",
+            )
+        return redirect_to
     base_parts = urlsplit(str(rs.config.base_url))
     if (parts.scheme, parts.netloc) != (base_parts.scheme, base_parts.netloc):
         raise HTTPException(

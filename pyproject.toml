@@ -1,6 +1,6 @@
 [project]
 name = "regstack"
-version = "0.5.9"
+version = "0.5.10"
 description = "Embeddable user registration, login, and account management for FastAPI apps. SQLite / Postgres / MongoDB."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -17,13 +17,18 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "fastapi>=0.110",
+    # fastapi>=0.120.0 picks up CVE-2025-62727 (Starlette DoS via large
+    # request bodies after multipart processing).
+    "fastapi>=0.120.0",
     "pydantic>=2.6",
     "pydantic-settings>=2.2",
     "pwdlib[argon2]>=0.2.1",
     # pyjwt>=2.12.1 includes the fix for CVE-2026-32597 (`crit` header bypass).
     "pyjwt>=2.12.1",
-    "jinja2>=3.1",
+    # jinja2>=3.1.6 picks up CVE-2025-27516 (sandbox breakout via the
+    # `|attr` filter; only relevant if hosts allow user-controlled
+    # templates, but we tighten the floor anyway).
+    "jinja2>=3.1.6",
     "click>=8.1",
     "dnspython>=2.6",
     # python-multipart>=0.0.26 picks up CVE-2026-40347 (DoS via oversized

@@ -5,6 +5,43 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
+## 0.5.10 — 2026-05-14
+
+Security fixes from the 2026-05-13 / 2026-05-14 daily reviews. All
+warnings, no criticals — but several are real exploitable issues.
+
+**Security.**
+
+- **Open-redirect bypass in OAuth `redirect_to`.** `_validate_redirect`
+  was forwarding `urlsplit`'s judgment, but browsers normalize values
+  like `/\evil.com` and `////evil.com` into the protocol-relative
+  `//evil.com` — both of which `urlsplit` reports as same-origin
+  paths. The validator now rejects any backslash plus any value that
+  doesn't start with a single `/` followed by a non-slash character.
+- **CVE-2025-62727 — `fastapi` floor raised to `>=0.120.0`.** Starlette
+  DoS via large request bodies after multipart processing.
+- **CVE-2025-27516 — `jinja2` floor raised to `>=3.1.6`.** Sandbox
+  breakout via the `|attr` filter (only relevant if hosts allow
+  user-controlled templates; tightening the floor regardless).
+- **Login lockout no longer skips disabled / unverified accounts.**
+  `POST /login` now records a failure before raising HTTP 403 for
+  `is_active=False` and (when `require_verification=True`)
+  `is_verified=False` users. Password verification was also re-ordered
+  to run **before** those checks, so an attacker without the password
+  can't distinguish disabled vs active accounts by HTTP code alone.
+- **`POST /change-email` no longer enumerates registered addresses.**
+  An authenticated attacker could previously iterate the email
+  namespace via the 409 vs 202 response distinction. The endpoint now
+  always returns 202; if the candidate is already registered, no
+  confirmation email is sent (the legitimate user finds out by not
+  receiving it). Matches the existing anti-enumeration stance on
+  `/forgot-password` and `/resend-verification`.
+- **Admin resend-verification rejects OAuth-only users.** Previously
+  attempted to construct a `PendingRegistration` from a user with
+  `hashed_password=None`, which either failed validation or stored
+  the literal string `"None"` in the pending row. Now returns 400
+  with a clear message.
+
 ## 0.5.9 — 2026-05-13
 
 **`OAuthConfig.enforce_mfa_on_oauth_signin` is now wired.** The flag

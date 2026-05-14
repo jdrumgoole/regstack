@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Annotated, Any
 
 import jwt as pyjwt
@@ -19,6 +20,8 @@ if TYPE_CHECKING:
 
 _EMAIL_CHANGE_PURPOSE = "email_change"
 _NEW_EMAIL_CLAIM = "new_email"
+
+log = logging.getLogger("regstack.account")
 
 
 class ChangePasswordRequest(BaseModel):
@@ -124,12 +127,24 @@ def build_account_router(rs: RegStack) -> APIRouter:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Current password is incorrect.",
             )
+
+        # Anti-enumeration: an authenticated attacker could otherwise
+        # walk the registered-email namespace by alternating 409 vs 202
+        # responses on this endpoint. Always return 202; if the address
+        # is already taken, log and skip the email send. The legitimate
+        # user finds out by not receiving the confirmation mail; the
+        # final uniqueness check still happens at /confirm-email-change
+        # via the users.update_email unique constraint.
         clash = await rs.users.get_by_email(payload.new_email)
+        accepted = MessageResponse(
+            message="If that email address is not already in use, a confirmation link has been sent.",
+        )
         if clash is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="That email address is already in use.",
+            log.info(
+                "change-email blocked by clash (anti-enumeration): user_id=%s",
+                user.id,
             )
+            return accepted
 
         assert user.id is not None
         ttl = rs.config.email_change_token_ttl_seconds
@@ -148,9 +163,7 @@ def build_account_router(rs: RegStack) -> APIRouter:
             new_email=payload.new_email,
             url=url,
         )
-        return MessageResponse(
-            message="A confirmation link has been sent to the new email address."
-        )
+        return accepted
 
     @router.post(
         "/confirm-email-change",

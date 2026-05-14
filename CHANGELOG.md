@@ -5,6 +5,33 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
+## 0.6.0 — 2026-05-14
+
+**Breaking change for wizard users.** The GUI setup wizards
+(`regstack oauth setup`, `regstack theme design`) are now behind a
+new optional `wizard` extra. `pip install regstack` no longer pulls
+in `pywebview`, `tomlkit`, or `uvicorn[standard]` — three heavy
+wizard-only dependencies that every library consumer was paying for,
+including a platform browser engine on every fresh install. A
+recurring audit recommendation since 0.5.0.
+
+**Migration.**
+
+- If you only embed regstack in a FastAPI app (no `regstack oauth
+  setup` or `regstack theme design`): no action needed. The base
+  install is now significantly slimmer.
+- If you use either setup wizard: install the new extra —
+  `pip install 'regstack[wizard]'` or `uv sync --extra wizard`.
+  Running a wizard subcommand without the extra now exits with a
+  one-line install hint (no ImportError traceback).
+- The `dev` extra continues to pull in the wizard deps directly so
+  `inv test-all` keeps working without an explicit `--extra wizard`.
+
+Bumped to **0.6.0** (not 0.5.12) because removing top-level deps is
+the kind of change that can surprise downstream `pip install
+regstack` callers — even though "the GUI wizard CLIs need an extra
+now" is the only observable effect.
+
 ## 0.5.11 — 2026-05-14
 
 CI / workflow hygiene. No runtime code changes.

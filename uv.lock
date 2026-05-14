@@ -2310,7 +2310,7 @@ wheels = [
 
 [[package]]
 name = "regstack"
-version = "0.5.11"
+version = "0.6.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiosmtplib" },
@@ -2326,10 +2326,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pyjwt" },
     { name = "python-multipart" },
-    { name = "pywebview" },
     { name = "sqlalchemy", extra = ["asyncio"] },
-    { name = "tomlkit" },
-    { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.optional-dependencies]
@@ -2347,8 +2344,10 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-playwright" },
     { name = "pytest-xdist" },
+    { name = "pywebview" },
     { name = "ruff" },
     { name = "slowapi" },
+    { name = "tomlkit" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 docs = [
@@ -2382,6 +2381,11 @@ sns = [
 ]
 twilio = [
     { name = "twilio" },
+]
+wizard = [
+    { name = "pywebview" },
+    { name = "tomlkit" },
+    { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.metadata]
@@ -2420,7 +2424,8 @@ requires-dist = [
     { name = "pytest-playwright", marker = "extra == 'dev'", specifier = ">=0.5" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.5" },
     { name = "python-multipart", specifier = ">=0.0.26" },
-    { name = "pywebview", specifier = ">=5.0" },
+    { name = "pywebview", marker = "extra == 'dev'", specifier = ">=5.0" },
+    { name = "pywebview", marker = "extra == 'wizard'", specifier = ">=5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
     { name = "slowapi", marker = "extra == 'dev'", specifier = ">=0.1.9" },
     { name = "slowapi", marker = "extra == 'rate-limit'", specifier = ">=0.1.9" },
@@ -2429,12 +2434,13 @@ requires-dist = [
     { name = "sphinx-autodoc-typehints", marker = "extra == 'docs'", specifier = ">=2.0" },
     { name = "sphinx-copybutton", marker = "extra == 'docs'", specifier = ">=0.5" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },
-    { name = "tomlkit", specifier = ">=0.13" },
+    { name = "tomlkit", marker = "extra == 'dev'", specifier = ">=0.13" },
+    { name = "tomlkit", marker = "extra == 'wizard'", specifier = ">=0.13" },
     { name = "twilio", marker = "extra == 'twilio'", specifier = ">=9.0" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.29" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'dev'", specifier = ">=0.29" },
+    { name = "uvicorn", extras = ["standard"], marker = "extra == 'wizard'", specifier = ">=0.29" },
 ]
-provides-extras = ["postgres", "mongo", "ses", "sns", "twilio", "oauth", "rate-limit", "docs", "dev"]
+provides-extras = ["postgres", "mongo", "ses", "sns", "twilio", "oauth", "wizard", "rate-limit", "docs", "dev"]
 
 [[package]]
 name = "requests"

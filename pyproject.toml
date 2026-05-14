@@ -1,6 +1,6 @@
 [project]
 name = "regstack"
-version = "0.5.11"
+version = "0.6.0"
 description = "Embeddable user registration, login, and account management for FastAPI apps. SQLite / Postgres / MongoDB."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -40,11 +40,6 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0",
     "aiosqlite>=0.20",
     "alembic>=1.13",
-    # OAuth setup wizard (regstack oauth setup) — needs a webview shell,
-    # a small in-process FastAPI server, and round-trip-safe TOML editing.
-    "pywebview>=5.0",
-    "tomlkit>=0.13",
-    "uvicorn[standard]>=0.29",
 ]
 
 [project.optional-dependencies]
@@ -56,6 +51,16 @@ twilio = ["twilio>=9.0"]
 # cryptography>=46.0.7 picks up CVE-2026-26007 (ECC subgroup attack on the
 # JWKS code path) plus CVE-2026-34073 and CVE-2026-39892.
 oauth = ["pyjwt[crypto]>=2.12.1", "cryptography>=46.0.7"]
+# Interactive setup wizards (`regstack oauth setup`, `regstack theme
+# design`). These open a native pywebview window over a local 127.0.0.1
+# FastAPI server and use tomlkit for non-destructive TOML merging.
+# Optional because library consumers who never run the GUI tools don't
+# need a platform browser engine pulled in by pywebview.
+wizard = [
+    "pywebview>=5.0",
+    "tomlkit>=0.13",
+    "uvicorn[standard]>=0.29",
+]
 # Per-route rate limiting on the auth router. The limiter itself can be
 # host-supplied (so hosts that already use slowapi share the same Limiter
 # state), otherwise regstack constructs an in-memory one.
@@ -91,6 +96,10 @@ dev = [
     "pytest-playwright>=0.5",
     # Rate-limit tests exercise the slowapi integration.
     "slowapi>=0.1.9",
+    # Wizard surface (now an optional `wizard` extra) — tests exercise
+    # the setup/theme-designer routes, writers, and Playwright e2e.
+    "pywebview>=5.0",
+    "tomlkit>=0.13",
 ]
 
 [project.scripts]

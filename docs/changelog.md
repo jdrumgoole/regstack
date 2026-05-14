@@ -3,6 +3,42 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## 0.6.0 — 2026-05-14
+
+### Changed (BREAKING — wizard install)
+
+- **GUI setup wizards now require the optional `wizard` extra.**
+  `regstack oauth setup` and `regstack theme design` previously
+  worked from a bare `pip install regstack` because their deps —
+  `pywebview`, `tomlkit`, and `uvicorn[standard]` — were in the base
+  dependency list. That meant every library consumer (including pure
+  FastAPI host apps that never run a setup wizard) was paying for a
+  platform browser engine and an ASGI server at install time.
+  Those three packages now live in a new `wizard` extra; the base
+  install is significantly slimmer.
+
+  **Migration.**
+
+  - If you embed regstack but don't use the setup wizards: no
+    action needed. `import regstack`, `RegStack(...)`, and the
+    `regstack init` / `regstack doctor` / `regstack migrate` /
+    `regstack create-admin` CLIs all work on the bare install.
+  - If you use either setup wizard:
+    `pip install 'regstack[wizard]'` or
+    `uv sync --extra wizard`.
+  - The `dev` extra continues to pull in the wizard deps directly,
+    so `inv test-all` keeps working without an explicit `--extra
+    wizard`.
+
+  Running a wizard subcommand without the extra installed now
+  exits with a one-line install hint and a non-zero exit code,
+  rather than an `ImportError` traceback from deep inside the
+  wizard subtree.
+
+  Bumped to **0.6.0** rather than 0.5.12 because removing top-level
+  dependencies can surprise downstream callers; the version line
+  signals it's worth a glance at the migration note.
+
 ## 0.5.11 — 2026-05-14
 
 CI / workflow hygiene. No runtime code changes.

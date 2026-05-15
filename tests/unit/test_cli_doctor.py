@@ -140,6 +140,79 @@ def test_doctor_send_test_email_via_console(doctor_env: tuple[Path, str]) -> Non
     assert "probe@example.com" in result.output
 
 
+def test_doctor_send_test_email_falls_back_to_app_name_when_from_name_unset(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """When ``email.from_name`` is unset, ``--send-test-email`` must still
+    produce a valid From: header by falling back to ``app_name`` — matching
+    the same fallback ``MailComposer`` does for the templated emails.
+
+    Before the fix, ``_send_test_email`` passed ``config.email.from_name``
+    (now ``Optional[str]``) straight into ``EmailMessage.from_name`` (typed
+    ``str``), producing a ``None <addr>`` From: header.
+    """
+    from regstack.cli import doctor as doctor_mod
+    from regstack.config.schema import EmailConfig, RegStackConfig
+    from regstack.email.base import EmailMessage, EmailService
+
+    captured: list[EmailMessage] = []
+
+    class _Capturing(EmailService):
+        async def send(self, message: EmailMessage) -> None:
+            captured.append(message)
+
+    monkeypatch.setattr(doctor_mod, "build_email_service", lambda _cfg: _Capturing())
+
+    cfg = RegStackConfig.load(
+        toml_path=Path("/dev/null"),
+        secrets_env_path=Path("/dev/null"),
+        jwt_secret=secrets.token_urlsafe(64),
+        database_url=f"sqlite+aiosqlite:///{tmp_path / 'doctor.db'}",
+        app_name="acme-app",
+        email=EmailConfig(backend="console", from_address="noreply@acme.example"),
+    )
+    assert cfg.email.from_name is None  # precondition: unset
+
+    result = asyncio.run(doctor_mod._send_test_email(cfg, "probe@example.com"))
+    assert result.ok, result.detail
+    assert len(captured) == 1
+    assert captured[0].from_name == "acme-app"
+
+
+def test_doctor_send_test_email_respects_explicit_from_name(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An explicit ``from_name`` must override the ``app_name`` fallback."""
+    from regstack.cli import doctor as doctor_mod
+    from regstack.config.schema import EmailConfig, RegStackConfig
+    from regstack.email.base import EmailMessage, EmailService
+
+    captured: list[EmailMessage] = []
+
+    class _Capturing(EmailService):
+        async def send(self, message: EmailMessage) -> None:
+            captured.append(message)
+
+    monkeypatch.setattr(doctor_mod, "build_email_service", lambda _cfg: _Capturing())
+
+    cfg = RegStackConfig.load(
+        toml_path=Path("/dev/null"),
+        secrets_env_path=Path("/dev/null"),
+        jwt_secret=secrets.token_urlsafe(64),
+        database_url=f"sqlite+aiosqlite:///{tmp_path / 'doctor.db'}",
+        app_name="acme-app",
+        email=EmailConfig(
+            backend="console",
+            from_address="noreply@acme.example",
+            from_name="Acme Customer Service",
+        ),
+    )
+
+    result = asyncio.run(doctor_mod._send_test_email(cfg, "probe@example.com"))
+    assert result.ok, result.detail
+    assert captured[0].from_name == "Acme Customer Service"
+
+
 def test_doctor_check_dns_runs_lookups(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """--check-dns runs SPF/DKIM/MX lookups for the sender domain.
 

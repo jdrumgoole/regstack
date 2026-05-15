@@ -79,6 +79,61 @@ async def test_unverified_user_cannot_login(make_client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_verification_url_picks_up_ui_prefix_when_router_enabled(make_client) -> None:
+    """When the bundled UI router is mounted, the verification email URL
+    should include ``ui_prefix`` so the link lands on regstack's themed
+    page (``/account/verify``) rather than the bare ``/verify`` path that
+    a host application would have to intercept itself.
+    """
+    async with make_client(
+        require_verification=True,
+        enable_ui_router=True,
+        ui_prefix="/account",
+    ) as (rs, client):
+        r = await client.post(REGISTER, json=CREDS)
+        assert r.status_code == 201, r.text
+
+        assert isinstance(rs.email, ConsoleEmailService)
+        message = rs.email.outbox[0]
+        assert "/account/verify?token=" in message.text
+        assert "/account/verify?token=" in message.html
+
+
+@pytest.mark.asyncio
+async def test_verification_url_explicit_prefix_override(make_client) -> None:
+    """``email_link_prefix`` lets a host route the link through a custom
+    path — useful when a SPA owns its own auth pages under a non-default
+    mount.
+    """
+    async with make_client(
+        require_verification=True,
+        enable_ui_router=True,
+        ui_prefix="/account",
+        email_link_prefix="/spa/auth",
+    ) as (rs, client):
+        await client.post(REGISTER, json=CREDS)
+        assert isinstance(rs.email, ConsoleEmailService)
+        message = rs.email.outbox[0]
+        assert "/spa/auth/verify?token=" in message.text
+        assert "/account/verify?token=" not in message.text
+
+
+@pytest.mark.asyncio
+async def test_verification_url_unchanged_when_ui_router_disabled(make_client) -> None:
+    """SPA / headless hosts keep the historical bare ``/verify?token=...``
+    URL so they can intercept it themselves at the root.
+    """
+    async with make_client(
+        require_verification=True,
+        enable_ui_router=False,
+    ) as (rs, client):
+        await client.post(REGISTER, json=CREDS)
+        assert isinstance(rs.email, ConsoleEmailService)
+        message = rs.email.outbox[0]
+        assert re.search(r"https?://[^/]+/verify\?token=", message.text)
+
+
+@pytest.mark.asyncio
 async def test_verification_token_expires(make_client, frozen_clock) -> None:
     async with make_client(require_verification=True, verification_token_ttl_seconds=60) as (
         rs,

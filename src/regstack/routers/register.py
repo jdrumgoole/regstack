@@ -87,7 +87,8 @@ async def _start_verification(
         ) from exc
 
     base = str(rs.config.base_url).rstrip("/")
-    url = f"{base}/verify?token={raw}"
+    prefix = rs.config.resolve_email_link_prefix()
+    url = f"{base}{prefix}/verify?token={raw}"
     message = rs.mail.verification(
         to=payload.email,
         full_name=payload.full_name,

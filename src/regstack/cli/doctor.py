@@ -204,7 +204,7 @@ async def _send_test_email(config: RegStackConfig, to: str) -> CheckResult:
                 html="<p>regstack doctor probe — if you can read this, your email backend works.</p>",
                 text="regstack doctor probe — if you can read this, your email backend works.",
                 from_address=config.email.from_address,
-                from_name=config.email.from_name,
+                from_name=config.email.from_name or config.app_name,
             )
         )
         return CheckResult(

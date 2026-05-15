@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 def build_email_service(config: EmailConfig) -> EmailService:
     if config.backend == "console":
-        return ConsoleEmailService()
+        return ConsoleEmailService(log_bodies=config.log_bodies)
     if config.backend == "smtp":
         from regstack.email.smtp import SmtpEmailService
 

@@ -6,6 +6,7 @@ from regstack.cli.admin import create_admin as create_admin_cmd
 from regstack.cli.doctor import doctor as doctor_cmd
 from regstack.cli.init import init as init_cmd
 from regstack.cli.migrate import migrate as migrate_cmd
+from regstack.cli.validate.cli import validate as validate_cmd
 from regstack.version import __version__
 
 _WIZARD_EXTRA_HINT = (
@@ -82,6 +83,7 @@ cli.add_command(init_cmd, name="init")
 cli.add_command(create_admin_cmd)
 cli.add_command(doctor_cmd)
 cli.add_command(migrate_cmd)
+cli.add_command(validate_cmd)
 cli.add_command(_LazyOauthGroup(name="oauth", help="OAuth provider setup wizards."))
 cli.add_command(_LazyThemeGroup(name="theme", help="Theme designer for the SSR pages."))
 

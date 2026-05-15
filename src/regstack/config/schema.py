@@ -31,6 +31,14 @@ class EmailConfig(BaseModel):
     ses_region: str = "eu-west-1"
     ses_profile: str | None = None
 
+    log_bodies: bool = False
+    """When True, the console backend logs the full rendered body at
+    INFO instead of DEBUG. Off by default because bodies contain
+    one-time tokens; turn on only for the ``console`` backend in a
+    dev/staging deployment that you intend to probe with
+    ``regstack validate``. Other backends ignore this flag — they
+    don't log bodies at all."""
+
 
 class SmsConfig(BaseModel):
     backend: SmsBackend = "null"
@@ -40,6 +48,12 @@ class SmsConfig(BaseModel):
 
     twilio_account_sid: str | None = None
     twilio_auth_token: SecretStr | None = None
+
+    log_bodies: bool = True
+    """When True (default), the ``null`` backend logs the SMS body
+    (including the 6-digit code) at INFO. Set to False to silence
+    code logging in shared environments. Other backends ignore this
+    flag — they never log message bodies."""
 
 
 class OAuthConfig(BaseModel):

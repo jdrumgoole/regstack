@@ -294,4 +294,5 @@ def _decode_email_change_token(rs: RegStack, token: str) -> tuple[str, str]:
 
 def _email_change_url(rs: RegStack, token: str) -> str:
     base = str(rs.config.base_url).rstrip("/")
-    return f"{base}/confirm-email-change?token={token}"
+    prefix = rs.config.resolve_email_link_prefix()
+    return f"{base}{prefix}/confirm-email-change?token={token}"

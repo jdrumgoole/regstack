@@ -187,6 +187,17 @@ class RegStackConfig(BaseSettings):
     static_prefix: str = "/regstack-static"
     theme_css_url: str | None = None  # if set, loaded AFTER bundled defaults
 
+    # Path prefix prepended to the bare /verify, /reset-password and
+    # /confirm-email-change paths used in verification, password-reset and
+    # email-change emails. ``None`` (default) auto-resolves: when the bundled
+    # UI router is enabled the resolved value is ``ui_prefix`` (so links land
+    # on regstack's themed pages); otherwise it resolves to ``""`` so the
+    # host application can intercept the bare paths itself (matches pre-0.7
+    # behaviour for SPA hosts). Set explicitly to override either default —
+    # e.g. ``email_link_prefix = "/my-app"`` if your SPA owns the auth pages
+    # under a different mount.
+    email_link_prefix: str | None = None
+
     @field_validator("jwt_secret")
     @classmethod
     def _warn_empty_secret(cls, v: SecretStr) -> SecretStr:
@@ -195,6 +206,19 @@ class RegStackConfig(BaseSettings):
         # or via the wizard. Validation that *requires* it lives at the
         # RegStack façade boundary so test fixtures can opt out.
         return v
+
+    def resolve_email_link_prefix(self) -> str:
+        """Return the path prefix to prepend to email-link paths.
+
+        Used by the verification, password-reset and email-change routers
+        when composing the URLs embedded in outgoing emails. See the
+        ``email_link_prefix`` field for the semantics.
+        """
+        if self.email_link_prefix is not None:
+            return self.email_link_prefix.rstrip("/")
+        if self.enable_ui_router:
+            return self.ui_prefix.rstrip("/")
+        return ""
 
     @classmethod
     def load(

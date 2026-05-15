@@ -114,7 +114,8 @@ def _ack() -> MessageResponse:
 
 def _verification_url(rs: RegStack, raw_token: str) -> str:
     base = str(rs.config.base_url).rstrip("/")
-    return f"{base}/verify?token={raw_token}"
+    prefix = rs.config.resolve_email_link_prefix()
+    return f"{base}{prefix}/verify?token={raw_token}"
 
 
 __all__ = ["ResendRequest", "VerifyRequest", "build_verify_router"]

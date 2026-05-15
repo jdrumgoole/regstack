@@ -18,6 +18,45 @@ def composer() -> MailComposer:
     )
 
 
+def test_from_name_defaults_to_app_name_when_unset() -> None:
+    """If the operator only sets ``app_name``, outgoing emails should use it
+    on the ``From:`` header too — no separate ``from_name`` setting needed
+    to rebrand. Pins the contract that ``EmailConfig.from_name=None``
+    defers to ``app_name``.
+    """
+    composer = MailComposer(
+        email_config=EmailConfig(
+            backend="console",
+            from_address="noreply@example.com",
+            # from_name left at its None default
+        ),
+        app_name="Acme",
+    )
+    message = composer.verification(
+        to="alice@example.com", full_name=None, url="https://acme.example/verify?token=t"
+    )
+    assert message.from_name == "Acme"
+    assert message.from_header == "Acme <noreply@example.com>"
+
+
+def test_explicit_from_name_overrides_app_name() -> None:
+    """Operators who deliberately set ``from_name`` keep it; useful when the
+    internal product code (``app_name``) shouldn't appear to end-users.
+    """
+    composer = MailComposer(
+        email_config=EmailConfig(
+            backend="console",
+            from_address="noreply@example.com",
+            from_name="Acme Customer Service",
+        ),
+        app_name="acme-internal",
+    )
+    message = composer.verification(
+        to="alice@example.com", full_name=None, url="https://acme.example/verify?token=t"
+    )
+    assert message.from_name == "Acme Customer Service"
+
+
 def test_verification_message_renders_subject_and_url(composer: MailComposer) -> None:
     message = composer.verification(
         to="alice@example.com",

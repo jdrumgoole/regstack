@@ -82,7 +82,9 @@ class MailComposer:
             html=html,
             text=text,
             from_address=self._email_config.from_address,
-            from_name=self._email_config.from_name,
+            # An unset ``from_name`` defers to ``app_name`` so changing one
+            # knob is enough to rebrand outgoing emails.
+            from_name=self._email_config.from_name or self._app_name,
         )
 
     # --- Public renderers -------------------------------------------------

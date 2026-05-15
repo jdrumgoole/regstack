@@ -15,7 +15,12 @@ TokenTransport = Literal["bearer", "cookie"]
 class EmailConfig(BaseModel):
     backend: EmailBackend = "console"
     from_address: EmailStr = "noreply@example.com"
-    from_name: str = "RegStack"
+    from_name: str | None = None
+    """Display name on the ``From:`` header. ``None`` (the default) defers
+    to :attr:`RegStackConfig.app_name`, so changing only ``app_name`` is
+    enough to brand the outgoing emails. Set explicitly to override —
+    e.g. ``from_name = "Acme Customer Service"`` when ``app_name`` is the
+    internal product code and shouldn't appear to end-users."""
 
     smtp_host: str | None = None
     smtp_port: int = 587

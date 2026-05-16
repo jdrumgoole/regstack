@@ -57,12 +57,16 @@ class UserRepo:
         return self._hydrate(doc)
 
     async def set_last_login(self, user_id: str, when: datetime) -> None:
+        if not ObjectId.is_valid(user_id):
+            return
         await self._collection.update_one(
             {"_id": ObjectId(user_id)},
             {"$set": {"last_login": when, "updated_at": self._clock.now()}},
         )
 
     async def set_tokens_invalidated_after(self, user_id: str, when: datetime) -> None:
+        if not ObjectId.is_valid(user_id):
+            return
         await self._collection.update_one(
             {"_id": ObjectId(user_id)},
             {
@@ -74,6 +78,8 @@ class UserRepo:
         )
 
     async def update_password(self, user_id: str, hashed_password: str) -> None:
+        if not ObjectId.is_valid(user_id):
+            return
         now = self._clock.now()
         await self._collection.update_one(
             {"_id": ObjectId(user_id)},
@@ -87,30 +93,40 @@ class UserRepo:
         )
 
     async def set_active(self, user_id: str, *, is_active: bool) -> None:
+        if not ObjectId.is_valid(user_id):
+            return
         await self._collection.update_one(
             {"_id": ObjectId(user_id)},
             {"$set": {"is_active": is_active, "updated_at": self._clock.now()}},
         )
 
     async def set_superuser(self, user_id: str, *, is_superuser: bool) -> None:
+        if not ObjectId.is_valid(user_id):
+            return
         await self._collection.update_one(
             {"_id": ObjectId(user_id)},
             {"$set": {"is_superuser": is_superuser, "updated_at": self._clock.now()}},
         )
 
     async def set_full_name(self, user_id: str, full_name: str | None) -> None:
+        if not ObjectId.is_valid(user_id):
+            return
         await self._collection.update_one(
             {"_id": ObjectId(user_id)},
             {"$set": {"full_name": full_name, "updated_at": self._clock.now()}},
         )
 
     async def set_phone(self, user_id: str, phone_number: str | None) -> None:
+        if not ObjectId.is_valid(user_id):
+            return
         await self._collection.update_one(
             {"_id": ObjectId(user_id)},
             {"$set": {"phone_number": phone_number, "updated_at": self._clock.now()}},
         )
 
     async def set_mfa_enabled(self, user_id: str, *, is_mfa_enabled: bool) -> None:
+        if not ObjectId.is_valid(user_id):
+            return
         await self._collection.update_one(
             {"_id": ObjectId(user_id)},
             {"$set": {"is_mfa_enabled": is_mfa_enabled, "updated_at": self._clock.now()}},
@@ -120,6 +136,8 @@ class UserRepo:
         """Atomically swap the user's email. Bumps tokens_invalidated_after so
         any session bound to the old email becomes useless.
         """
+        if not ObjectId.is_valid(user_id):
+            return
         now = self._clock.now()
         try:
             await self._collection.update_one(

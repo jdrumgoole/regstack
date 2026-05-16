@@ -31,9 +31,10 @@ dependencies = [
     "jinja2>=3.1.6",
     "click>=8.1",
     "dnspython>=2.6",
-    # python-multipart>=0.0.26 picks up CVE-2026-40347 (DoS via oversized
-    # multipart preamble).
-    "python-multipart>=0.0.26",
+    # python-multipart>=0.0.27 picks up CVE-2026-40347 (DoS via oversized
+    # multipart preamble) and CVE-2026-42561 (DoS via unbounded part-header
+    # count/size — CVSS 7.5, network-exploitable).
+    "python-multipart>=0.0.27",
     "email-validator>=2.1",
     "aiosmtplib>=3.0",
     # SQL stack — bundled by default because SQLite is the default backend.
@@ -117,6 +118,34 @@ build-backend = "hatchling.build"
 packages = ["src/regstack"]
 # Hatch's package autodiscovery already picks up template / static assets
 # under src/regstack — no force-include needed (it would double-pack).
+
+[tool.hatch.build.targets.sdist]
+# Hatchling's sdist default includes every git-tracked file. Without this
+# block the published source tarball ships internal planning docs,
+# security-review prompts, the full test suite, and CI configuration to
+# anyone who runs `pip download --no-binary`. The wheel target above is
+# already tight (src/regstack only); this list is the matching sdist
+# discipline. Flagged as W-2 in the 2026-05-15 / 2026-05-16 security
+# reviews — CLAUDE.md in particular contains a developer home path.
+exclude = [
+    ".git",
+    ".github/",
+    ".python-version",
+    ".readthedocs.yaml",
+    "CLAUDE.md",
+    "docs/",
+    "examples/",
+    "scripts/",
+    "tasks.py",
+    "tasks/",
+    "tests/",
+    "uv.lock",
+]
+# Note on `.git`: hatchling normally skips it because it's a directory, but
+# when this repo is built from a git *worktree* (e.g. release prep on a
+# branch), `.git` is a 1-line text file containing an absolute path to the
+# primary repo's worktrees dir — which leaks the developer's home directory
+# into PyPI. Excluding it explicitly is harmless for non-worktree builds.
 
 [tool.pytest.ini_options]
 minversion = "8.0"

@@ -94,5 +94,53 @@ async def install_indexes(db: AsyncDatabase[MongoDoc], config: RegStackConfig) -
             ),
         ]
     )
+    await _ensure_oauth_states_validator(db, config.oauth_state_collection)
 
     log.info("regstack indexes installed on database %s", db.name)
+
+
+async def _ensure_oauth_states_validator(db: AsyncDatabase[MongoDoc], collection_name: str) -> None:
+    """Pin ``oauth_states.mode`` to ``signin`` / ``link`` at the DB level.
+
+    Mirrors the SQL backend's ``CheckConstraint("mode IN ('signin', 'link')")``.
+    ``OAuthState.model_validate()`` already enforces this at the application
+    layer on every read, so this is defence-in-depth rather than a closed
+    exploit path — flagged as I-5 in the 2026-05-15 / 2026-05-16 security
+    reviews.
+
+    Uses ``validationLevel="moderate"`` so re-running ``install_indexes``
+    on a populated collection does not retroactively reject pre-existing
+    rows; the constraint applies to inserts and updates that touch
+    ``mode``.
+    """
+    from pymongo.errors import OperationFailure
+
+    validator = {
+        "$jsonSchema": {
+            "bsonType": "object",
+            "properties": {
+                "mode": {"enum": ["signin", "link"]},
+            },
+        }
+    }
+    try:
+        await db.command(
+            {
+                "collMod": collection_name,
+                "validator": validator,
+                "validationLevel": "moderate",
+                "validationAction": "error",
+            }
+        )
+    except OperationFailure as exc:
+        # collMod fails on a non-existent collection. Create it with the
+        # validator attached instead; either path leaves the collection
+        # with the schema in place.
+        if "NamespaceNotFound" not in str(exc) and exc.code != 26:  # 26 = NamespaceNotFound
+            raise
+        await db.create_collection(
+            collection_name,
+            validator=validator,
+            validationLevel="moderate",
+            validationAction="error",
+        )

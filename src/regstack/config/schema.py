@@ -9,7 +9,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 EmailBackend = Literal["console", "smtp", "ses"]
 SmsBackend = Literal["null", "sns", "twilio"]
 JwtAlgorithm = Literal["HS256", "HS384", "HS512"]
-TokenTransport = Literal["bearer", "cookie"]
+TokenTransport = Literal["bearer"]
+# Note: a "cookie" transport was previously listed here but never
+# implemented — `AuthDependencies._authenticate` reads `HTTPBearer`
+# tokens unconditionally and no router sets a `Set-Cookie` header.
+# Hosts that set `transport = "cookie"` were silently no-op'd, which
+# is a security misconfiguration risk (the host thinks tokens are
+# cookies, the library expects Authorization headers). Tightening the
+# Literal makes the misconfiguration surface as a config validation
+# error instead. If cookie transport ships later, add it back here.
+# Flagged as I-7 in the 2026-05-15 / 2026-05-16 security reviews.
 
 
 class EmailConfig(BaseModel):
@@ -170,6 +179,7 @@ class RegStackConfig(BaseSettings):
     # limit on this route". The Limiter is either host-supplied via
     # ``RegStack(rate_limiter=...)`` or built from the ``rate_limit`` extra.
     login_rate_limit: str | None = None
+    login_mfa_confirm_rate_limit: str | None = None
     register_rate_limit: str | None = None
     forgot_password_rate_limit: str | None = None
     reset_password_rate_limit: str | None = None
@@ -179,6 +189,7 @@ class RegStackConfig(BaseSettings):
     change_email_rate_limit: str | None = None
     confirm_email_change_rate_limit: str | None = None
     delete_account_rate_limit: str | None = None
+    oauth_exchange_rate_limit: str | None = None
     # DEPRECATED in favour of the per-route fields above; kept for
     # back-compat with configs that set them. Unused by the router.
     login_max_per_minute: Annotated[int, Field(ge=1)] = 5

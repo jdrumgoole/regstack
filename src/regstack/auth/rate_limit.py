@@ -43,6 +43,7 @@ if TYPE_CHECKING:
 # decoration walks the assembled APIRouter and matches by `route.path`.
 ROUTE_LIMIT_MAP: dict[str, str] = {
     "login_rate_limit": "/login",
+    "login_mfa_confirm_rate_limit": "/login/mfa-confirm",
     "register_rate_limit": "/register",
     "forgot_password_rate_limit": "/forgot-password",
     "reset_password_rate_limit": "/reset-password",
@@ -52,6 +53,7 @@ ROUTE_LIMIT_MAP: dict[str, str] = {
     "change_email_rate_limit": "/change-email",
     "confirm_email_change_rate_limit": "/confirm-email-change",
     "delete_account_rate_limit": "/account",
+    "oauth_exchange_rate_limit": "/oauth/exchange",
 }
 
 

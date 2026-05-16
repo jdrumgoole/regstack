@@ -14,7 +14,13 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch:
+  # `workflow_dispatch:` was previously listed here. It let a manual run
+  # build artefacts without a tag — the publish job's `if:` guard kept
+  # those artefacts from reaching PyPI, but they still landed in Actions
+  # storage with no version validation, where they could be confused
+  # with a release build. Tag-push is the only documented trigger;
+  # making it the only trigger removes the ambiguity entirely.
+  # Flagged as I-10 in the 2026-05-15 / 2026-05-16 security reviews.
 
 # Workflow-level default. Individual jobs override where they need
 # extra scopes (the `publish` job adds `id-token: write` for OIDC).
@@ -80,3 +86,12 @@ jobs:
       # OIDC identity. Update by resolving the latest SHA on `release/v1`
       # and bumping the trailing comment to match.
       - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b  # v1.14.0
+        with:
+          # PEP 740 sigstore attestations cryptographically bind each
+          # published wheel/sdist to this specific Actions run, so a
+          # consumer can verify the artefact really came from this
+          # repo's CI rather than a hijacked PyPI account. Requires
+          # OIDC (already configured above via `id-token: write`).
+          # Flagged as I-8 in the 2026-05-15 / 2026-05-16 security
+          # reviews.
+          attestations: true

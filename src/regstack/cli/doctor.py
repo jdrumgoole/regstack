@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -10,18 +9,12 @@ import click
 import dns.resolver
 
 from regstack.backends.factory import build_backend, detect_backend_kind
+from regstack.cli._results import CheckResult
 from regstack.cli._runtime import load_runtime_config
 from regstack.email.factory import build_email_service
 
 if TYPE_CHECKING:
     from regstack.config.schema import RegStackConfig
-
-
-@dataclass(slots=True)
-class CheckResult:
-    name: str
-    ok: bool
-    detail: str
 
 
 @click.command(

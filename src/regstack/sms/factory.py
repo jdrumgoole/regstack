@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 def build_sms_service(config: SmsConfig) -> SmsService:
     if config.backend == "null":
-        return NullSmsService()
+        return NullSmsService(log_bodies=config.log_bodies)
     if config.backend == "sns":
         from regstack.sms.sns import SnsSmsService
 

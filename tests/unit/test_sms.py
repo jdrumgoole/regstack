@@ -45,6 +45,33 @@ async def test_null_service_captures_outbox() -> None:
     assert msg.from_number == "MyApp"
 
 
+@pytest.mark.asyncio
+async def test_null_service_log_bodies_true_logs_body(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level("INFO", logger="regstack.sms.null")
+    service = NullSmsService(log_bodies=True)
+    await service.send(SmsMessage(to="+14155552671", body="code 123456"))
+    assert any("code 123456" in r.getMessage() for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_null_service_log_bodies_false_suppresses_body(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level("INFO", logger="regstack.sms.null")
+    service = NullSmsService(log_bodies=False)
+    await service.send(SmsMessage(to="+14155552671", body="code 123456"))
+    assert not any("code 123456" in r.getMessage() for r in caplog.records)
+    assert any("body suppressed" in r.getMessage() for r in caplog.records)
+
+
+def test_factory_threads_log_bodies_flag() -> None:
+    service = build_sms_service(SmsConfig(backend="null", log_bodies=False))
+    assert isinstance(service, NullSmsService)
+    assert service._log_bodies is False
+
+
 def test_sns_requires_extra(monkeypatch: pytest.MonkeyPatch) -> None:
     real_import = builtins.__import__
 

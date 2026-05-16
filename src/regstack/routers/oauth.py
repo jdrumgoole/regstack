@@ -279,7 +279,14 @@ def build_oauth_router(rs: RegStack) -> APIRouter:
         ui_login = _ui_login_url(rs)
 
         if error:
-            log.info("oauth callback error from provider %s: %s", provider_name, error)
+            # The `error` query string is attacker-controlled (set by the
+            # OAuth provider after the redirect). Strip CR/LF/CTRL chars
+            # and cap length before logging so a compromised or malicious
+            # provider can't inject log lines or ANSI escapes into the
+            # server's log stream. Flagged as I-3 in the 2026-05-15 /
+            # 2026-05-16 security reviews.
+            safe_error = _sanitize_for_log(error)
+            log.info("oauth callback error from provider %s: %s", provider_name, safe_error)
             return _redirect_with_error(ui_login, "oauth_failed")
         if not code or not state:
             return _redirect_with_error(ui_login, "missing_code_or_state")
@@ -562,6 +569,17 @@ def _redirect_with_error(ui_login_url: str, code: str) -> RedirectResponse:
         f"{ui_login_url}{sep}error={code}",
         status_code=status.HTTP_302_FOUND,
     )
+
+
+def _sanitize_for_log(value: str) -> str:
+    """Strip CR/LF and other control characters and cap length for safe
+    logging of provider-controlled query strings. Defends against log
+    injection where a malicious or compromised provider crafts an
+    ``error=...`` value containing newlines or ANSI escape sequences
+    intended to forge or obscure log entries.
+    """
+    cleaned = "".join(ch for ch in value if ch.isprintable() and ch not in "\r\n")
+    return cleaned[:200]
 
 
 async def _begin_flow(

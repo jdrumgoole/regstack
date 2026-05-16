@@ -77,8 +77,29 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Refuse to roll back a NULL→NOT NULL column if any OAuth-only users
-    # exist; otherwise the constraint can't be re-applied.
+    # The pre-check below is what the original comment promised but
+    # never implemented. Without this, the SQLite batch_alter_table
+    # path silently succeeds even when the column contains NULLs
+    # (SQLite rebuilds the table via CREATE-COPY-DROP-RENAME and skips
+    # NOT NULL enforcement during copy), leaving the deployed schema
+    # in a state that doesn't match the constraint. PostgreSQL would
+    # raise loudly at constraint-application time, which is the
+    # noisy-but-safe failure mode this guard makes deterministic
+    # across both backends.
+    #
+    # Flagged as I-4 in the 2026-05-15 / 2026-05-16 security reviews.
+    conn = op.get_bind()
+    null_count = conn.execute(
+        sa.text("SELECT COUNT(*) FROM users WHERE hashed_password IS NULL")
+    ).scalar_one()
+    if null_count:
+        raise RuntimeError(
+            f"Cannot downgrade revision 0002: {null_count} OAuth-only user(s) "
+            "have NULL hashed_password. Delete or re-password those rows "
+            "before downgrading, or accept that those accounts will lose "
+            "their sign-in method."
+        )
+
     with op.batch_alter_table("users") as batch_op:
         batch_op.alter_column(
             "hashed_password",

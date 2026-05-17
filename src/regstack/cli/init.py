@@ -104,9 +104,7 @@ def init(target_dir: Path, *, force: bool) -> None:
             )
         )
     sender_default = (
-        sender_host_default
-        if sender_host_default and "." in sender_host_default
-        else "example.com"
+        sender_host_default if sender_host_default and "." in sender_host_default else "example.com"
     )
     from_address = click.prompt("Sender email address", default=f"noreply@{sender_default}")
     from_name = click.prompt("Sender display name", default=app_name)

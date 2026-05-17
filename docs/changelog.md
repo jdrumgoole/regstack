@@ -3,6 +3,21 @@
 All notable changes to this project are documented here. Versions follow
 [Semantic Versioning](https://semver.org/) once `1.0.0` ships.
 
+## Unreleased
+
+### Fixed
+
+- **Idempotent migration from legacy unnamed unique-on-email index.**
+  A host that previously ran
+  `db.users.create_index([("email", 1)], unique=True)` from its own
+  pre-regstack auth code will have a unique index named `email_1` on
+  the `users` collection. `install_schema()` previously crashed with
+  `IndexOptionsConflict` on first boot because it tried to create
+  `email_unique` over the same key. It now detects any
+  uniquely-indexed-by-email index whose name isn't `email_unique`,
+  drops it, and proceeds. Idempotent — re-running on a healthy
+  database leaves indexes alone.
+
 ## 0.6.0 — 2026-05-14
 
 ### Changed (BREAKING — wizard install)

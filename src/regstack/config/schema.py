@@ -119,7 +119,6 @@ class RegStackConfig(BaseSettings):
     # Identity / hosting
     app_name: str = "RegStack"
     base_url: AnyHttpUrl = AnyHttpUrl("http://localhost:8000")
-    cookie_domain: str | None = None
     behind_proxy: bool = False
 
     # Database

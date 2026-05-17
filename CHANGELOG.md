@@ -7,6 +7,16 @@ Sphinx docs.
 
 ## Unreleased
 
+**Breaking: `UserPublic` JSON key is `id`, not `_id`.** The
+`alias="_id"` on `UserPublic.id` (and the accompanying
+`populate_by_name=True`) is removed. The on-wire field name for
+`/api/auth/register`, `/api/auth/me`, `PATCH /api/auth/me`, and
+the admin endpoints is now `id`. `BaseUser` (the Mongo-document
+model) keeps the alias because it round-trips to BSON via
+`to_mongo()`; only `UserPublic` (the API contract) is touched.
+Hosts that have been hand-rolling a `/me` override solely to swap
+the key shape can drop it.
+
 **Fixed: `install_schema()` survives legacy unnamed unique-on-email
 index.** A host that previously ran its own
 `db.users.create_index([("email", 1)], unique=True)` would have

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -14,7 +14,10 @@ if TYPE_CHECKING:
     from regstack.models.user import BaseUser
 
 UserDependency = Callable[..., Awaitable["BaseUser"]]
-OptionalUserDependency = Callable[..., Awaitable["BaseUser | None"]]
+# typing.Optional avoids a PEP-604 union-inside-string-forward-ref,
+# which some mypy / pyright configurations refuse to resolve when
+# BaseUser is only imported under TYPE_CHECKING.
+OptionalUserDependency = Callable[..., Awaitable[Optional["BaseUser"]]]
 
 _bearer = HTTPBearer(auto_error=False)
 

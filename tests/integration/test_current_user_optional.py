@@ -71,18 +71,14 @@ async def test_malformed_bearer_collapses_to_none(optional_client: AsyncClient) 
     """An expired/garbled token must NOT 401 the optional endpoint —
     that defeats the whole point. Treat it as anonymous.
     """
-    r = await optional_client.get(
-        "/who", headers={"authorization": "Bearer not-a-real-jwt"}
-    )
+    r = await optional_client.get("/who", headers={"authorization": "Bearer not-a-real-jwt"})
     assert r.status_code == 200
     assert r.json() == {"email": None}
 
 
 @pytest.mark.asyncio
 async def test_non_bearer_scheme_collapses_to_none(optional_client: AsyncClient) -> None:
-    r = await optional_client.get(
-        "/who", headers={"authorization": "Basic dXNlcjpwYXNz"}
-    )
+    r = await optional_client.get("/who", headers={"authorization": "Basic dXNlcjpwYXNz"})
     assert r.status_code == 200
     assert r.json() == {"email": None}
 
@@ -97,9 +93,7 @@ async def test_revoked_token_collapses_to_none(optional_client: AsyncClient) -> 
         LOGIN, json={"email": CREDS["email"], "password": CREDS["password"]}
     )
     token = r.json()["access_token"]
-    await optional_client.post(
-        "/api/auth/logout", headers={"authorization": f"Bearer {token}"}
-    )
+    await optional_client.post("/api/auth/logout", headers={"authorization": f"Bearer {token}"})
 
     r = await optional_client.get("/who", headers={"authorization": f"Bearer {token}"})
     assert r.status_code == 200

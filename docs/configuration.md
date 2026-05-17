@@ -160,7 +160,7 @@ with no `mkdir` or `touch` step.
   - Sets the `aud` claim if non-null and validates on decode.
 * - `transport`
   - `"bearer"`
-  - `"cookie"` is reserved for a future milestone.
+  - Only `"bearer"` is accepted. `"cookie"` was removed in 0.7.0 — the option was never wired and silently no-op'd. If cookie transport ships later, the literal will be widened back.
 * - `verification_token_ttl_seconds`
   - `86400`
   - 24h.
@@ -262,7 +262,10 @@ against one IP spamming requests across many accounts.
 
 * - `login_rate_limit`
   - `""`
-  - Per-IP on `POST /login` (and the MFA confirm step).
+  - Per-IP on `POST /login`.
+* - `login_mfa_confirm_rate_limit`
+  - `""`
+  - Per-IP on `POST /login/mfa-confirm`. Stacks on top of the per-code `attempts` counter on `mfa_codes`; defends the SMS second factor against distributed guessing across many source IPs. New in 0.7.0.
 * - `register_rate_limit`
   - `""`
   - Per-IP on `POST /register`.
@@ -290,6 +293,9 @@ against one IP spamming requests across many accounts.
 * - `delete_account_rate_limit`
   - `""`
   - Per-IP on `DELETE /account`.
+* - `oauth_exchange_rate_limit`
+  - `""`
+  - Per-IP on `POST /oauth/exchange` (the SPA token-pickup endpoint). New in 0.7.0.
 ```
 
 If any `*_rate_limit` is set but neither a `rate_limiter=` argument
@@ -331,7 +337,16 @@ the 429 response shape.
 [email]
 backend = "console"             # console | smtp | ses
 from_address = "noreply@app.example.com"
+# from_name defaults to app_name when unset (new in 0.7.0). Set
+# explicitly to override — e.g. when app_name is an internal product
+# code that shouldn't appear to end users.
 from_name    = "Example App"
+
+# When true, the console backend logs the full rendered message body
+# at INFO instead of DEBUG. Off by default (bodies contain one-time
+# tokens). Turn on only for the `console` backend in a dev/staging
+# deployment that you intend to probe with `regstack validate`.
+log_bodies = false
 
 # smtp
 smtp_host = "smtp.app.example.com"
@@ -354,12 +369,54 @@ ses_profile = "production"               # AWS profile name from ~/.aws/credenti
 # IAM instance role).
 ```
 
+### Email-link URL composition
+
+Verification, password-reset, and email-change emails contain a URL
+that the user clicks to complete the flow. By default the URL is
+composed from `base_url`, the resolved UI prefix, and the
+flow-specific path (`/verify`, `/reset-password`,
+`/confirm-email-change`). Two layers of overrides are available
+when the default doesn't fit:
+
+```{list-table}
+:header-rows: 1
+:widths: 30 15 55
+
+* - Field
+  - Default
+  - Notes
+
+* - `email_link_prefix`
+  - `None`
+  - Path prefix prepended to the bare flow path (e.g. `"/account"` → links land at `<base_url>/account/verify?token=...`). When `None` and `enable_ui_router=True`, auto-resolves to `ui_prefix` so the bundled SSR pages get the right links automatically. Set to `""` to force bare paths. New in 0.7.0.
+* - `verify_url_template`
+  - `None`
+  - Full URL template for the verification email link. Substitutes `{base_url}` and `{token}` literally (no URL-encoding). Example for a hash-routed SPA: `"{base_url}/#/verify/{token}"`. Set, takes precedence over `email_link_prefix`. New in 0.7.0.
+* - `password_reset_url_template`
+  - `None`
+  - Same shape, for password-reset links.
+* - `email_change_url_template`
+  - `None`
+  - Same shape, for change-email confirmation links.
+```
+
+The four URL-building call sites (in `routers/register.py`,
+`verify.py`, `password.py`, `account.py`) all delegate to
+`RegStackConfig.resolve_{verify,password_reset,email_change}_url(token)`,
+so hosts overriding the URL story only need to set the config
+fields — no template-package surgery required.
+
 `[sms]` (`SmsConfig`):
 
 ```toml
 [sms]
 backend = "null"                # null | sns | twilio
 from_number = "+15555550100"
+
+# When true (default), the `null` backend logs the SMS body
+# (including the 6-digit code) at INFO. Set to false to silence code
+# logging in shared environments. Other backends ignore. New in 0.7.0.
+log_bodies = true
 
 # sns
 sns_region = "eu-west-1"

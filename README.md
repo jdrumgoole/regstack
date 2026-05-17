@@ -72,7 +72,7 @@ result everywhere is what regstack is for.
 ✔ Server-rendered HTML pages, theme with one CSS file
 ✔ Pluggable email (console / SMTP / Amazon SES) and SMS (Amazon SNS / Twilio)
 ✔ Argon2 password hashing, CSP-friendly templates
-✔ Setup wizards (live in their own pywebview windows): `regstack init` (project bootstrap), `regstack oauth setup` (guided Google OAuth client config), `regstack theme design` (live theme designer with preview), and `regstack doctor` (config validator)
+✔ Setup wizards (live in their own pywebview windows): `regstack init` (project bootstrap), `regstack oauth setup` (guided Google OAuth client config), `regstack theme design` (live theme designer with preview), `regstack doctor` (config validator), and `regstack validate` (end-to-end probe of a deployed install)
 ✔ Three storage backends: SQLite, PostgreSQL, MongoDB — chosen by URL
 ```
 

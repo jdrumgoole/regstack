@@ -185,3 +185,86 @@ Optional checks:
 | `dns spf` | A TXT record containing `v=spf1` |
 | `dns dmarc` | A TXT record at `_dmarc.<domain>` containing `v=DMARC1` |
 | `email send` | The configured backend's `send()` returned without raising |
+
+## `regstack validate`
+
+End-to-end probe of a **deployed** regstack installation. Companion to
+`regstack doctor`: doctor checks the loaded config, validate hits the
+live JSON API. Registers a throwaway user, walks every auth flow
+(verify → login → /me → logout + blacklist → PATCH /me →
+change-password → change-email → password reset → OAuth start →
+SMS 2FA), then deletes the user. Exit code is the number of failed
+checks.
+
+```bash
+uv run regstack validate \
+    --url https://staging.app.example.com/api/auth \
+    --log-source ssh:deploy@staging.app.example.com:/var/log/regstack.log
+```
+
+### Preparation
+
+Validate scrapes one-time tokens out of the deployment's stdout, so
+the deployment needs three things in place before running it:
+
+1. `email.backend = "console"` in `regstack.toml`. Real SMTP/SES
+   backends are rejected because the validator cannot read the
+   token out of a real email.
+2. `email.log_bodies = true` so the console backend promotes the
+   message body (containing the verification / reset / change-email
+   URL) from DEBUG to INFO.
+3. If you intend to probe SMS 2FA: `sms.backend = "null"` (the
+   `null` backend logs the SMS body at INFO so the validator can
+   scrape the 6-digit code).
+
+Then make the deployment's stdout tailable from where you run
+validate by picking ONE of the `--log-source` flavours:
+
+- `file:/var/log/regstack.log` — tail a local file. Set up by
+  routing the deployment's stdout to that path (`systemd:
+  StandardOutput=append:/var/log/regstack.log`, `docker run …
+  &> /var/log/regstack.log`).
+- `ssh:user@host:/var/log/regstack.log` — tail a file on a remote
+  host over SSH. Uses key-based auth (`BatchMode=yes`).
+- `docker:<container>` — `docker logs -f --since 1s <container>`.
+- `cmd:'journalctl -fu regstack.service'` — escape hatch for any
+  command that streams the deployment's stdout to its own stdout.
+
+### Options
+
+- `--url URL` — base URL where the regstack JSON router is mounted
+  (e.g. `https://host/api/auth`). **Required.**
+- `--log-source SPEC` — see "Preparation" above.
+- `--phone E.164` — phone number for the SMS 2FA probe. Without
+  this, the SMS phase is skipped even on a deployment that has it
+  mounted.
+- `--probe-email-domain DOMAIN` — domain for the throwaway user
+  (default `regstack-probe.example`, RFC 2606 reserved so no real
+  mail can be sent by mistake).
+- `--password PW` — explicit probe password (default: random
+  32-byte urlsafe).
+- `--skip oauth,sms,reset,account` — comma-separated phases to
+  skip.
+- `--json` — emit a JSON report instead of the human ✔/✘ stream.
+- `--no-cleanup` — leave the probe user behind (debugging only).
+- `-v`, `--verbose` — log every HTTP request and tailed log line.
+- `--insecure` — skip TLS verification (self-signed staging
+  certs).
+- `--timeout SECS` — per-request HTTP timeout (default 10).
+
+### Phases
+
+| Phase | What it checks |
+|-------|----------------|
+| `reachability` | Base URL responds to `POST /login` with 401/422 (not 404 → wrong `--url`) |
+| `features` | Which optional routers are mounted (oauth, admin, sms-2fa, password-reset) |
+| `register` → `verify` → `login` → `/me` → `logout` → `blacklist` → `re-login` | Core auth chain |
+| `patch /me` → `change-password` → `change-email` | Account management (bulk-revoke verified on each mutation) |
+| `password-reset` | `/forgot-password` → reset → confirm old session revoked → re-login |
+| `oauth:start` | `GET /oauth/google/start` returns a 302 to `accounts.google.com` with `client_id` + `state` (does not complete the flow) |
+| `sms-2fa` | Full phone-setup → MFA-required login → confirm → disable flow |
+| `cleanup` | `DELETE /account`; runs in a `finally` so it fires even on phase abort |
+
+Each phase reports its own ✔ / ✘ line. The runner aborts after a
+hard prerequisite (reachability or register) but otherwise keeps
+going so one broken flow doesn't mask the rest.

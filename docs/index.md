@@ -128,7 +128,9 @@ matters.
   a native webview — see [OAuth guide](oauth.md)),
   `regstack theme design` (live theme designer with a real-time preview
   of the SSR widgets — see [theming guide](theming.md)),
-  `regstack create-admin`, `regstack doctor`.
+  `regstack create-admin`, `regstack doctor`,
+  `regstack validate` (end-to-end probe of a deployed install —
+  see [CLI reference](cli.md)).
 - **OAuth — Sign in with Google** (opt-in, since 0.3.0). Authorization
   Code with PKCE, ID-token verification, identity-linking with a
   default-refuse policy hosts can opt out of. Connected-accounts

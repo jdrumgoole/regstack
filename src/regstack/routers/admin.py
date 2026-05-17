@@ -183,9 +183,7 @@ def build_admin_router(rs: RegStack) -> APIRouter:
         )
         await rs.pending.upsert(pending)
 
-        base = str(rs.config.base_url).rstrip("/")
-        prefix = rs.config.resolve_email_link_prefix()
-        url = f"{base}{prefix}/verify?token={raw}"
+        url = rs.config.resolve_verify_url(raw)
         message = rs.mail.verification(to=user.email, full_name=user.full_name, url=url)
         await rs.email.send(message)
         await rs.hooks.fire("verification_requested", email=user.email, url=url)

@@ -21,6 +21,32 @@ All notable changes to this project are documented here. Versions follow
   a hand-rolled `/me` override on top of the previous shape to get
   a conventional `id` key can drop that adapter entirely.
 
+### Added
+
+- **Per-link email URL templates** for SPAs whose router shape
+  doesn't take the canonical `/verify?token=...` /
+  `/reset-password?token=...` /
+  `/confirm-email-change?token=...` form. Three new optional
+  `RegStackConfig` fields:
+
+      verify_url_template: str | None = None
+      password_reset_url_template: str | None = None
+      email_change_url_template: str | None = None
+
+  Each accepts `{base_url}` (trailing slash trimmed) and `{token}`
+  (literal, no URL-encoding) placeholders. A hash-routed SPA can
+  set `verify_url_template = "{base_url}/#/verify/{token}"`; a host
+  whose auth pages live on a sibling subdomain can set
+  `verify_url_template = "https://auth.example.com/verify/{token}"`.
+
+  When a template is `None`, the resolver falls back to the existing
+  `email_link_prefix`-based composition — no behaviour change for
+  anyone who hasn't opted in. New helpers
+  `RegStackConfig.resolve_verify_url(token)`,
+  `resolve_password_reset_url(token)`,
+  `resolve_email_change_url(token)` are now the single source of
+  truth for those URLs across the four router call sites.
+
 ### Fixed
 
 - **Idempotent migration from legacy unnamed unique-on-email index.**

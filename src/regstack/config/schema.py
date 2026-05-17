@@ -222,6 +222,25 @@ class RegStackConfig(BaseSettings):
     # under a different mount.
     email_link_prefix: str | None = None
 
+    # Full URL templates for the three transactional email links. When set,
+    # bypass ``email_link_prefix`` entirely and use the template verbatim
+    # with ``{base_url}`` and ``{token}`` substituted in. Designed for SPA
+    # hosts whose router doesn't take the canonical
+    # ``/verify?token=...`` / ``/reset-password?token=...`` shape (e.g.
+    # hash routing: ``{base_url}/#/verify/{token}``) or hosts whose auth
+    # pages live on a different subdomain (``https://app.example.com/...``
+    # vs ``base_url``).
+    #
+    # ``{base_url}`` substitutes the config's ``base_url`` with the trailing
+    # slash trimmed. ``{token}`` substitutes the raw verification /
+    # password-reset / email-change token. Both substitutions are exact
+    # string replacement — no URL-encoding is applied so the host can
+    # decide the encoding for its router. Default: ``None`` (preserves
+    # the prefix-based composition used by every release through 0.6.0).
+    verify_url_template: str | None = None
+    password_reset_url_template: str | None = None
+    email_change_url_template: str | None = None
+
     @field_validator("jwt_secret")
     @classmethod
     def _warn_empty_secret(cls, v: SecretStr) -> SecretStr:
@@ -243,6 +262,59 @@ class RegStackConfig(BaseSettings):
         if self.enable_ui_router:
             return self.ui_prefix.rstrip("/")
         return ""
+
+    def _compose_email_url(
+        self,
+        *,
+        template: str | None,
+        bare_path: str,
+        token: str,
+    ) -> str:
+        """Build a transactional-email URL, preferring the host-supplied
+        template over the prefix-based composition.
+
+        Both substitutions are deliberately literal — no URL-encoding —
+        so a host that wants ``{token}`` in a path segment can drop the
+        ``?token=`` query string entirely without regstack pre-encoding
+        the value as if it were one.
+
+        Uses ``str.replace`` rather than ``str.format`` deliberately:
+        ``str.format`` would accept attribute-traversal syntax like
+        ``{base_url.__class__.__name__}`` and would raise ``KeyError``
+        at first email-send time on a typoed placeholder (surfacing as
+        a 500 on register). ``str.replace`` leaves unrecognised
+        ``{whatever}`` strings in place so the operator gets a visibly
+        wrong link in the email instead of a 500 during signup.
+        """
+        base = str(self.base_url).rstrip("/")
+        if template is not None:
+            return template.replace("{base_url}", base).replace("{token}", token)
+        prefix = self.resolve_email_link_prefix()
+        return f"{base}{prefix}{bare_path}?token={token}"
+
+    def resolve_verify_url(self, token: str) -> str:
+        """Return the URL embedded in the verification email."""
+        return self._compose_email_url(
+            template=self.verify_url_template,
+            bare_path="/verify",
+            token=token,
+        )
+
+    def resolve_password_reset_url(self, token: str) -> str:
+        """Return the URL embedded in the password-reset email."""
+        return self._compose_email_url(
+            template=self.password_reset_url_template,
+            bare_path="/reset-password",
+            token=token,
+        )
+
+    def resolve_email_change_url(self, token: str) -> str:
+        """Return the URL embedded in the email-change confirmation email."""
+        return self._compose_email_url(
+            template=self.email_change_url_template,
+            bare_path="/confirm-email-change",
+            token=token,
+        )
 
     @classmethod
     def load(

@@ -28,6 +28,21 @@ exactly `{"email": 1}`, drops it, and proceeds. Idempotent — a
 healthy database stays a no-op. Regression test in
 `tests/integration/test_indexes.py`.
 
+**Added: per-link email URL templates.** Three new optional
+`RegStackConfig` fields — `verify_url_template`,
+`password_reset_url_template`, `email_change_url_template` —
+let SPAs whose router shape doesn't fit
+`/verify?token=...` / `/reset-password?token=...` /
+`/confirm-email-change?token=...` rewrite the email links to
+whatever shape they need. Substitutes `{base_url}` (trailing
+slash trimmed) and `{token}` (literal, no URL-encoding). When a
+template is `None` the resolver falls back to the existing
+`email_link_prefix`-based composition, so no behaviour change for
+anyone who hasn't opted in. New helpers
+`RegStackConfig.resolve_{verify,password_reset,email_change}_url(token)`
+encapsulate the lookup; the four URL-building call sites in
+`routers/{register,verify,admin,password,account}.py` now delegate.
+
 ## 0.6.0 — 2026-05-14
 
 **Breaking change for wizard users.** The GUI setup wizards

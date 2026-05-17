@@ -36,9 +36,6 @@ addressed in env using a `__` separator: `REGSTACK_EMAIL__FROM_ADDRESS`.
 * - `base_url`
   - `http://localhost:8000`
   - Origin used to build verification / reset / email-change links.
-* - `cookie_domain`
-  - `None`
-  - Reserved for cookie-transport mode.
 * - `behind_proxy`
   - `false`
   - Tells the host app to trust `X-Forwarded-*`.

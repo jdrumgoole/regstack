@@ -341,6 +341,52 @@ class RegStack:
         )
         return await self.users.create(user)
 
+    async def promote_pending(self, email: str) -> BaseUser:
+        """Convert a pending registration directly into a verified user.
+
+        Bypasses the email-link round-trip. Useful when:
+
+        - a user lost their verification link and ``resend-verification``
+          isn't an option (admin-triggered onboarding, dev fixtures);
+        - a CLI batch operation seeds users from a known-good list;
+        - an admin is rescuing a stuck signup.
+
+        The pending row's ``hashed_password`` and ``full_name`` carry
+        over verbatim — the user logs in with the password they
+        originally registered with. The pending row is deleted on
+        success. Fires the ``user_verified`` hook so analytics /
+        downstream listeners see the same event the email-driven
+        ``POST /verify`` produces.
+
+        Args:
+            email: The email address whose pending registration should
+                be promoted.
+
+        Returns:
+            The newly persisted, active, verified
+            :class:`~regstack.models.user.BaseUser`.
+
+        Raises:
+            LookupError: If no pending registration exists for that
+                email (caller's job to surface as 404 / CLI error).
+            UserAlreadyExistsError: If a non-pending user with that
+                email already exists (caller's job to surface as 409).
+        """
+        pending = await self.pending.find_by_email(email)
+        if pending is None:
+            raise LookupError(f"No pending registration for {email!r}.")
+        user = BaseUser(
+            email=pending.email,
+            hashed_password=pending.hashed_password,
+            full_name=pending.full_name,
+            is_active=True,
+            is_verified=True,
+        )
+        user = await self.users.create(user)
+        await self.pending.delete_by_email(pending.email)
+        await self.hooks.fire("user_verified", user=user)
+        return user
+
     # --- Extension surface ------------------------------------------------
 
     def set_email_backend(self, service: EmailService) -> None:

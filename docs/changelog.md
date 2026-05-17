@@ -33,6 +33,28 @@ All notable changes to this project are documented here. Versions follow
   uniquely-indexed-by-email index whose name isn't `email_unique`,
   drops it, and proceeds. Idempotent — re-running on a healthy
   database leaves indexes alone.
+### Added
+
+- **`RegStack.promote_pending(email)` + admin route** for converting
+  a `PendingRegistration` row directly into a verified active user,
+  bypassing the email-link round-trip:
+
+      user = await regstack.promote_pending("alice@example.com")
+
+  The pending row's `hashed_password` and `full_name` carry over
+  verbatim so the user can log in with their original password.
+  Fires the same `user_verified` hook as `POST /verify` so
+  downstream analytics see one event regardless of trigger.
+
+  Useful for:
+  - admin rescue of users who lost their verification link;
+  - CLI batch seeding from a known-good list;
+  - dev fixtures.
+
+  Exposed over HTTP as `POST /admin/pending/{email}/promote` when
+  the admin router is enabled. Returns 201 on success, 404 when no
+  pending row exists for that email, 409 when a user with that
+  email is already registered.
 
 ## 0.6.0 — 2026-05-14
 

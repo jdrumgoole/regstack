@@ -191,6 +191,36 @@ def build_admin_router(rs: RegStack) -> APIRouter:
         await rs.hooks.fire("verification_requested", email=user.email, url=url)
         return MessageResponse(message=f"Verification email sent to {user.email}.")
 
+    @router.post(
+        "/pending/{email}/promote",
+        response_model=UserPublic,
+        status_code=status.HTTP_201_CREATED,
+        summary="Promote a pending registration directly into a verified user",
+    )
+    async def admin_promote_pending(
+        email: str = Path(..., description="Email of the pending registration"),
+        _admin: BaseUser = Depends(rs.deps.current_admin()),
+    ) -> UserPublic:
+        """Bypasses the verification email round-trip. The pending row's
+        hashed_password and full_name carry over verbatim — the user
+        logs in with whatever password they registered with.
+        """
+        from regstack.backends.protocols import UserAlreadyExistsError
+
+        try:
+            user = await rs.promote_pending(email)
+        except LookupError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No pending registration for {email}.",
+            ) from exc
+        except UserAlreadyExistsError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"A user with email {email} already exists.",
+            ) from exc
+        return UserPublic.from_user(user)
+
     return router
 
 

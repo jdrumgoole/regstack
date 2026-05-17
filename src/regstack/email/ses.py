@@ -33,12 +33,18 @@ class SesEmailService(EmailService):
             session_kwargs["profile_name"] = self._config.ses_profile
         if self._config.ses_access_key_id is not None:
             # ses_access_key_id and ses_secret_access_key are validated
-            # to be set together by EmailConfig._validate_ses_creds, so
-            # the secret access key cannot be None when we get here.
-            assert self._config.ses_secret_access_key is not None
-            session_kwargs["aws_access_key_id"] = (
-                self._config.ses_access_key_id.get_secret_value()
-            )
+            # to be set together by EmailConfig._validate_ses_creds. We
+            # re-check at runtime (rather than `assert`) because Python
+            # strips `assert` under `python -O` / `PYTHONOPTIMIZE=1`,
+            # which is common in production containers — and a None
+            # secret here would otherwise raise a cryptic AttributeError
+            # on the .get_secret_value() call below.
+            if self._config.ses_secret_access_key is None:
+                raise RuntimeError(
+                    "ses_access_key_id set without ses_secret_access_key — "
+                    "EmailConfig validation should have caught this."
+                )
+            session_kwargs["aws_access_key_id"] = self._config.ses_access_key_id.get_secret_value()
             session_kwargs["aws_secret_access_key"] = (
                 self._config.ses_secret_access_key.get_secret_value()
             )

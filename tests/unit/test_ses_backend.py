@@ -103,12 +103,12 @@ async def test_explicit_creds_passed_to_aioboto3_session(
         sess = real_session()
 
         class _Ctx:
-            async def __aenter__(self_inner):
+            async def __aenter__(self):
                 client = MagicMock()
                 client.send_email = AsyncMock(return_value={"MessageId": "x"})
                 return client
 
-            async def __aexit__(self_inner, *exc):
+            async def __aexit__(self, *exc):
                 return False
 
         sess.client = MagicMock(return_value=_Ctx())  # type: ignore[method-assign]
@@ -161,12 +161,12 @@ async def test_no_explicit_creds_yields_empty_session_kwargs(
         sess = real_session()
 
         class _Ctx:
-            async def __aenter__(self_inner):
+            async def __aenter__(self):
                 client = MagicMock()
                 client.send_email = AsyncMock(return_value={"MessageId": "x"})
                 return client
 
-            async def __aexit__(self_inner, *exc):
+            async def __aexit__(self, *exc):
                 return False
 
         sess.client = MagicMock(return_value=_Ctx())  # type: ignore[method-assign]
@@ -205,12 +205,12 @@ async def test_profile_only_passes_profile_name(
         sess = real_session()
 
         class _Ctx:
-            async def __aenter__(self_inner):
+            async def __aenter__(self):
                 client = MagicMock()
                 client.send_email = AsyncMock(return_value={"MessageId": "x"})
                 return client
 
-            async def __aexit__(self_inner, *exc):
+            async def __aexit__(self, *exc):
                 return False
 
         sess.client = MagicMock(return_value=_Ctx())  # type: ignore[method-assign]

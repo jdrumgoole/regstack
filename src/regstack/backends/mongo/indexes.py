@@ -139,7 +139,8 @@ async def _drop_conflicting_email_index(users: Any) -> None:
         log.warning(
             "Dropping legacy unique-on-email index %r on %s.users to "
             "make room for email_unique (regstack canonical name).",
-            name, users.database.name,
+            name,
+            users.database.name,
         )
         await users.drop_index(name)
 

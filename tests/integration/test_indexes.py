@@ -63,12 +63,8 @@ async def test_install_indexes_renames_legacy_unnamed_email_unique(
     # Wipe the canonical index regstack just created, then plant a
     # legacy-style unnamed unique index on the same key.
     await users.drop_indexes()
-    legacy_name = await users.create_index(
-        [("email", ASCENDING)], unique=True
-    )
-    assert legacy_name == "email_1", (
-        f"Mongo default-naming changed under us — saw {legacy_name!r}"
-    )
+    legacy_name = await users.create_index([("email", ASCENDING)], unique=True)
+    assert legacy_name == "email_1", f"Mongo default-naming changed under us — saw {legacy_name!r}"
 
     # Re-running install_indexes must reconcile rather than crash.
     await regstack.install_schema()

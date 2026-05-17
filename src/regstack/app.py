@@ -375,6 +375,14 @@ class RegStack:
         pending = await self.pending.find_by_email(email)
         if pending is None:
             raise LookupError(f"No pending registration for {email!r}.")
+        # Match ``POST /verify``'s contract: an expired pending row is
+        # not a valid promotion target. Mongo's TTL reap is eventual
+        # and the SQL backends only purge on ``purge_expired()``, so a
+        # row past its window can still appear here. Treat it as
+        # missing rather than silently promoting a stale invitation.
+        if pending.expires_at <= self.clock.now():
+            await self.pending.delete_by_email(pending.email)
+            raise LookupError(f"Pending registration for {email!r} has expired.")
         user = BaseUser(
             email=pending.email,
             hashed_password=pending.hashed_password,

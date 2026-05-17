@@ -10,7 +10,6 @@ from __future__ import annotations
 import pytest
 from httpx import AsyncClient
 
-from regstack import RegStack
 from regstack.backends.protocols import UserAlreadyExistsError
 
 REGISTER = "/api/auth/register"

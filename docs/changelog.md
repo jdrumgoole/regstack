@@ -46,6 +46,28 @@ All notable changes to this project are documented here. Versions follow
   `resolve_password_reset_url(token)`,
   `resolve_email_change_url(token)` are now the single source of
   truth for those URLs across the four router call sites.
+- **`current_user_optional` dependency.** Companion to the
+  existing `current_user` / `current_admin` factories on
+  `regstack.deps`. Returns `BaseUser | None` instead of raising
+  401 — for endpoints that render differently for authenticated
+  vs anonymous callers (cart icon, comment author prefill,
+  "your recent X" sections):
+
+      from fastapi import Depends
+      from regstack.models.user import BaseUser
+
+      @app.get("/products/{slug}")
+      async def view_product(
+          slug: str,
+          user: BaseUser | None = Depends(regstack.deps.current_user_optional()),
+      ):
+          ...
+
+  Every form of auth failure — missing header, wrong scheme,
+  malformed/expired/revoked token, deleted or bulk-revoked user —
+  collapses to `None` (no `HTTPException` raised). On success the
+  user is stashed on `request.state.regstack_user`, same as
+  `current_user`.
 
 ### Fixed
 

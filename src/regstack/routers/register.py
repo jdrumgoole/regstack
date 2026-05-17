@@ -86,9 +86,7 @@ async def _start_verification(
             detail="A pending registration already exists for that email.",
         ) from exc
 
-    base = str(rs.config.base_url).rstrip("/")
-    prefix = rs.config.resolve_email_link_prefix()
-    url = f"{base}{prefix}/verify?token={raw}"
+    url = rs.config.resolve_verify_url(raw)
     message = rs.mail.verification(
         to=payload.email,
         full_name=payload.full_name,

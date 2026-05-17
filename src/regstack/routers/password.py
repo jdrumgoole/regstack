@@ -107,9 +107,7 @@ def build_password_router(rs: RegStack) -> APIRouter:
 
 
 def _reset_url(rs: RegStack, token: str) -> str:
-    base = str(rs.config.base_url).rstrip("/")
-    prefix = rs.config.resolve_email_link_prefix()
-    return f"{base}{prefix}/reset-password?token={token}"
+    return rs.config.resolve_password_reset_url(token)
 
 
 __all__ = ["ForgotPasswordRequest", "ResetPasswordRequest", "build_password_router"]

@@ -7,70 +7,184 @@ Sphinx docs.
 
 ## Unreleased
 
-**Breaking: `UserPublic` JSON key is `id`, not `_id`.** The
-`alias="_id"` on `UserPublic.id` (and the accompanying
-`populate_by_name=True`) is removed. The on-wire field name for
-`/api/auth/register`, `/api/auth/me`, `PATCH /api/auth/me`, and
-the admin endpoints is now `id`. `BaseUser` (the Mongo-document
-model) keeps the alias because it round-trips to BSON via
-`to_mongo()`; only `UserPublic` (the API contract) is touched.
-Hosts that have been hand-rolling a `/me` override solely to swap
-the key shape can drop it.
+## 0.7.0 — 2026-05-17
 
-**Added: `current_user_optional` dependency.** Companion to the
-existing `current_user` / `current_admin` factories on
-`regstack.deps`. Returns ``BaseUser | None`` instead of raising
-401 — hosts use it for endpoints that render differently for
-signed-in vs anonymous callers (cart icon, comment author
-prefill, "your recent X" sections). Every form of auth failure
-— missing header, wrong scheme, malformed/expired/revoked token,
-deleted or bulk-revoked user — collapses to ``None``.
+Two-week sprint that lands the `regstack validate` end-to-end probe,
+seven security-review findings, a clutch of host-integration
+ergonomic wins (per-link email URL templates, optional auth
+dependency, admin `promote_pending`, explicit SES credentials), and
+two breaking API trims (`UserPublic._id` → `id`,
+`TokenTransport = "bearer"` only).
 
-**Fixed: `install_schema()` survives legacy unnamed unique-on-email
-index.** A host that previously ran its own
-`db.users.create_index([("email", 1)], unique=True)` would have
-Mongo auto-name that `email_1`. regstack's `install_indexes` then
-crashed on first boot with `IndexOptionsConflict` because it tries
-to create `email_unique` over the same key with a different name.
-`install_indexes` now detects ANY unnamed/legacy unique index over
-exactly `{"email": 1}`, drops it, and proceeds. Idempotent — a
-healthy database stays a no-op. Regression test in
-`tests/integration/test_indexes.py`.
-**Added: `RegStack.promote_pending(email)` + admin route.** Converts
-a `PendingRegistration` row directly into a verified active user,
-bypassing the email-link round-trip. The pending row's
-`hashed_password` and `full_name` carry over verbatim so the user
-logs in with their original password. Fires the `user_verified`
-hook the same as `POST /verify`. Useful for admin rescue of stuck
-signups, programmatic seeding from a known-good list, and dev
-fixtures. Exposed over HTTP as
-`POST /admin/pending/{email}/promote` when the admin router is
-enabled.
+The headline is `regstack validate` — a new CLI command that drives
+a real deployed install through every auth flow (register, verify,
+login, logout, password reset, change-email, OAuth start, SMS 2FA)
+from a remote operator workstation, scraping one-time tokens out of
+the deployment's stdout via a `--log-source` of your choice
+(`file:`, `ssh:`, `docker:`, `cmd:`). The companion to `regstack
+doctor`: doctor checks the loaded config, validate checks the
+running service.
 
-**Added: per-link email URL templates.** Three new optional
-`RegStackConfig` fields — `verify_url_template`,
-`password_reset_url_template`, `email_change_url_template` —
-let SPAs whose router shape doesn't fit
-`/verify?token=...` / `/reset-password?token=...` /
-`/confirm-email-change?token=...` rewrite the email links to
-whatever shape they need. Substitutes `{base_url}` (trailing
-slash trimmed) and `{token}` (literal, no URL-encoding). When a
-template is `None` the resolver falls back to the existing
-`email_link_prefix`-based composition, so no behaviour change for
-anyone who hasn't opted in. New helpers
-`RegStackConfig.resolve_{verify,password_reset,email_change}_url(token)`
-encapsulate the lookup; the four URL-building call sites in
-`routers/{register,verify,admin,password,account}.py` now delegate.
-**Added: explicit SES credential fields on `EmailConfig`.** New
-`ses_access_key_id` / `ses_secret_access_key` (both `SecretStr |
-None`) let hosts pass AWS creds directly into regstack instead of
-relying on boto3's env-var fallthrough. Useful when the host
-already loads AWS creds from a secrets store (Vault, AWS Secrets
-Manager, `secrets.env`) and would rather not re-export them into
-the process environment. Both must be set together; setting just
-one is a config error, and combining them with `ses_profile` is
-rejected (boto3's resolution order silently prefers explicit creds
-over profile — making the choice ambiguous from config alone).
+**Breaking.**
+
+- **`UserPublic` JSON key is `id`, not `_id`.** The `alias="_id"`
+  on `UserPublic.id` (and the accompanying `populate_by_name=True`)
+  is removed. Every endpoint returning a `UserPublic` —
+  `POST /api/auth/register`, `GET /api/auth/me`, `PATCH /api/auth/me`,
+  and the admin user endpoints — now sends `id` on the wire.
+  `BaseUser` (the Mongo-document model) keeps the alias because it
+  round-trips to BSON via `to_mongo()`; only the API contract is
+  touched. Clients that read `body["_id"]` should switch to
+  `body["id"]`. Hosts hand-rolling a `/me` override solely to swap
+  the key shape can drop it.
+- **`TokenTransport` literal narrowed to `Literal["bearer"]`.**
+  `"cookie"` was previously accepted by config validation but
+  silently no-op'd (no router ever set `Set-Cookie`). Hosts that
+  set `transport = "cookie"` now get a clear pydantic
+  `literal_error` at startup instead of a silent
+  security-misconfiguration. `RegStackConfig.cookie_domain` is
+  removed along with it. `regstack init` no longer offers the
+  cookie option either.
+
+**Added.**
+
+- **`regstack validate`.** End-to-end probe of a deployed install
+  — registers a throwaway user, walks every auth flow, then
+  deletes it. Reads one-time tokens out of the deployment's
+  stdout via `--log-source` (file / ssh / docker / arbitrary
+  command). Skip phases with `--skip`. Companion to `regstack
+  doctor` (which only validates loaded config). See
+  `regstack validate --help` for the full operator runbook.
+- **`email.log_bodies` and `sms.log_bodies` config flags** to
+  promote the console / null backends' body log lines from
+  DEBUG → INFO without enabling DEBUG globally. `email.log_bodies`
+  defaults to `False`; `sms.log_bodies` defaults to `True`
+  (preserves prior null-SMS behaviour). Other backends ignore.
+- **`RegStackConfig.email_link_prefix` + auto-resolve from
+  `ui_prefix`.** Verification / reset / email-change links now
+  default to `<base_url><ui_prefix>/verify?token=...` when the
+  bundled UI router is enabled, instead of bare `/verify`. Hosts
+  whose SPA owns the auth pages can pin a path explicitly via
+  `email_link_prefix`; the bundled UI hosts get the right links
+  automatically.
+- **`EmailConfig.from_name` defaults to `app_name`** when unset.
+  Hosts that change `app_name` to brand outgoing email also get
+  the matching `From:` header automatically. Explicit `from_name`
+  values still win.
+- **Per-link email URL templates.** Three new optional fields on
+  `RegStackConfig` — `verify_url_template`,
+  `password_reset_url_template`, `email_change_url_template` —
+  let SPAs whose router shape doesn't fit
+  `/verify?token=...` rewrite the email links. Templates
+  substitute `{base_url}` and `{token}` literally. Hash-routed
+  SPA: `"{base_url}/#/verify/{token}"`. Sibling subdomain:
+  `"https://auth.example.com/verify/{token}"`. Default unset
+  falls back to the prefix-based composition above. New helpers
+  `RegStackConfig.resolve_{verify,password_reset,email_change}_url(token)`.
+- **`current_user_optional` dependency.** Companion to
+  `current_user` / `current_admin` on `regstack.deps`. Returns
+  `BaseUser | None` instead of raising 401, for endpoints that
+  render differently for signed-in vs anonymous callers (cart
+  icon, comment-author prefill). Every form of auth failure —
+  missing header, wrong scheme, malformed / expired / revoked
+  token, deleted or bulk-revoked user — collapses to `None`.
+- **`RegStack.promote_pending(email)` + admin route.** Converts
+  a `PendingRegistration` row directly into a verified active
+  user, bypassing the email-link round-trip. Hashed password and
+  full name carry over verbatim. Fires the same `user_verified`
+  hook as `POST /verify`. Useful for admin rescue of stuck
+  signups, batch seeding from a known-good list, and dev
+  fixtures. Exposed as `POST /admin/pending/{email}/promote`
+  when the admin router is enabled.
+- **Explicit SES credential fields on `EmailConfig`.** New
+  `ses_access_key_id` / `ses_secret_access_key` (both `SecretStr |
+  None`) let hosts pass AWS creds directly instead of relying on
+  boto3's env-var fallthrough. Validated as a pair, mutually
+  exclusive with `ses_profile`.
+
+**Security.**
+
+- **CVE-2026-42561 — `python-multipart>=0.0.27`.** Closes a
+  network-exploitable DoS via unbounded multipart part-header
+  parsing (CVSS 7.5). Previous floor `>=0.0.26` had the earlier
+  CVE-2026-40347 fix only.
+- **sdist no longer ships internal docs to PyPI.** Added a
+  `[tool.hatch.build.targets.sdist]` exclude block. The published
+  source tarball used to contain `CLAUDE.md` (with a developer
+  home-directory path), the security-review prompt, the full test
+  suite, build tooling, and (when built from a worktree) a `.git`
+  text file pointing at the operator's worktrees directory.
+- **Defensive `ObjectId.is_valid()` on nine Mongo UserRepo
+  mutations.** `set_last_login`, `set_tokens_invalidated_after`,
+  `update_password`, `set_active`, `set_superuser`, `set_full_name`,
+  `set_phone`, `set_mfa_enabled`, and `update_email` now match
+  `get_by_id` / `delete`: invalid input no-ops instead of raising
+  `bson.errors.InvalidId` (which would have surfaced as a 500 on
+  any future caller passing raw external input).
+- **Per-IP rate-limit map covers `/login/mfa-confirm` and
+  `/oauth/exchange`.** Two new config fields:
+  `login_mfa_confirm_rate_limit`, `oauth_exchange_rate_limit`.
+  The per-code attempt counter on `mfa_codes` defends each
+  individual code; this adds the per-IP layer against distributed
+  guessing across many source IPs.
+- **OAuth callback `error` query parameter sanitized before
+  logging.** A compromised or malicious OAuth provider could
+  previously inject newlines / ANSI escapes into the log stream
+  via the `error=...` redirect. The callback now strips control
+  characters and caps length at 200 before logging.
+- **`oauth_states.mode` validated at the MongoDB storage layer.**
+  A `$jsonSchema` validator on the collection enforces
+  `mode IN ('signin', 'link')`, matching the SQL backend's
+  existing `CheckConstraint`. `OAuthState.model_validate()`
+  already enforced this at the app layer; this is defence-in-depth.
+- **Migration `0002` downgrade refuses to roll back when OAuth-only
+  users exist.** The downgrade re-applies `NOT NULL` to
+  `users.hashed_password`; if any row has `NULL` (OAuth-only
+  signup), it now raises `RuntimeError` with a clear remediation
+  message instead of silently succeeding on SQLite (where
+  `batch_alter_table`'s CREATE-COPY-DROP-RENAME path skipped
+  NOT NULL enforcement).
+- **PEP 740 sigstore attestations on the PyPI publish workflow.**
+  Each published wheel / sdist is now cryptographically bound to
+  the specific GitHub Actions run that produced it, so consumers
+  can verify the artefact came from this repo's CI.
+- **`workflow_dispatch` removed from `publish.yml`.** Manual runs
+  previously uploaded artefacts to Actions storage with no
+  version validation, where they could be confused with a real
+  release build. Tag-push is the only supported trigger.
+
+**Fixed.**
+
+- **`regstack doctor --send-test-email` honours the new `from_name`
+  fall-back.** Before, the probe path passed `config.email.from_name`
+  (now `Optional[str]`) straight into `EmailMessage.from_name`
+  (typed `str`), producing a `None <addr>` From: header when
+  unset.
+- **`install_schema()` survives a legacy unnamed unique-on-email
+  index.** A host that previously ran
+  `db.users.create_index([("email", 1)], unique=True)` from its
+  own pre-regstack auth code has a Mongo-auto-named `email_1`
+  index. `install_indexes` previously crashed on first boot with
+  `IndexOptionsConflict`. It now detects any unnamed/legacy
+  unique index over `{"email": 1}`, drops it, and proceeds.
+  Idempotent on a healthy DB.
+- **`POST /verify` no longer 500s on the admin-promote-meets-user-
+  clicks-verify race.** The endpoint now catches
+  `UserAlreadyExistsError` from `users.create` and returns a
+  graceful 400 ("This email is already registered. Please sign
+  in.") instead of letting the unique-constraint violation bubble
+  up as a 500.
+
+**Internal.**
+
+- **GitHub Actions pinned ahead of Node 20 deprecation.**
+  `actions/checkout` v4→v6.0.2, `astral-sh/setup-uv` v3→v8.1.0,
+  `actions/upload-artifact` v4→v7.0.1, `actions/download-artifact`
+  v4→v8.0.1. All pins remain commit SHAs.
+- **Daily scheduled security-review reports** land under
+  `docs/security-reports/` for 2026-05-15 through 2026-05-17.
+  The 2026-05-17 report is `[security-clean]`: all warnings from
+  the prior two days resolved in this release.
 
 ## 0.6.0 — 2026-05-14
 

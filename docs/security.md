@@ -74,6 +74,33 @@ Bulk revoke fires on:
 - successful change-email confirm
 - admin-disabled user (`PATCH /admin/users/{id} {is_active: false}`)
 
+### Data-exposure trade-off
+
+`tokens_invalidated_after` is **intentionally** included in the
+`UserPublic` projection, and therefore appears in the response bodies
+of every endpoint that returns the current user: `GET /me`,
+`GET /admin/users/{id}`, and `POST /confirm-email-change`.
+
+The intended consumer is a single-page app holding a regstack JWT.
+The SPA can compare `tokens_invalidated_after` against the local
+session JWT's `iat` claim and detect that the token has been
+invalidated by a password change or email change *without* paying for
+a separate authenticated round-trip on every navigation. Without the
+field in the response, the SPA would either have to make that extra
+call or wait for the next genuinely-authenticated request to fail.
+
+The consequence is that any session-token holder — including a stolen
+one — can observe the precise timestamp of the most recent
+security-affecting event on the account (password change, email
+change, admin disable). The timestamp is not by itself a credential
+and cannot be used to forge new tokens, but it is a signal an attacker
+would not otherwise have.
+
+Hosts for whom that disclosure is unacceptable can strip the field in
+their own API wrapper layer — regstack does not currently expose a
+config knob to suppress it, since doing so would silently break the
+SPA-polling pattern the field exists for.
+
 ## Account enumeration
 
 Account enumeration is when an attacker can tell whether a given

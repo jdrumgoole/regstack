@@ -3,7 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import AnyHttpUrl, BaseModel, EmailStr, Field, SecretStr, field_validator
+from pydantic import (
+    AnyHttpUrl,
+    BaseModel,
+    EmailStr,
+    Field,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 EmailBackend = Literal["console", "smtp", "ses"]
@@ -39,6 +47,17 @@ class EmailConfig(BaseModel):
 
     ses_region: str = "eu-west-1"
     ses_profile: str | None = None
+    ses_access_key_id: SecretStr | None = None
+    """Explicit AWS access key id for the SES backend. ``None`` (the
+    default) lets boto3 walk its usual credential chain — env vars,
+    shared credentials file, EC2/ECS instance profile. Set explicitly
+    when the host already loads its AWS credentials from a secrets
+    store (Vault, AWS Secrets Manager, ``secrets.env``) and would
+    rather pass them in than re-export them into the process env."""
+    ses_secret_access_key: SecretStr | None = None
+    """Explicit AWS secret access key — pairs with
+    :attr:`ses_access_key_id`. Both must be set together; setting only
+    one is a config error."""
 
     log_bodies: bool = False
     """When True, the console backend logs the full rendered body at
@@ -47,6 +66,27 @@ class EmailConfig(BaseModel):
     dev/staging deployment that you intend to probe with
     ``regstack validate``. Other backends ignore this flag — they
     don't log bodies at all."""
+
+    @model_validator(mode="after")
+    def _validate_ses_creds(self) -> EmailConfig:
+        explicit_key = self.ses_access_key_id is not None
+        explicit_secret = self.ses_secret_access_key is not None
+        if explicit_key != explicit_secret:
+            raise ValueError(
+                "ses_access_key_id and ses_secret_access_key must be set "
+                "together (or both left unset to use boto3's default "
+                "credential chain)."
+            )
+        if (explicit_key or explicit_secret) and self.ses_profile is not None:
+            # boto3 lets profile + explicit creds coexist but the resolution
+            # order is surprising — explicit creds win silently. Reject the
+            # combination so the host can't think they're using one when
+            # they're actually using the other.
+            raise ValueError(
+                "ses_profile and explicit ses_access_key_id/"
+                "ses_secret_access_key are mutually exclusive. Pick one."
+            )
+        return self
 
 
 class SmsConfig(BaseModel):

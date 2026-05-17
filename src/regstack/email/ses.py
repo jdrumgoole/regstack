@@ -28,9 +28,20 @@ class SesEmailService(EmailService):
     async def send(self, message: EmailMessage) -> None:
         import aioboto3
 
-        session_kwargs = {}
+        session_kwargs: dict[str, str] = {}
         if self._config.ses_profile:
             session_kwargs["profile_name"] = self._config.ses_profile
+        if self._config.ses_access_key_id is not None:
+            # ses_access_key_id and ses_secret_access_key are validated
+            # to be set together by EmailConfig._validate_ses_creds, so
+            # the secret access key cannot be None when we get here.
+            assert self._config.ses_secret_access_key is not None
+            session_kwargs["aws_access_key_id"] = (
+                self._config.ses_access_key_id.get_secret_value()
+            )
+            session_kwargs["aws_secret_access_key"] = (
+                self._config.ses_secret_access_key.get_secret_value()
+            )
         session = aioboto3.Session(**session_kwargs)
 
         async with session.client("ses", region_name=self._config.ses_region) as client:

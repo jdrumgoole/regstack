@@ -52,6 +52,16 @@ anyone who hasn't opted in. New helpers
 `RegStackConfig.resolve_{verify,password_reset,email_change}_url(token)`
 encapsulate the lookup; the four URL-building call sites in
 `routers/{register,verify,admin,password,account}.py` now delegate.
+**Added: explicit SES credential fields on `EmailConfig`.** New
+`ses_access_key_id` / `ses_secret_access_key` (both `SecretStr |
+None`) let hosts pass AWS creds directly into regstack instead of
+relying on boto3's env-var fallthrough. Useful when the host
+already loads AWS creds from a secrets store (Vault, AWS Secrets
+Manager, `secrets.env`) and would rather not re-export them into
+the process environment. Both must be set together; setting just
+one is a config error, and combining them with `ses_profile` is
+rejected (boto3's resolution order silently prefers explicit creds
+over profile — making the choice ambiguous from config alone).
 
 ## 0.6.0 — 2026-05-14
 

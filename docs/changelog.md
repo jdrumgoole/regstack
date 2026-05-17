@@ -81,6 +81,26 @@ All notable changes to this project are documented here. Versions follow
   the admin router is enabled. Returns 201 on success, 404 when no
   pending row exists for that email, 409 when a user with that
   email is already registered.
+- **Explicit SES credential fields on `EmailConfig`.** Two new
+  optional `SecretStr` fields:
+
+      ses_access_key_id: SecretStr | None = None
+      ses_secret_access_key: SecretStr | None = None
+
+  Set them to pass AWS credentials directly into the SES backend
+  instead of relying on boto3's environment-variable fallthrough.
+  Useful when the host already loads its AWS creds from a secrets
+  store (Vault, AWS Secrets Manager, `secrets.env`) and would
+  rather not re-export them into the process environment.
+
+  Validated as a pair: setting just one raises a `ValidationError`,
+  and combining them with `ses_profile` raises (boto3 silently
+  resolves explicit creds over profile, which makes the active
+  identity ambiguous from config alone).
+
+  Default unset → no behaviour change. Boto3's existing credential
+  chain (env vars, shared credentials file, EC2/ECS instance
+  profile) keeps working.
 
 ## 0.6.0 — 2026-05-14
 

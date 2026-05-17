@@ -342,7 +342,16 @@ smtp_username = "<username>"
 
 # ses
 ses_region = "eu-west-1"
-ses_profile = "production"
+# Pick ONE of these credential sources (they are mutually exclusive,
+# validated at config-load time):
+ses_profile = "production"               # AWS profile name from ~/.aws/credentials
+# OR set explicit creds (typically split between regstack.toml and
+# regstack.secrets.env so the secret never lands in version control):
+# ses_access_key_id = "AKIA..."          # SecretStr
+# ses_secret_access_key = "..."          # SecretStr — set via REGSTACK_EMAIL__SES_SECRET_ACCESS_KEY
+# If neither profile nor explicit creds is set, boto3 falls back to its
+# default credential chain (env vars, ~/.aws/credentials default profile,
+# IAM instance role).
 ```
 
 `[sms]` (`SmsConfig`):

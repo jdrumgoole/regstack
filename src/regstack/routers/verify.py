@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, EmailStr
 
 from regstack.auth.tokens import generate_verification_token, hash_token
+from regstack.backends.protocols import UserAlreadyExistsError
 from regstack.models.pending_registration import PendingRegistration
 from regstack.models.user import BaseUser, UserPublic
 from regstack.routers._schemas import MessageResponse
@@ -55,7 +56,20 @@ def build_verify_router(rs: RegStack) -> APIRouter:
             is_active=True,
             is_verified=True,
         )
-        user = await rs.users.create(user)
+        try:
+            user = await rs.users.create(user)
+        except UserAlreadyExistsError as exc:
+            # An admin's `promote_pending` call (or a duplicate
+            # `POST /verify` racing with itself) can have created the
+            # user between our find-pending and now. Both paths leave
+            # the user in the correct end-state, so surface a friendly
+            # 400 rather than letting the unique-key violation bubble
+            # up as a 500.
+            await rs.pending.delete_by_email(pending.email)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This email is already registered. Please sign in.",
+            ) from exc
         await rs.pending.delete_by_email(pending.email)
 
         await rs.hooks.fire("user_verified", user=user)

@@ -27,6 +27,16 @@ to create `email_unique` over the same key with a different name.
 exactly `{"email": 1}`, drops it, and proceeds. Idempotent — a
 healthy database stays a no-op. Regression test in
 `tests/integration/test_indexes.py`.
+**Added: `RegStack.promote_pending(email)` + admin route.** Converts
+a `PendingRegistration` row directly into a verified active user,
+bypassing the email-link round-trip. The pending row's
+`hashed_password` and `full_name` carry over verbatim so the user
+logs in with their original password. Fires the `user_verified`
+hook the same as `POST /verify`. Useful for admin rescue of stuck
+signups, programmatic seeding from a known-good list, and dev
+fixtures. Exposed over HTTP as
+`POST /admin/pending/{email}/promote` when the admin router is
+enabled.
 
 **Added: per-link email URL templates.** Three new optional
 `RegStackConfig` fields — `verify_url_template`,

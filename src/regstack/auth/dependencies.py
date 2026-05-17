@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from regstack.models.user import BaseUser
 
 UserDependency = Callable[..., Awaitable["BaseUser"]]
+OptionalUserDependency = Callable[..., Awaitable["BaseUser | None"]]
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -77,6 +78,37 @@ class AuthDependencies:
             creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
         ) -> BaseUser:
             user = await self._authenticate(creds)
+            request.state.regstack_user = user
+            return user
+
+        return _dep
+
+    def current_user_optional(self) -> OptionalUserDependency:
+        """Return a FastAPI dependency that yields the user or ``None``.
+
+        For endpoints that render differently for authenticated vs
+        anonymous callers (think "show your cart icon if logged in").
+        Treats every form of auth failure — missing header, bad scheme,
+        expired token, revoked jti, deleted user, bulk-revoked session
+        — as anonymous and returns ``None`` rather than raising 401.
+
+        On success the user is stashed on
+        ``request.state.regstack_user`` (same as :meth:`current_user`),
+        so downstream middleware sees the same shape for either path.
+
+        Returns:
+            A callable suitable for ``Depends(...)``. Never raises an
+            ``HTTPException`` — auth problems collapse to ``None``.
+        """
+
+        async def _dep(
+            request: Request,
+            creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+        ) -> BaseUser | None:
+            try:
+                user = await self._authenticate(creds)
+            except HTTPException:
+                return None
             request.state.regstack_user = user
             return user
 

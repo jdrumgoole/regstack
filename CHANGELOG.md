@@ -17,6 +17,15 @@ model) keeps the alias because it round-trips to BSON via
 Hosts that have been hand-rolling a `/me` override solely to swap
 the key shape can drop it.
 
+**Added: `current_user_optional` dependency.** Companion to the
+existing `current_user` / `current_admin` factories on
+`regstack.deps`. Returns ``BaseUser | None`` instead of raising
+401 — hosts use it for endpoints that render differently for
+signed-in vs anonymous callers (cart icon, comment author
+prefill, "your recent X" sections). Every form of auth failure
+— missing header, wrong scheme, malformed/expired/revoked token,
+deleted or bulk-revoked user — collapses to ``None``.
+
 **Fixed: `install_schema()` survives legacy unnamed unique-on-email
 index.** A host that previously ran its own
 `db.users.create_index([("email", 1)], unique=True)` would have

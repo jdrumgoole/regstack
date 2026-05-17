@@ -43,7 +43,11 @@ async def test_register_login_me_logout(client: AsyncClient, regstack: RegStack)
     body = r.json()
     assert body["email"] == CREDS["email"]
     assert body["is_active"] is True
-    assert "_id" in body or "id" in body  # alias
+    # UserPublic is the API contract for /register and /me. The JSON
+    # key is `id` (HTTP convention); the BSON `_id` belongs on
+    # BaseUser, which never reaches the wire.
+    assert "id" in body and isinstance(body["id"], str)
+    assert "_id" not in body
 
     r = await client.post(LOGIN, json={"email": CREDS["email"], "password": CREDS["password"]})
     assert r.status_code == 200, r.text
@@ -52,7 +56,9 @@ async def test_register_login_me_logout(client: AsyncClient, regstack: RegStack)
 
     r = await client.get(ME, headers={"authorization": f"Bearer {token}"})
     assert r.status_code == 200, r.text
-    assert r.json()["email"] == CREDS["email"]
+    me_body = r.json()
+    assert me_body["email"] == CREDS["email"]
+    assert "id" in me_body and "_id" not in me_body
 
     r = await client.post(LOGOUT, headers={"authorization": f"Bearer {token}"})
     assert r.status_code == 200, r.text

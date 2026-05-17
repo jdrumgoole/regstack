@@ -71,9 +71,7 @@ async def test_admin_can_list_and_get_users(make_client) -> None:
         listing = r.json()
         assert listing["total"] == 3
         assert len(listing["items"]) == 3
-        target_id = next(
-            item["_id"] for item in listing["items"] if item["email"] == ALICE["email"]
-        )
+        target_id = next(item["id"] for item in listing["items"] if item["email"] == ALICE["email"])
 
         r = await client.get(f"{ADMIN_USERS}/{target_id}", headers=headers)
         assert r.status_code == 200

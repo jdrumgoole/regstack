@@ -81,11 +81,17 @@ class UserUpdate(BaseModel):
 
 
 class UserPublic(BaseModel):
-    """Safe-to-serialise projection of a user (no password hash)."""
+    """Safe-to-serialise projection of a user (no password hash).
 
-    model_config = ConfigDict(populate_by_name=True)
+    The on-wire JSON contract uses ``id`` — the conventional HTTP API
+    field name — even though the underlying Mongo document keys the
+    user by ``_id``. ``BaseUser`` keeps the alias (it round-trips to
+    Mongo via ``to_mongo()``), but ``UserPublic`` never touches Mongo
+    so there's no reason to leak the BSON convention into the API
+    contract every host has to build its clients against.
+    """
 
-    id: str = Field(alias="_id")
+    id: str
     email: EmailStr
     is_active: bool
     is_verified: bool

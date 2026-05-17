@@ -5,6 +5,22 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+### Changed (BREAKING — JSON API contract)
+
+- **`UserPublic` serialises the user identifier as `id`, not `_id`.**
+  The `alias="_id"` on `UserPublic.id` (with `populate_by_name=True`)
+  is removed. Every endpoint returning a `UserPublic` —
+  `POST /api/auth/register`, `GET /api/auth/me`,
+  `PATCH /api/auth/me`, the admin user endpoints — now sends `id`
+  on the wire. `BaseUser` (the Mongo-document model) keeps the
+  alias because `to_mongo()` round-trips via `model_dump(by_alias=True)`;
+  the API surface is the only thing that changes.
+
+  **Migration:** any client (browser or service) that read
+  `body["_id"]` should switch to `body["id"]`. Hosts that bolted
+  a hand-rolled `/me` override on top of the previous shape to get
+  a conventional `id` key can drop that adapter entirely.
+
 ### Fixed
 
 - **Idempotent migration from legacy unnamed unique-on-email index.**

@@ -34,8 +34,7 @@ def test_verify_url_defaults_to_legacy_composition() -> None:
 def test_password_reset_url_defaults_to_legacy_composition() -> None:
     cfg = _cfg()
     assert (
-        cfg.resolve_password_reset_url("TOK")
-        == "https://app.example.com/reset-password?token=TOK"
+        cfg.resolve_password_reset_url("TOK") == "https://app.example.com/reset-password?token=TOK"
     )
 
 
@@ -49,10 +48,7 @@ def test_email_change_url_defaults_to_legacy_composition() -> None:
 
 def test_default_composition_honours_email_link_prefix() -> None:
     cfg = _cfg(email_link_prefix="/my-app")
-    assert (
-        cfg.resolve_verify_url("TOK")
-        == "https://app.example.com/my-app/verify?token=TOK"
-    )
+    assert cfg.resolve_verify_url("TOK") == "https://app.example.com/my-app/verify?token=TOK"
 
 
 def test_verify_url_template_overrides_completely() -> None:

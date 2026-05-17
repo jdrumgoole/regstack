@@ -277,10 +277,18 @@ class RegStackConfig(BaseSettings):
         so a host that wants ``{token}`` in a path segment can drop the
         ``?token=`` query string entirely without regstack pre-encoding
         the value as if it were one.
+
+        Uses ``str.replace`` rather than ``str.format`` deliberately:
+        ``str.format`` would accept attribute-traversal syntax like
+        ``{base_url.__class__.__name__}`` and would raise ``KeyError``
+        at first email-send time on a typoed placeholder (surfacing as
+        a 500 on register). ``str.replace`` leaves unrecognised
+        ``{whatever}`` strings in place so the operator gets a visibly
+        wrong link in the email instead of a 500 during signup.
         """
         base = str(self.base_url).rstrip("/")
         if template is not None:
-            return template.format(base_url=base, token=token)
+            return template.replace("{base_url}", base).replace("{token}", token)
         prefix = self.resolve_email_link_prefix()
         return f"{base}{prefix}{bare_path}?token={token}"
 

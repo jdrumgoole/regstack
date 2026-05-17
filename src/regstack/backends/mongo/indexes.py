@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pymongo import ASCENDING, IndexModel
 
@@ -17,6 +17,7 @@ log = logging.getLogger(__name__)
 async def install_indexes(db: AsyncDatabase[MongoDoc], config: RegStackConfig) -> None:
     """Create the indexes regstack relies on. Safe to call repeatedly."""
     users = db[config.user_collection]
+    await _drop_conflicting_email_index(users)
     await users.create_indexes(
         [IndexModel([("email", ASCENDING)], unique=True, name="email_unique")]
     )
@@ -97,6 +98,51 @@ async def install_indexes(db: AsyncDatabase[MongoDoc], config: RegStackConfig) -
     await _ensure_oauth_states_validator(db, config.oauth_state_collection)
 
     log.info("regstack indexes installed on database %s", db.name)
+
+
+async def _drop_conflicting_email_index(users: Any) -> None:
+    """Drop an unnamed unique index on ``email`` left over from a host's
+    pre-regstack auth code.
+
+    Mongo cannot rename an index in place. Hosts that previously ran
+    ``db.users.create_index([("email", ASCENDING)], unique=True)`` from
+    their own code end up with the auto-generated name ``email_1`` on
+    the same key + uniqueness regstack wants under ``email_unique``.
+    A fresh ``install_indexes`` then raises ``IndexOptionsConflict``
+    on its first boot under regstack.
+
+    This helper detects ANY index over exactly ``{"email": 1}`` with
+    ``unique=True`` that is not already named ``email_unique``, and
+    drops it so the canonical-name create on the next line succeeds.
+    We deliberately do not require the legacy name to be exactly
+    ``email_1`` — any other rename (e.g. a host that named theirs
+    ``users_email_uq``) would hit the same conflict.
+
+    Idempotent — re-running on a healthy database is a no-op because
+    the loop only matches indexes that aren't already the canonical
+    one. Safe even if the collection doesn't exist yet (the
+    ``index_information`` call returns an empty dict).
+    """
+    try:
+        existing = await users.index_information()
+    except Exception:  # pragma: no cover — defensive; missing namespace
+        return
+
+    for name, info in existing.items():
+        if name in ("_id_", "email_unique"):
+            continue
+        key = info.get("key")
+        if key != [("email", 1)]:
+            continue
+        if not info.get("unique"):
+            continue
+        log.warning(
+            "Dropping legacy unique-on-email index %r on %s.users to "
+            "make room for email_unique (regstack canonical name).",
+            name,
+            users.database.name,
+        )
+        await users.drop_index(name)
 
 
 async def _ensure_oauth_states_validator(db: AsyncDatabase[MongoDoc], collection_name: str) -> None:

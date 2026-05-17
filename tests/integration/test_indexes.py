@@ -41,3 +41,58 @@ async def test_blacklist_index_idempotent(regstack: RegStack) -> None:
     await regstack.blacklist.revoke("jti-1", exp)  # second insert silently ignored
     assert await regstack.blacklist.is_revoked("jti-1")
     assert not await regstack.blacklist.is_revoked("never-issued")
+
+
+@pytest.mark.asyncio
+async def test_install_indexes_renames_legacy_unnamed_email_unique(
+    regstack: RegStack,
+) -> None:
+    """A host that adopted regstack from its own auth code may have
+    previously created an unnamed unique index on ``email`` (default
+    Mongo name ``email_1``). On the next boot under regstack,
+    ``install_indexes`` must drop the legacy index and replace it
+    with the canonical ``email_unique`` rather than raising
+    ``IndexOptionsConflict``. Regression for the winebox migration
+    that hit this on its first OAT deploy at v0.7.81.
+    """
+    from pymongo import ASCENDING
+
+    backend = regstack.backend
+    users = backend.database[regstack.config.user_collection]  # type: ignore[attr-defined]
+
+    # Wipe the canonical index regstack just created, then plant a
+    # legacy-style unnamed unique index on the same key.
+    await users.drop_indexes()
+    legacy_name = await users.create_index([("email", ASCENDING)], unique=True)
+    assert legacy_name == "email_1", f"Mongo default-naming changed under us — saw {legacy_name!r}"
+
+    # Re-running install_indexes must reconcile rather than crash.
+    await regstack.install_schema()
+
+    info = await users.index_information()
+    assert "email_unique" in info, (
+        f"email_unique should have been (re)created; got {list(info.keys())}"
+    )
+    assert info["email_unique"]["key"] == [("email", 1)]
+    assert info["email_unique"]["unique"] is True
+    assert "email_1" not in info, (
+        f"Legacy email_1 should have been dropped; got {list(info.keys())}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_install_indexes_is_a_noop_on_canonical_state(
+    regstack: RegStack,
+) -> None:
+    """If the canonical email_unique already exists, re-running
+    install_indexes must not drop and recreate it (which would
+    interrupt readers and trigger a needless O(n) build).
+    """
+    backend = regstack.backend
+    users = backend.database[regstack.config.user_collection]  # type: ignore[attr-defined]
+
+    info_before = await users.index_information()
+    assert "email_unique" in info_before
+    await regstack.install_schema()
+    info_after = await users.index_information()
+    assert info_after.keys() == info_before.keys()

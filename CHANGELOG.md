@@ -5,6 +5,19 @@ authoritative copy lives at
 [`docs/changelog.md`](docs/changelog.md) and is rendered into the
 Sphinx docs.
 
+## Unreleased
+
+**Fixed: `install_schema()` survives legacy unnamed unique-on-email
+index.** A host that previously ran its own
+`db.users.create_index([("email", 1)], unique=True)` would have
+Mongo auto-name that `email_1`. regstack's `install_indexes` then
+crashed on first boot with `IndexOptionsConflict` because it tries
+to create `email_unique` over the same key with a different name.
+`install_indexes` now detects ANY unnamed/legacy unique index over
+exactly `{"email": 1}`, drops it, and proceeds. Idempotent — a
+healthy database stays a no-op. Regression test in
+`tests/integration/test_indexes.py`.
+
 ## 0.6.0 — 2026-05-14
 
 **Breaking change for wizard users.** The GUI setup wizards

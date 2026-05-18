@@ -5,6 +5,43 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+## 0.8.0 — 2026-05-19
+
+### Headline
+
+`regstack ses setup` — guided SES configuration that validates
+against AWS as you go.
+
+A new pywebview wizard mirrors the existing `regstack oauth setup`
+flow: pick a region, pick a credential source (named profile /
+explicit access keys / IAM role chain), confirm the sender domain
+is verified in SES, detect the AWS account's sandbox state, fire
+one live test send, then merge the result into `regstack.toml`
++ `regstack.secrets.env` non-destructively. Available behind both
+`wizard` and `ses` extras: `pip install 'regstack[wizard,ses]'`.
+
+Plus two security fixes from yesterday's daily review (the
+theme-designer wheel was shipping well-known example credentials in
+its preview HTML; the Google OAuth exchange path could echo a live
+short-lived access token in an error message when the response
+shape was malformed).
+
+### Added
+
+- **`regstack ses setup` CLI command.** Guided pywebview wizard for
+  the SES email backend. Nine steps walk through region selection,
+  credential source (`profile` / `explicit` / `chain`), sender-
+  domain identity verification (via SES
+  `GetIdentityVerificationAttributes`), sandbox detection (via
+  `GetAccount` with a `GetSendQuota` heuristic fallback for
+  IAM-restricted policies), and a live test send (via `SendEmail`).
+  Non-clobbering tomlkit + secrets.env merge.
+
+  Headless `--print-only` mode runs the same merge without the GUI
+  for CI / scripting. Gated behind the joint extra:
+  `pip install 'regstack[wizard,ses]'`. Companion to the existing
+  `regstack doctor --send-test-email` for post-config verification.
+
 ### Security
 
 - **Theme-designer preview no longer ships well-known credentials.**

@@ -7,6 +7,22 @@ Sphinx docs.
 
 ## Unreleased
 
+## 0.8.0 — 2026-05-19
+
+`regstack ses setup` guided wizard, plus two security fixes from
+the 2026-05-18 daily review.
+
+**Added: `regstack ses setup`.** A pywebview wizard for the SES
+email backend, mirroring the existing `regstack oauth setup` flow.
+Nine steps walk through region selection, credential source
+(`profile` / `explicit` / `chain`), sender-domain identity
+verification (via SES `GetIdentityVerificationAttributes`),
+sandbox detection (via `GetAccount` with `GetSendQuota` heuristic
+fallback for IAM-restricted policies), and a live test send.
+Non-clobbering tomlkit + secrets.env merge. Headless
+`--print-only` mode for CI / scripting. Gated behind the joint
+extra: `pip install 'regstack[wizard,ses]'`.
+
 **Fixed: theme-designer preview no longer ships well-known credentials
 in the wheel.** `designer.html` had `alice@example.com` /
 `hunter2hunter2` as `value=` attributes on its login-form preview;

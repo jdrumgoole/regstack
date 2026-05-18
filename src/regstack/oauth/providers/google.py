@@ -152,7 +152,7 @@ class GoogleProvider(OAuthProvider):
             )
         except KeyError as exc:
             raise OAuthTokenExchangeError(
-                f"google token response missing field {exc.args[0]!r}: {body!r}"
+                f"google token response missing field {exc.args[0]!r}"
             ) from exc
 
     async def verify_id_token(

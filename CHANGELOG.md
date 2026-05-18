@@ -7,6 +7,23 @@ Sphinx docs.
 
 ## Unreleased
 
+**Fixed: theme-designer preview no longer ships well-known credentials
+in the wheel.** `designer.html` had `alice@example.com` /
+`hunter2hunter2` as `value=` attributes on its login-form preview;
+flipped to `placeholder=` so the wheel doesn't carry well-known
+example creds that could be mistaken for real fixtures.
+(Daily security review 2026-05-18 · I-1.)
+
+**Fixed: Google OAuth token-exchange error no longer echoes the
+response body.** `exchange_code()` previously raised
+`OAuthTokenExchangeError(f"... {body!r}")` on the rare 200-without-id_token
+edge case. The body can contain a live short-lived `access_token` in
+that path, and the OAuth router logs the exception text at WARNING.
+Dropped `{body!r}` from the message; regression test in
+`tests/unit/test_oauth_google.py` pins that a planted token never
+appears in the exception's `str()` or `args`.
+(Daily security review 2026-05-18 · I-2.)
+
 ## 0.7.0 — 2026-05-17
 
 Two-week sprint that lands the `regstack validate` end-to-end probe,

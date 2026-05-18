@@ -417,6 +417,36 @@ async def test_exchange_code_raises_on_missing_id_token(
             )
 
 
+@pytest.mark.asyncio
+async def test_exchange_code_error_message_does_not_leak_token_body(
+    rsa_key: RSAPrivateKey, mock_jwks_url: str
+) -> None:
+    """In the unusual 200-without-id_token edge case the response body
+    can contain a live ``access_token`` (Google's docs say id_token is
+    only returned when the ``openid`` scope is granted — a misconfigured
+    client could land here). The error message + traceback must not
+    echo that token; the router logs the OAuthTokenExchangeError text
+    at WARNING and surfaced tokens are short-lived credentials all the
+    same.
+    """
+    leaky_token = "ya29.SECRET-ACCESS-TOKEN-VALUE-must-not-leak"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"access_token": leaky_token})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        provider = _make_provider(rsa_key, mock_jwks_url, http=client)
+        with pytest.raises(OAuthTokenExchangeError) as exc_info:
+            await provider.exchange_code(
+                code="c", redirect_uri="http://localhost/cb", code_verifier="v"
+            )
+        assert leaky_token not in str(exc_info.value)
+        # Belt-and-braces: also check the args tuple so a future change
+        # to __str__ can't quietly re-expose it.
+        assert all(leaky_token not in str(a) for a in exc_info.value.args)
+
+
 # ---------------------------------------------------------------------------
 # Construction
 # ---------------------------------------------------------------------------

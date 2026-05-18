@@ -5,6 +5,28 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+### Security
+
+- **Theme-designer preview no longer ships well-known credentials.**
+  The `designer.html` preview card had `alice@example.com` /
+  `hunter2hunter2` as `value=` attributes on its mock sign-in form,
+  meaning every wheel that bundled the wizard carried well-known
+  example creds someone could mistake for real fixtures. Both are
+  now `placeholder=` attributes so the form starts empty. (Daily
+  security review 2026-05-18 · I-1.)
+
+- **Google OAuth `exchange_code()` no longer echoes the response
+  body.** In the rare 200-without-`id_token` edge case
+  (misconfigured client missing the `openid` scope), the response
+  body can carry a live short-lived `access_token`. The previous
+  `OAuthTokenExchangeError(f"... {body!r}")` then surfaced that
+  token through the router's WARNING-level log. Dropped `{body!r}`
+  from the exception message; regression test
+  `test_exchange_code_error_message_does_not_leak_token_body`
+  plants a recognisable token in the response and asserts it
+  never appears in the exception's `str()` or `args` tuple. (Daily
+  security review 2026-05-18 · I-2.)
+
 ## 0.7.0 — 2026-05-17
 
 ### Headline

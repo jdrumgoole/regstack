@@ -15,7 +15,7 @@ class SnsSmsService(SmsService):
 
     def __init__(self, config: SmsConfig) -> None:
         try:
-            import aioboto3  # type: ignore[import-not-found]  # noqa: F401
+            import aioboto3  # type: ignore  # noqa: F401
         except ImportError as exc:
             raise RuntimeError(
                 "The SNS SMS backend requires the 'sns' extra. "

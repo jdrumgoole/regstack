@@ -15,7 +15,11 @@ class SesEmailService(EmailService):
 
     def __init__(self, config: EmailConfig) -> None:
         try:
-            import aioboto3  # type: ignore[import-not-found]  # noqa: F401  (import-time check)
+            # Bare `type: ignore` because aioboto3 lacks py.typed; with
+            # the ses extra installed mypy emits import-untyped, without
+            # it import-not-found. A compound code list trips
+            # unused-ignore in whichever environment doesn't match.
+            import aioboto3  # type: ignore  # noqa: F401  (import-time check)
         except ImportError as exc:
             raise RuntimeError(
                 "The SES email backend requires the 'ses' extra. "

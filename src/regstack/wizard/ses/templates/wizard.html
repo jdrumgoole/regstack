@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>regstack — SES setup</title>
+  <link rel="stylesheet" href="/static/wizard.css">
+</head>
+<body data-token="{{ launch_token }}" data-num-steps="{{ num_steps }}">
+  <header>
+    <h1>regstack &mdash; SES setup</h1>
+    <p class="step-counter">Step <span id="step-current">1</span> of {{ num_steps }}</p>
+  </header>
+
+  <main id="wizard-root">
+    <noscript><p>This wizard requires JavaScript.</p></noscript>
+  </main>
+
+  <footer>
+    <button type="button" id="btn-back" disabled>Back</button>
+    <button type="button" id="btn-next">Next</button>
+  </footer>
+
+  <script src="/static/wizard.js" defer></script>
+</body>
+</html>

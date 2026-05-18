@@ -101,6 +101,112 @@ designer — anything else in the file is left alone.
 Same security shape as `regstack oauth setup`: binds `127.0.0.1`
 only, every API call requires a per-launch random token.
 
+## `regstack ses setup`
+
+Opens a guided 9-step wizard in a native webview window that
+configures the SES email backend. Validates against AWS as you
+go: confirms the chosen credential source authenticates (STS
+`GetCallerIdentity`), confirms the sender domain is verified in
+SES (`GetIdentityVerificationAttributes`), detects sandbox state
+(`GetAccount` with a `GetSendQuota` heuristic fallback for
+IAM-restricted policies), and optionally fires one live
+`SendEmail` as a probe before persisting. Non-clobbering tomlkit
+merge into `regstack.toml` + `regstack.secrets.env`.
+
+```bash
+uv run regstack ses setup
+uv run regstack ses setup --target /etc/app
+```
+
+New in 0.8.0. Gated behind the joint extra:
+`pip install 'regstack[wizard,ses]'`. If either extra is missing,
+the lazy click group prints a combined install hint and exits
+non-zero — running with only one of the two never partially
+starts.
+
+Options:
+
+- `--target DIR` — directory containing (or to receive)
+  `regstack.toml` (default cwd).
+- `--port N` — pin the wizard server's TCP port (default: random
+  free port on `127.0.0.1`).
+- `--print-only` — skip the GUI; run the same merge logic
+  headlessly from the CLI flags and emit a JSON summary. AWS
+  state checks (credential resolution, identity verification,
+  sandbox, test send) are skipped in this mode — the operator
+  is trusted to know the config is correct. Pair with:
+  - `--region REGION` — AWS region (e.g. `eu-west-1`). Validated
+    against the known SES region list.
+  - `--from-address EMAIL` — sender address that lands in
+    `[email].from_address`.
+  - `--credential-source {profile,explicit,chain}` — which
+    credential source to write. `profile` writes
+    `[email].ses_profile`; `explicit` writes
+    `[email].ses_access_key_id` plus the secret to
+    `regstack.secrets.env`; `chain` writes neither (boto3's
+    default credential resolution runs at runtime).
+  - `--profile NAME` — required when
+    `--credential-source=profile`.
+  - `--access-key-id KEY` — required when
+    `--credential-source=explicit`.
+  - `--secret-access-key SECRET` — required when
+    `--credential-source=explicit`. Lands in
+    `regstack.secrets.env`, never in the TOML.
+
+### Sandbox handling
+
+When the wizard detects the AWS account is in the SES sandbox
+(via `ses:GetAccount`, with a 200-messages/day quota heuristic
+fallback), it surfaces a self-attested checkbox naming the
+limitation ("SES will reject email to any address that isn't
+separately verified") and refuses to advance until the operator
+ticks it. Graduation out of the sandbox is a manual AWS process
+the wizard can't drive; it just makes the trade-off explicit.
+
+If `ses:GetAccount` returns `AccessDenied` (some
+least-privilege IAM policies block it), the wizard surfaces a
+non-blocking advisory and proceeds, recommending a follow-up
+verification before the host ships to production.
+
+### Typical usage
+
+Local dev with a named AWS profile:
+
+```bash
+uv run regstack ses setup
+# in the window: region eu-west-1, profile mode, profile name "dev"
+```
+
+CI / scripted, headless:
+
+```bash
+uv run regstack ses setup --print-only \
+    --region eu-west-1 \
+    --from-address noreply@app.example.com \
+    --credential-source chain
+```
+
+Containerised prod with explicit credentials (the secret lands
+in `regstack.secrets.env`):
+
+```bash
+uv run regstack ses setup --print-only \
+    --region eu-west-1 \
+    --from-address noreply@app.example.com \
+    --credential-source explicit \
+    --access-key-id "$AWS_ACCESS_KEY_ID" \
+    --secret-access-key "$AWS_SECRET_ACCESS_KEY"
+```
+
+Verify end-to-end after the wizard writes:
+
+```bash
+uv run regstack doctor --send-test-email you@example.com
+```
+
+Same security shape as the other two wizards: binds
+`127.0.0.1` only, per-launch random token on every API call.
+
 ## `regstack create-admin`
 
 Create or promote a superuser. Idempotent.

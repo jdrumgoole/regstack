@@ -76,7 +76,8 @@ each time".
     `regstack-theme.css`. CSS-only re-skin in minutes, no template
     editing required.
   Both tools are local-only (`127.0.0.1` + per-launch token), have
-  a `--print-only` mode for headless CI, and ship under the same
+  a `--headless` mode for headless CI (plus `--dry-run` for
+  no-write validation), and ship under the same
   test-from-the-outside Playwright suite the SSR pages do.
 - **Zero vendor lock-in.** Your user table is in your database, not
   someone else's. Switch storage backends by changing one URL.

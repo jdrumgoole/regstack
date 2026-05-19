@@ -2,7 +2,7 @@
 
 Two surfaces are covered here:
 
-- ``--print-only`` mode end-to-end (writes regstack.toml + secrets,
+- ``--headless`` mode end-to-end (writes regstack.toml + secrets,
   rejects bad payloads, chmod 0600).
 - The GUI orchestration in ``_run_gui`` — drained of pywebview by
   monkeypatching ``open_wizard_window`` and the uvicorn ``serve``
@@ -37,8 +37,8 @@ def _run(tmp_path: Path, *extra: str) -> tuple[int, str]:
         [
             "oauth",
             "setup",
-            "--print-only",
-            "--target",
+            "--headless",
+            "--config",
             str(tmp_path),
             "--client-id",
             "12345-abc.apps.googleusercontent.com",
@@ -79,8 +79,8 @@ def test_print_only_rejects_bad_client_id(tmp_path: Path) -> None:
         [
             "oauth",
             "setup",
-            "--print-only",
-            "--target",
+            "--headless",
+            "--config",
             str(tmp_path),
             "--client-id",
             "not-a-google-id",
@@ -145,7 +145,7 @@ def test_run_gui_happy_path_uses_make_wizard_server_and_joins_thread(
     runner = CliRunner()
     result = runner.invoke(
         cli,
-        ["oauth", "setup", "--target", str(tmp_path), "--port", "0"],
+        ["oauth", "setup", "--config", str(tmp_path), "--port", "0"],
     )
     assert result.exit_code == 0, result.output
     assert "Wizard URL:" in result.output
@@ -170,7 +170,7 @@ def test_run_gui_window_error_exits_nonzero(
     runner = CliRunner()
     result = runner.invoke(
         cli,
-        ["oauth", "setup", "--target", str(tmp_path), "--port", "0"],
+        ["oauth", "setup", "--config", str(tmp_path), "--port", "0"],
     )
     assert result.exit_code == 1
     assert "no display" in result.output
@@ -197,7 +197,7 @@ def test_run_gui_passes_existing_base_url_into_settings(
     runner = CliRunner()
     result = runner.invoke(
         cli,
-        ["oauth", "setup", "--target", str(tmp_path), "--port", "0"],
+        ["oauth", "setup", "--config", str(tmp_path), "--port", "0"],
     )
     assert result.exit_code == 0, result.output
     assert captured["existing_base_url"] == "https://prod.example.com"

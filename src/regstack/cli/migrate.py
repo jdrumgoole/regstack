@@ -6,6 +6,7 @@ from pathlib import Path
 import click
 
 from regstack.backends.factory import detect_backend_kind
+from regstack.cli._paths import resolve_toml_path
 from regstack.cli._runtime import load_runtime_config
 
 
@@ -15,18 +16,26 @@ from regstack.cli._runtime import load_runtime_config
 )
 @click.option(
     "--config",
-    "toml_path",
-    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    "config_path_in",
+    type=click.Path(exists=True, path_type=Path),
     default=None,
-    help="Path to regstack.toml (default: search cwd / $REGSTACK_CONFIG).",
+    help=(
+        "Path to regstack.toml (or a directory containing it). "
+        "Default: search cwd / $REGSTACK_CONFIG."
+    ),
 )
 @click.option(
     "--target",
     default="head",
     show_default=True,
-    help="Revision to upgrade to (e.g. 'head', '0001', '+1').",
+    help=(
+        "Alembic revision to upgrade to (e.g. 'head', '0001', '+1'). "
+        "Note: distinct from the global --target/--config flag pair on "
+        "config-writing commands."
+    ),
 )
-def migrate(toml_path: Path | None, target: str) -> None:
+def migrate(config_path_in: Path | None, target: str) -> None:
+    toml_path = resolve_toml_path(config_path_in)
     """Idempotent: re-running on a DB at the target revision is a no-op.
 
     Mongo backends are silently skipped — TTL indexes are installed by

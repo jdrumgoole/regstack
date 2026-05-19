@@ -22,6 +22,7 @@ from pathlib import Path
 
 import click
 
+from regstack.cli._paths import resolve_target_dir
 from regstack.wizard.oauth_google.server import make_wizard_server, serve
 from regstack.wizard.oauth_google.validators import validate_all
 from regstack.wizard.oauth_google.writer import merge_into_config
@@ -39,12 +40,18 @@ def oauth() -> None:
     )
 )
 @click.option(
+    "--config",
+    "config_path_in",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Path to regstack.toml or its directory (default: current directory).",
+)
+@click.option(
     "--target",
-    "target_dir",
+    "target_path_in",
     type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
-    default=Path.cwd,
-    show_default="current directory",
-    help="Directory containing (or to receive) regstack.toml.",
+    default=None,
+    help="DEPRECATED: use --config.",
 )
 @click.option(
     "--api-prefix",
@@ -59,34 +66,55 @@ def oauth() -> None:
     help="Pin the wizard server's TCP port (default: random free port).",
 )
 @click.option(
+    "--headless",
+    is_flag=True,
+    help=(
+        "Don't open a GUI. Validate from --client-id / --client-secret / "
+        "--base-url, write the config, print the diff. For CI and "
+        "headless hosts."
+    ),
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help=(
+        "Implies --headless. Validate and print the diff that WOULD be "
+        "written, but do not touch the files. Exits 0 on success, "
+        "2 on validation failure."
+    ),
+)
+@click.option(
     "--print-only",
     is_flag=True,
-    help="Don't open a GUI; print the TOML + secrets diff that would be written.",
+    help="DEPRECATED: alias for --headless.",
 )
-@click.option("--client-id", default=None, help="Used only with --print-only.")
-@click.option("--client-secret", default=None, help="Used only with --print-only.")
+@click.option("--client-id", default=None, help="Used only with --headless / --dry-run.")
+@click.option("--client-secret", default=None, help="Used only with --headless / --dry-run.")
 @click.option(
     "--base-url",
     default="http://localhost:8000",
     show_default=True,
-    help="Used only with --print-only.",
+    help="Used only with --headless / --dry-run.",
 )
 @click.option(
     "--auto-link/--no-auto-link",
     "auto_link_verified_emails",
     default=False,
-    help="Used only with --print-only.",
+    help="Used only with --headless / --dry-run.",
 )
 @click.option(
     "--mfa/--no-mfa",
     "enforce_mfa_on_oauth_signin",
     default=False,
-    help="Used only with --print-only.",
+    help="Used only with --headless / --dry-run.",
 )
 def setup(
-    target_dir: Path,
+    config_path_in: Path | None,
+    target_path_in: Path | None,
     api_prefix: str,
     port: int | None,
+    headless: bool,
+    dry_run: bool,
     print_only: bool,
     client_id: str | None,
     client_secret: str | None,
@@ -94,9 +122,21 @@ def setup(
     auto_link_verified_emails: bool,
     enforce_mfa_on_oauth_signin: bool,
 ) -> None:
-    target_dir = Path(target_dir).resolve()
+    target_dir = resolve_target_dir(config=config_path_in, target=target_path_in)
     if print_only:
-        _run_print_only(
+        click.echo(
+            click.style(
+                "Deprecation: --print-only is deprecated; use --headless. "
+                "--print-only will be removed in 1.0.",
+                fg="yellow",
+            ),
+            err=True,
+        )
+        headless = True
+    if dry_run:
+        headless = True
+    if headless:
+        _run_headless(
             target_dir=target_dir,
             api_prefix=api_prefix,
             base_url=base_url,
@@ -104,13 +144,14 @@ def setup(
             client_secret=client_secret or "",
             auto_link_verified_emails=auto_link_verified_emails,
             enforce_mfa_on_oauth_signin=enforce_mfa_on_oauth_signin,
+            dry_run=dry_run,
         )
         return
 
     _run_gui(target_dir=target_dir, api_prefix=api_prefix, port=port)
 
 
-def _run_print_only(
+def _run_headless(
     *,
     target_dir: Path,
     api_prefix: str,
@@ -119,6 +160,7 @@ def _run_print_only(
     client_secret: str,
     auto_link_verified_emails: bool,
     enforce_mfa_on_oauth_signin: bool,
+    dry_run: bool,
 ) -> None:
     inputs = {
         "existing_oauth": False,
@@ -145,6 +187,7 @@ def _run_print_only(
         client_secret=client_secret,
         auto_link_verified_emails=auto_link_verified_emails,
         enforce_mfa_on_oauth_signin=enforce_mfa_on_oauth_signin,
+        dry_run=dry_run,
     )
     click.echo(
         json.dumps(
@@ -154,6 +197,7 @@ def _run_print_only(
                 "secrets_path": str(write_result.secrets_path),
                 "secrets_diff": write_result.secrets_diff,
                 "replaced_existing": write_result.replaced_existing,
+                "dry_run": dry_run,
             },
             indent=2,
         )

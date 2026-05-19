@@ -6,6 +6,7 @@ from pathlib import Path
 
 import click
 
+from regstack.cli._paths import resolve_toml_path
 from regstack.cli._runtime import open_regstack
 
 
@@ -21,17 +22,21 @@ from regstack.cli._runtime import open_regstack
 )
 @click.option(
     "--config",
-    "toml_path",
-    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    "config_path_in",
+    type=click.Path(exists=True, path_type=Path),
     default=None,
-    help="Path to regstack.toml (default: search cwd / $REGSTACK_CONFIG).",
+    help=(
+        "Path to regstack.toml (or a directory containing it). "
+        "Default: search cwd / $REGSTACK_CONFIG."
+    ),
 )
-def create_admin(email: str, password: str | None, toml_path: Path | None) -> None:
+def create_admin(email: str, password: str | None, config_path_in: Path | None) -> None:
     if password is None:
         password = click.prompt("Password", hide_input=True, confirmation_prompt=True)
     if len(password) < 8:
         raise click.UsageError("Password must be at least 8 characters.")
 
+    toml_path = resolve_toml_path(config_path_in)
     asyncio.run(_run(email=email, password=password, toml_path=toml_path))
 
 

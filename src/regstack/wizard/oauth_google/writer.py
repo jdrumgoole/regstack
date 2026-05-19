@@ -90,6 +90,7 @@ def merge_into_config(
     auto_link_verified_emails: bool,
     enforce_mfa_on_oauth_signin: bool,
     custom_redirect_uri: str | None = None,
+    dry_run: bool = False,
 ) -> WriteResult:
     """Merge OAuth values into ``regstack.toml`` + ``regstack.secrets.env``.
 
@@ -98,9 +99,13 @@ def merge_into_config(
     running with the same inputs is a no-op aside from touching
     mtimes.
 
+    When ``dry_run=True`` the function validates and computes the
+    diff but does NOT touch the filesystem. The :class:`WriteResult`
+    still describes what would have changed.
+
     Args:
         target_dir: Directory containing (or to receive) the config
-            files. Created if missing.
+            files. Created if missing (unless ``dry_run=True``).
         base_url: Host public URL, used to compute the default
             redirect URI when ``custom_redirect_uri`` is None.
         api_prefix: Router prefix the host mounts regstack under
@@ -117,11 +122,14 @@ def merge_into_config(
             running behind a proxy that rewrites paths). When
             ``None``, omitted from the TOML so the running app uses
             its computed default.
+        dry_run: If True, do not touch the filesystem; only compute
+            and return the diff.
 
     Returns:
-        :class:`WriteResult` describing what changed.
+        :class:`WriteResult` describing what changed (or would have).
     """
-    target_dir.mkdir(parents=True, exist_ok=True)
+    if not dry_run:
+        target_dir.mkdir(parents=True, exist_ok=True)
     config_path = (target_dir / CONFIG_FILE).resolve()
     secrets_path = (target_dir / SECRETS_FILE).resolve()
 
@@ -132,9 +140,10 @@ def merge_into_config(
         enforce_mfa_on_oauth_signin=enforce_mfa_on_oauth_signin,
         custom_redirect_uri=custom_redirect_uri,
     )
-    config_path.write_text(tomlkit.dumps(config_doc), encoding="utf-8")
+    if not dry_run:
+        config_path.write_text(tomlkit.dumps(config_doc), encoding="utf-8")
 
-    replaced_secret = _update_secrets(secrets_path, client_secret)
+    replaced_secret = _update_secrets(secrets_path, client_secret, dry_run=dry_run)
 
     return WriteResult(
         config_path=config_path,
@@ -194,9 +203,14 @@ def _update_config(
     return doc, replaced
 
 
-def _update_secrets(secrets_path: Path, client_secret: str) -> bool:
+def _update_secrets(secrets_path: Path, client_secret: str, *, dry_run: bool = False) -> bool:
     """Write/replace the client-secret line. Returns True if a previous
-    line was overwritten."""
+    line was overwritten.
+
+    With ``dry_run=True`` the function still scans for an existing key
+    (so the returned ``replaced`` flag is accurate) but does NOT touch
+    the file.
+    """
     lines = secrets_path.read_text(encoding="utf-8").splitlines() if secrets_path.exists() else []
 
     replaced = False
@@ -210,6 +224,8 @@ def _update_secrets(secrets_path: Path, client_secret: str) -> bool:
     if not replaced:
         new_lines.append(f"{SECRETS_ENV_KEY}={client_secret}")
 
+    if dry_run:
+        return replaced
     text = "\n".join(new_lines)
     if not text.endswith("\n"):
         text += "\n"

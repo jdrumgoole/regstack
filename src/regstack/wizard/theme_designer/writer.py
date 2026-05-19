@@ -72,6 +72,7 @@ def save_theme(
     light: dict[str, str] | None = None,
     dark: dict[str, str] | None = None,
     filename: str = THEME_FILE,
+    dry_run: bool = False,
 ) -> SaveResult:
     """Write a theme.css containing the supplied variable values.
 
@@ -84,11 +85,14 @@ def save_theme(
             override. Empty values omitted; an empty dict suppresses
             the dark block entirely.
         filename: Override the output filename.
+        dry_run: If True, compute what would be written (sizes, paths)
+            but don't touch the filesystem.
 
     Returns:
-        :class:`SaveResult` describing what was written.
+        :class:`SaveResult` describing what was written (or would have).
     """
-    target_dir.mkdir(parents=True, exist_ok=True)
+    if not dry_run:
+        target_dir.mkdir(parents=True, exist_ok=True)
     path = (target_dir / filename).resolve()
 
     light_clean = _clean(light or {})
@@ -102,7 +106,8 @@ def save_theme(
     text = "".join(parts)
     if not text.endswith("\n"):
         text += "\n"
-    path.write_text(text, encoding="utf-8")
+    if not dry_run:
+        path.write_text(text, encoding="utf-8")
 
     return SaveResult(
         target_path=path,

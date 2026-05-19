@@ -21,6 +21,7 @@ from pathlib import Path
 
 import click
 
+from regstack.cli._paths import resolve_target_dir
 from regstack.wizard.ses.server import make_wizard_server, serve
 from regstack.wizard.ses.validators import (
     CREDENTIAL_SOURCES,
@@ -42,12 +43,18 @@ def ses() -> None:
     )
 )
 @click.option(
+    "--config",
+    "config_path_in",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Path to regstack.toml or its directory (default: current directory).",
+)
+@click.option(
     "--target",
-    "target_dir",
+    "target_path_in",
     type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
-    default=Path.cwd,
-    show_default="current directory",
-    help="Directory containing (or to receive) regstack.toml.",
+    default=None,
+    help="DEPRECATED: use --config.",
 )
 @click.option(
     "--port",
@@ -56,29 +63,49 @@ def ses() -> None:
     help="Pin the wizard server's TCP port (default: random free port).",
 )
 @click.option(
+    "--headless",
+    is_flag=True,
+    help=(
+        "Don't open a GUI. Validate from CLI flags, write the config, "
+        "print the diff. For CI and headless hosts."
+    ),
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Implies --headless. Print the diff but do not write the files.",
+)
+@click.option(
     "--print-only",
     is_flag=True,
-    help="Don't open a GUI; print the TOML + secrets diff that would be written.",
+    help="DEPRECATED: alias for --headless.",
 )
-@click.option("--region", default=None, help="Used only with --print-only.")
-@click.option("--from-address", default=None, help="Used only with --print-only.")
+@click.option("--region", default=None, help="Used only with --headless / --dry-run.")
+@click.option("--from-address", default=None, help="Used only with --headless / --dry-run.")
 @click.option(
     "--credential-source",
     type=click.Choice(list(CREDENTIAL_SOURCES)),
     default="chain",
     show_default=True,
-    help="Used only with --print-only.",
+    help="Used only with --headless / --dry-run.",
 )
-@click.option("--profile", default=None, help="Used only with --print-only (profile mode).")
-@click.option("--access-key-id", default=None, help="Used only with --print-only (explicit mode).")
+@click.option(
+    "--profile", default=None, help="Used only with --headless / --dry-run (profile mode)."
+)
+@click.option(
+    "--access-key-id", default=None, help="Used only with --headless / --dry-run (explicit mode)."
+)
 @click.option(
     "--secret-access-key",
     default=None,
-    help="Used only with --print-only (explicit mode).",
+    help="Used only with --headless / --dry-run (explicit mode).",
 )
 def setup(
-    target_dir: Path,
+    config_path_in: Path | None,
+    target_path_in: Path | None,
     port: int | None,
+    headless: bool,
+    dry_run: bool,
     print_only: bool,
     region: str | None,
     from_address: str | None,
@@ -87,9 +114,21 @@ def setup(
     access_key_id: str | None,
     secret_access_key: str | None,
 ) -> None:
-    target_dir = Path(target_dir).resolve()
+    target_dir = resolve_target_dir(config=config_path_in, target=target_path_in)
     if print_only:
-        _run_print_only(
+        click.echo(
+            click.style(
+                "Deprecation: --print-only is deprecated; use --headless. "
+                "--print-only will be removed in 1.0.",
+                fg="yellow",
+            ),
+            err=True,
+        )
+        headless = True
+    if dry_run:
+        headless = True
+    if headless:
+        _run_headless(
             target_dir=target_dir,
             region=region or "",
             from_address=from_address or "",
@@ -97,13 +136,14 @@ def setup(
             profile=profile,
             access_key_id=access_key_id,
             secret_access_key=secret_access_key,
+            dry_run=dry_run,
         )
         return
 
     _run_gui(target_dir=target_dir, port=port)
 
 
-def _run_print_only(
+def _run_headless(
     *,
     target_dir: Path,
     region: str,
@@ -112,6 +152,7 @@ def _run_print_only(
     profile: str | None,
     access_key_id: str | None,
     secret_access_key: str | None,
+    dry_run: bool,
 ) -> None:
     if region and region not in KNOWN_SES_REGIONS:
         click.echo(
@@ -141,7 +182,8 @@ def _run_print_only(
             click.echo(f"  - {err.field}: {err.message}", err=True)
         sys.exit(2)
 
-    target_dir.mkdir(parents=True, exist_ok=True)
+    if not dry_run:
+        target_dir.mkdir(parents=True, exist_ok=True)
     write_result = merge_into_config(
         target_dir=target_dir,
         ses_region=region,
@@ -150,6 +192,7 @@ def _run_print_only(
         ses_profile=profile,
         ses_access_key_id=access_key_id,
         ses_secret_access_key=secret_access_key,
+        dry_run=dry_run,
     )
     click.echo(
         json.dumps(
@@ -159,6 +202,7 @@ def _run_print_only(
                 "secrets_path": str(write_result.secrets_path),
                 "secrets_diff": write_result.secrets_diff,
                 "replaced_existing": write_result.replaced_existing,
+                "dry_run": dry_run,
             },
             indent=2,
         )

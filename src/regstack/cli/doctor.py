@@ -9,6 +9,7 @@ import click
 import dns.resolver
 
 from regstack.backends.factory import build_backend, detect_backend_kind
+from regstack.cli._paths import resolve_toml_path
 from regstack.cli._results import CheckResult
 from regstack.cli._runtime import load_runtime_config
 from regstack.email.factory import build_email_service
@@ -23,10 +24,13 @@ if TYPE_CHECKING:
 )
 @click.option(
     "--config",
-    "toml_path",
-    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    "config_path_in",
+    type=click.Path(exists=True, path_type=Path),
     default=None,
-    help="Path to regstack.toml (default: search cwd / $REGSTACK_CONFIG).",
+    help=(
+        "Path to regstack.toml (or a directory containing it). "
+        "Default: search cwd / $REGSTACK_CONFIG."
+    ),
 )
 @click.option(
     "--check-dns",
@@ -39,7 +43,8 @@ if TYPE_CHECKING:
     default=None,
     help="Send a probe email to this address through the configured backend.",
 )
-def doctor(toml_path: Path | None, check_dns: bool, test_recipient: str | None) -> None:
+def doctor(config_path_in: Path | None, check_dns: bool, test_recipient: str | None) -> None:
+    toml_path = resolve_toml_path(config_path_in)
     results = asyncio.run(
         _run(toml_path=toml_path, check_dns=check_dns, test_recipient=test_recipient)
     )

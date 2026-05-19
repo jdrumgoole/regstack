@@ -40,13 +40,13 @@ def build_verify_router(rs: RegStack) -> APIRouter:
         if pending is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Verification token is invalid or has expired.",
+                detail="Verification link is invalid or has expired. Request a new one.",
             )
         if pending.expires_at <= rs.clock.now():
             await rs.pending.delete_by_email(pending.email)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Verification token has expired. Request a new one.",
+                detail="Verification link is invalid or has expired. Request a new one.",
             )
 
         user = BaseUser(
@@ -114,6 +114,7 @@ def build_verify_router(rs: RegStack) -> APIRouter:
             to=pending.email,
             full_name=pending.full_name,
             url=url,
+            ttl_hours=max(ttl // 3600, 1),
         )
         await rs.email.send(message)
         await rs.hooks.fire("verification_requested", email=pending.email, url=url)

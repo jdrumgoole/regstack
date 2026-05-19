@@ -24,6 +24,7 @@ KNOWN_EVENTS = {
     "email_change_requested",
     "email_changed",
     "phone_setup_started",
+    "phone_setup_disabled",
     "mfa_login_started",
     "mfa_enabled",
     "mfa_disabled",

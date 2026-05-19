@@ -229,10 +229,12 @@ class RegStackConfig(BaseSettings):
     confirm_email_change_rate_limit: str | None = None
     delete_account_rate_limit: str | None = None
     oauth_exchange_rate_limit: str | None = None
-    # DEPRECATED in favour of the per-route fields above; kept for
-    # back-compat with configs that set them. Unused by the router.
-    login_max_per_minute: Annotated[int, Field(ge=1)] = 5
-    login_max_per_hour: Annotated[int, Field(ge=1)] = 20
+    # Phone routes send paid SMS and brute-force a 6-digit code, so
+    # they need IP throttles regardless of the per-code attempt counter
+    # in mfa_codes. (Review #6.)
+    phone_start_rate_limit: str | None = None
+    phone_confirm_rate_limit: str | None = None
+    phone_disable_rate_limit: str | None = None
 
     # Sub-configs
     email: EmailConfig = Field(default_factory=EmailConfig)

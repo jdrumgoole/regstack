@@ -93,6 +93,19 @@ class LockoutService:
             )
         return LockoutDecision(locked=False, retry_after_seconds=0)
 
+    async def attempts_remaining(self, email: str) -> int | None:
+        """Return how many failures are left before lockout fires.
+
+        Used by the login route after a wrong-password 401 so we can
+        surface the same "N attempts remaining" message MFA shows.
+        Returns ``None`` when rate-limiting is disabled (tests) — the
+        route should then suppress the line entirely.
+        """
+        if self._config.rate_limit_disabled:
+            return None
+        count = await self._attempts.count_recent(email, window=self._window, now=self._clock.now())
+        return max(self._config.login_lockout_threshold - count, 0)
+
     async def record_failure(self, email: str, *, ip: str | None = None) -> None:
         """Record one failed login. No-op when rate limiting is disabled.
 

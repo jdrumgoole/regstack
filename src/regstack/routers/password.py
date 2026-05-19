@@ -44,7 +44,10 @@ def build_password_router(rs: RegStack) -> APIRouter:
 
         # Anti-enumeration: same response regardless of whether the user exists.
         ack = MessageResponse(
-            message="If an account exists for that email, a reset link has been sent."
+            message=(
+                "If the address matches an active account, a reset link has been sent. "
+                "Check your email."
+            )
         )
         user = await rs.users.get_by_email(payload.email)
         if user is None or user.id is None or not user.is_active:
@@ -84,14 +87,24 @@ def build_password_router(rs: RegStack) -> APIRouter:
         except TokenError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Reset token is invalid or has expired.",
+                detail="Reset link is invalid or has expired. Request a new one.",
             ) from exc
+
+        # Refuse to re-use a reset token. The token's jti is added to the
+        # blacklist on first success, so a second click of the same link
+        # gets the same "invalid or has expired" response that an
+        # expired-token attempt sees. (Review #17.)
+        if await rs.blacklist.is_revoked(token_payload.jti):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Reset link is invalid or has expired. Request a new one.",
+            )
 
         user = await rs.users.get_by_id(token_payload.sub)
         if user is None or user.id is None or not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Reset token does not match an active account.",
+                detail="Reset link does not match an active account.",
             )
 
         new_hash = rs.password_hasher.hash(payload.new_password)
@@ -100,6 +113,8 @@ def build_password_router(rs: RegStack) -> APIRouter:
         # stolen session token would otherwise outlive the password change.
         await rs.users.update_password(user.id, new_hash)
         await rs.lockout.clear(user.email)
+        # Blacklist the reset token so the same link can't be used twice.
+        await rs.blacklist.revoke(token_payload.jti, token_payload.exp)
         await rs.hooks.fire("password_reset_completed", user=user)
         return MessageResponse(message="Password has been reset. Please sign in.")
 

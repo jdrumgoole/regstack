@@ -137,7 +137,9 @@ def build_account_router(rs: RegStack) -> APIRouter:
         # via the users.update_email unique constraint.
         clash = await rs.users.get_by_email(payload.new_email)
         accepted = MessageResponse(
-            message="If that email address is not already in use, a confirmation link has been sent.",
+            message=(
+                "If the address is available, a confirmation link has been sent. Check your email."
+            ),
         )
         if clash is not None:
             log.info(
@@ -176,7 +178,7 @@ def build_account_router(rs: RegStack) -> APIRouter:
         except TokenError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Token is invalid or has expired.",
+                detail="Email-change link is invalid or has expired. Request a new one.",
             ) from exc
 
         user = await rs.users.get_by_id(user_id)

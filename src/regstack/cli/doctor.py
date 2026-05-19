@@ -49,7 +49,10 @@ def doctor(toml_path: Path | None, check_dns: bool, test_recipient: str | None) 
         click.echo(f"{symbol} {r.name}: {r.detail}")
     if failed:
         click.echo(click.style(f"\n{failed} check(s) failed.", fg="red"), err=True)
-    sys.exit(failed)
+    # Clamp to 0/1 so a shell `regstack doctor && deploy` is predictable;
+    # the failure count appears on the stderr line above for operators
+    # who want it. (Review #4.)
+    sys.exit(1 if failed else 0)
 
 
 async def _run(

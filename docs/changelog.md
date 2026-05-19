@@ -5,31 +5,73 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+## 0.8.1 — 2026-05-19
+
+### Headline
+
+CLI ergonomics: one `--config` flag everywhere, `--headless` and
+`--dry-run` on the wizards.
+
+The 0.8.0 system-consistency review left five deferred items on the
+table. Three of them ship in this release. Every command that loads
+or writes regstack config now takes a single `--config` flag — and
+it accepts either a TOML file path or a directory containing one, so
+the same value flows through `init` and the read-only commands without
+the old file-vs-directory dance. `--target` survives as a deprecated
+alias on the four config-writing commands (`init`, `oauth setup`,
+`ses setup`, `theme design`) and emits a one-line warning; it goes
+away in 1.0. `migrate --target` keeps its existing meaning (Alembic
+revision) since the conflict is contextual — the helptext now spells
+that out.
+
+Alongside that, the three pywebview wizards swap their misleadingly-
+named `--print-only` flag (which actually wrote to disk) for two
+honest flags: `--headless` writes the config from CLI flags and prints
+a JSON summary; `--dry-run` validates and prints the same diff but
+leaves the filesystem untouched. `--print-only` survives as a
+deprecated alias for `--headless`; it also goes away in 1.0. The
+emitted JSON now carries `"dry_run": <bool>` so scripted consumers
+can branch on it.
+
+Plus a small refactor: the two SSR token-handoff pages
+(`verify.html`, `email_change_confirm.html`) used to be near-duplicate
+templates. They now share a Jinja macro, `auth/_token_handoff.html` —
+rendered HTML is unchanged, but the divergence is gone for the next
+time someone needs to touch both at once.
+
 ### Changed
 
 - **CLI flag unification.** `--config` is now the canonical flag on
-  every command that loads or writes regstack config. It accepts
-  either a path to `regstack.toml` or a directory containing it.
-  `--target` is retained as a deprecated alias on `init`,
-  `oauth setup`, `ses setup`, and `theme design` (emits a one-line
-  warning; removed in 1.0). `migrate --target` keeps its existing
-  meaning (Alembic revision) since the conflict is contextual.
+  every command that loads or writes regstack config. Accepts either
+  a path to `regstack.toml` or a directory containing it. `--target`
+  is retained as a deprecated alias on `init`, `oauth setup`,
+  `ses setup`, and `theme design` (warning emitted; removed in 1.0).
+  `migrate --target` keeps its existing meaning (Alembic revision)
+  since the conflict is contextual.
 
-- **Wizard mode flags.** The three pywebview wizards now use
-  `--headless` to mean "skip the GUI, write the config from CLI
-  flags, emit a JSON summary" and `--dry-run` to mean "validate
-  and print the diff but do **not** touch the files." `--print-only`
-  is retained as a deprecated alias for `--headless` (removed in 1.0).
-  The old name was misleading — all three wizards already wrote to
-  disk despite the "print-only" label.
+- **Wizard mode flags.** The three pywebview wizards now expose
+  `--headless` ("skip the GUI, write the config from CLI flags,
+  emit a JSON summary") and `--dry-run` ("validate and print the
+  diff but do **not** touch the files"). `--print-only` is the
+  deprecated alias for `--headless`; removed in 1.0. The emitted
+  JSON gains a `"dry_run": <bool>` field for scripted consumers.
 
-- **Token-handoff SSR pages share a macro.** ``verify.html`` and
-  ``email_change_confirm.html`` were near-duplicates — same DOM, same
-  ``data-rs-token`` / ``data-rs-status`` shape, only the heading and
-  pending-message strings differed. Factored the shared body into
-  ``auth/_token_handoff.html``. Rendered output is unchanged; hosts
-  that override either file individually still win against the bundled
-  default via ``RegStack.add_template_dir(...)``.
+- **Token-handoff SSR pages share a macro.** `verify.html` and
+  `email_change_confirm.html` were near-duplicates — same DOM,
+  same `data-rs-token` / `data-rs-status` shape, only the heading
+  and pending-message strings differed. The shared body lives in
+  `auth/_token_handoff.html`. Rendered HTML is unchanged; hosts
+  that override either file individually still win against the
+  bundled default via `RegStack.add_template_dir(...)`.
+
+### Deprecated
+
+- `--target` on `regstack init`, `regstack oauth setup`,
+  `regstack ses setup`, `regstack theme design`. Use `--config`.
+  Removed in 1.0.
+- `--print-only` on `regstack oauth setup`, `regstack ses setup`,
+  `regstack theme design`. Use `--headless` (or `--dry-run` for
+  no-write validation). Removed in 1.0.
 
 ## 0.8.0 — 2026-05-19
 

@@ -6,20 +6,26 @@ from urllib.parse import urlsplit
 
 import click
 
+from regstack.cli._paths import CONFIG_FILE, resolve_target_dir
 from regstack.config.secrets import generate_secret
 
-CONFIG_FILE = "regstack.toml"
 SECRETS_FILE = "regstack.secrets.env"
 
 
 @click.command(help="Interactive wizard that writes regstack.toml + regstack.secrets.env.")
 @click.option(
+    "--config",
+    "config_path_in",
+    type=click.Path(path_type=Path),
+    default=None,
+    help=("Path to regstack.toml or the directory to write it into (default: current directory)."),
+)
+@click.option(
     "--target",
-    "target_dir",
+    "target_path_in",
     type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
-    default=Path.cwd,
-    show_default="current directory",
-    help="Directory to write config files into.",
+    default=None,
+    help="DEPRECATED: use --config. Directory to write config files into.",
 )
 @click.option("--force", is_flag=True, help="Overwrite existing config files without prompting.")
 @click.option(
@@ -32,10 +38,16 @@ SECRETS_FILE = "regstack.secrets.env"
         "no-ops on every subsequent boot."
     ),
 )
-def init(target_dir: Path, *, force: bool, if_missing: bool) -> None:
+def init(
+    config_path_in: Path | None,
+    target_path_in: Path | None,
+    *,
+    force: bool,
+    if_missing: bool,
+) -> None:
     if force and if_missing:
         raise click.UsageError("--force and --if-missing are mutually exclusive.")
-    target_dir = Path(target_dir).resolve()
+    target_dir = resolve_target_dir(config=config_path_in, target=target_path_in)
     target_dir.mkdir(parents=True, exist_ok=True)
 
     config_path = target_dir / CONFIG_FILE

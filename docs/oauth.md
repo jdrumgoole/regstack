@@ -67,8 +67,9 @@ The wizard is **non-clobbering** — it preserves comments, unrelated
 top-level keys, and unrelated tables (`[email]`, `[sms]`, etc.). Re-run
 it any time you need to rotate credentials or change the linking
 policy. On a headless host (CI, server) use
-`regstack oauth setup --print-only --client-id=… --client-secret=…`
-to get the same merge with no GUI.
+`regstack oauth setup --headless --client-id=… --client-secret=…`
+to get the same merge with no GUI (pair with `--dry-run` for a
+preview that does not touch the files).
 
 If you'd rather edit by hand, the resulting files look like:
 

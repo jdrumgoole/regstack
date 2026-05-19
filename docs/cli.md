@@ -14,13 +14,21 @@ checks if asked, never provisions infrastructure.
 
 ```bash
 uv run regstack init
-uv run regstack init --target /etc/app --force
+uv run regstack init --config /etc/app --force
 ```
 
 Options:
 
-- `--target DIR` — directory to write the config files (default cwd).
+- `--config PATH` — path to `regstack.toml` *or* a directory to write
+  it into (default cwd). Accepts either form so the same value can
+  flow through `init` and the read-only commands.
+- `--target DIR` — **deprecated alias for `--config`. Will be removed in
+  1.0.** Emits a one-line warning when used.
 - `--force` — overwrite without confirming.
+- `--if-missing` — exit 0 silently when either config file already
+  exists. Useful for idempotent infrastructure-as-code: the wizard
+  produces config the first time and no-ops on every boot after.
+  Mutually exclusive with `--force`.
 
 Re-running the wizard prompts before overwriting unless `--force` is
 passed; pre-existing answers aren't kept (the wizard is intentionally
@@ -38,27 +46,31 @@ rotate credentials or change the linking policy.
 
 ```bash
 uv run regstack oauth setup
-uv run regstack oauth setup --target /etc/app
+uv run regstack oauth setup --config /etc/app
 ```
 
 Options:
 
-- `--target DIR` — directory containing (or to receive) `regstack.toml`
+- `--config PATH` — path to `regstack.toml` or its directory
   (default cwd).
+- `--target DIR` — **deprecated alias for `--config`.** Removed in 1.0.
 - `--api-prefix PREFIX` — router prefix the host mounts regstack under
   (default `/api/auth`). Used to compute the suggested redirect URI.
 - `--port N` — pin the wizard server's TCP port (default: random free
   port on `127.0.0.1`).
-- `--print-only` — skip the GUI; print the TOML + secrets diff that
-  *would* be written to stdout, then exit. Useful for headless hosts
-  (CI, servers without a webview backend) and dry-run smoke tests.
-  Pair with `--client-id`, `--client-secret`, `--base-url`,
-  `--auto-link/--no-auto-link`, `--mfa/--no-mfa`.
+- `--headless` — skip the GUI; validate from `--client-id`,
+  `--client-secret`, `--base-url`, `--auto-link/--no-auto-link`,
+  `--mfa/--no-mfa`; write the config; print a JSON diff. For CI and
+  headless hosts.
+- `--dry-run` — implies `--headless`. Validate and print the diff
+  but **do not** write the files. Exits 0 on success, 2 on
+  validation failure.
+- `--print-only` — **deprecated alias for `--headless`.** Removed in 1.0.
 
 The interactive mode requires a desktop environment with a webview
 backend (WebKit on macOS, GTK / QtWebEngine on Linux, Edge WebView2 on
 Windows). On a headless host it exits with a clear error pointing at
-`--print-only`.
+`--headless`.
 
 The wizard binds to `127.0.0.1` only and authenticates every API call
 with a per-launch random token, so a hostile process on the same host
@@ -76,21 +88,25 @@ stylesheet on the clipboard without writing.
 
 ```bash
 uv run regstack theme design
-uv run regstack theme design --target /var/www/static
+uv run regstack theme design --config /var/www/static
 ```
 
 Options:
 
-- `--target DIR` — directory to write `regstack-theme.css` into
-  (default cwd).
+- `--config PATH` — path to `regstack.toml` or its directory
+  (regstack-theme.css is written alongside, default cwd).
+- `--target DIR` — **deprecated alias for `--config`.** Removed in 1.0.
 - `--filename NAME` — output filename
   (default `regstack-theme.css`).
 - `--port N` — pin the designer's TCP port (default: random free
   port on `127.0.0.1`).
-- `--print-only` — skip the GUI; write the file from `--var` pairs
-  and emit a JSON summary. For headless / CI use.
-- `--var NAME=VALUE` — repeatable. Used with `--print-only`. Prefix
-  with `dark:` to set the dark-scheme value, e.g.
+- `--headless` — skip the GUI; validate `--var` pairs, write the
+  file, emit a JSON summary. For headless / CI use.
+- `--dry-run` — implies `--headless`. Validate and emit the summary
+  but **do not** write the file.
+- `--print-only` — **deprecated alias for `--headless`.** Removed in 1.0.
+- `--var NAME=VALUE` — repeatable. Used with `--headless` /
+  `--dry-run`. Prefix with `dark:` to set the dark-scheme value, e.g.
   `--var dark:--rs-accent=#2dd4bf`.
 
 Re-running the designer reloads the previous values out of the file,
@@ -115,7 +131,7 @@ merge into `regstack.toml` + `regstack.secrets.env`.
 
 ```bash
 uv run regstack ses setup
-uv run regstack ses setup --target /etc/app
+uv run regstack ses setup --config /etc/app
 ```
 
 New in 0.8.0. Gated behind the joint extra:
@@ -126,15 +142,16 @@ starts.
 
 Options:
 
-- `--target DIR` — directory containing (or to receive)
-  `regstack.toml` (default cwd).
+- `--config PATH` — path to `regstack.toml` or its directory
+  (default cwd).
+- `--target DIR` — **deprecated alias for `--config`.** Removed in 1.0.
 - `--port N` — pin the wizard server's TCP port (default: random
   free port on `127.0.0.1`).
-- `--print-only` — skip the GUI; run the same merge logic
-  headlessly from the CLI flags and emit a JSON summary. AWS
-  state checks (credential resolution, identity verification,
-  sandbox, test send) are skipped in this mode — the operator
-  is trusted to know the config is correct. Pair with:
+- `--headless` — skip the GUI; run the same merge logic from
+  CLI flags and emit a JSON summary. AWS state checks (credential
+  resolution, identity verification, sandbox, test send) are skipped
+  in this mode — the operator is trusted to know the config is
+  correct. Pair with:
   - `--region REGION` — AWS region (e.g. `eu-west-1`). Validated
     against the known SES region list.
   - `--from-address EMAIL` — sender address that lands in
@@ -152,6 +169,9 @@ Options:
   - `--secret-access-key SECRET` — required when
     `--credential-source=explicit`. Lands in
     `regstack.secrets.env`, never in the TOML.
+- `--dry-run` — implies `--headless`. Run validation and emit the
+  diff but **do not** write the files.
+- `--print-only` — **deprecated alias for `--headless`.** Removed in 1.0.
 
 ### Sandbox handling
 
@@ -180,7 +200,7 @@ uv run regstack ses setup
 CI / scripted, headless:
 
 ```bash
-uv run regstack ses setup --print-only \
+uv run regstack ses setup --headless \
     --region eu-west-1 \
     --from-address noreply@app.example.com \
     --credential-source chain
@@ -190,7 +210,7 @@ Containerised prod with explicit credentials (the secret lands
 in `regstack.secrets.env`):
 
 ```bash
-uv run regstack ses setup --print-only \
+uv run regstack ses setup --headless \
     --region eu-west-1 \
     --from-address noreply@app.example.com \
     --credential-source explicit \
@@ -221,7 +241,8 @@ Options:
 
 - `--email EMAIL` *(required)*.
 - `--password PW` — if omitted, prompts (with confirmation).
-- `--config PATH` — TOML file to load (default: env or cwd).
+- `--config PATH` — TOML file or directory containing it (default:
+  env or cwd).
 
 If the user already exists, the command sets `is_superuser=True` and
 keeps the existing password. If they don't exist, it creates the user
@@ -243,10 +264,13 @@ uv run regstack migrate --config /etc/app/regstack.toml --target 0001
 
 Options:
 
-- `--config PATH` — TOML file to load (default: cwd / `$REGSTACK_CONFIG`).
+- `--config PATH` — TOML file or directory containing it
+  (default: cwd / `$REGSTACK_CONFIG`).
 - `--target REV` — revision to upgrade to (default `head`). Accepts
   any Alembic revision spec: a revision id (`0001`), a relative step
-  (`+1`), or `head`.
+  (`+1`), or `head`. Note: this is the only `--target` flag that
+  survives the 0.8.0 flag-unification — `migrate`'s `--target` is
+  the Alembic revision, not a config path.
 
 Mongo backends are silently skipped: TTL indexes are installed by
 `RegStack.install_schema()` on every app start, so there's no separate
@@ -268,7 +292,7 @@ uv run regstack doctor --send-test-email alice@app.example.com
 
 Options:
 
-- `--config PATH` — TOML file to load.
+- `--config PATH` — TOML file or directory containing it.
 - `--check-dns` — run SPF / DMARC / MX `dig`s on the sender domain.
   Internet-dependent; off by default.
 - `--send-test-email TO` — actually send a probe email through the

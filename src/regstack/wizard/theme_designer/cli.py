@@ -20,6 +20,7 @@ from pathlib import Path
 
 import click
 
+from regstack.cli._paths import resolve_target_dir
 from regstack.wizard.theme_designer.routes import DEFAULT_LIGHT
 from regstack.wizard.theme_designer.server import make_designer_server, serve
 from regstack.wizard.theme_designer.validators import validate_vars
@@ -35,12 +36,21 @@ from regstack.wizard.theme_designer.writer import THEME_FILE, save_theme
     ),
 )
 @click.option(
+    "--config",
+    "config_path_in",
+    type=click.Path(path_type=Path),
+    default=None,
+    help=(
+        "Path to regstack.toml or the directory to write "
+        "regstack-theme.css into (default: current directory)."
+    ),
+)
+@click.option(
     "--target",
-    "target_dir",
+    "target_path_in",
     type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
-    default=Path.cwd,
-    show_default="current directory",
-    help="Directory to write regstack-theme.css into.",
+    default=None,
+    help="DEPRECATED: use --config.",
 )
 @click.option(
     "--filename",
@@ -55,35 +65,75 @@ from regstack.wizard.theme_designer.writer import THEME_FILE, save_theme
     help="Pin the designer's TCP port (default: random free port).",
 )
 @click.option(
+    "--headless",
+    is_flag=True,
+    help=(
+        "Don't open a GUI. Validate from --var pairs, write "
+        "regstack-theme.css, print a JSON summary. For CI and "
+        "headless hosts."
+    ),
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Implies --headless. Validate but do not write the file.",
+)
+@click.option(
     "--print-only",
     is_flag=True,
-    help="Don't open a GUI; write the file from --var pairs and print summary.",
+    help="DEPRECATED: alias for --headless.",
 )
 @click.option(
     "--var",
     "var_pairs",
     multiple=True,
     help=(
-        "Used with --print-only. Repeatable. Accepts NAME=VALUE pairs, e.g. "
+        "Used with --headless / --dry-run. Repeatable. Accepts NAME=VALUE pairs, e.g. "
         "--var --rs-accent=#0d9488. Prefix with `dark:` to set in the dark "
         "scope, e.g. --var dark:--rs-accent=#2dd4bf."
     ),
 )
 def design(
-    target_dir: Path,
+    config_path_in: Path | None,
+    target_path_in: Path | None,
     filename: str,
     port: int | None,
+    headless: bool,
+    dry_run: bool,
     print_only: bool,
     var_pairs: tuple[str, ...],
 ) -> None:
-    target_dir = Path(target_dir).resolve()
+    target_dir = resolve_target_dir(config=config_path_in, target=target_path_in)
     if print_only:
-        _run_print_only(target_dir=target_dir, filename=filename, var_pairs=var_pairs)
+        click.echo(
+            click.style(
+                "Deprecation: --print-only is deprecated; use --headless. "
+                "--print-only will be removed in 1.0.",
+                fg="yellow",
+            ),
+            err=True,
+        )
+        headless = True
+    if dry_run:
+        headless = True
+    if headless:
+        _run_headless(
+            target_dir=target_dir,
+            filename=filename,
+            var_pairs=var_pairs,
+            dry_run=dry_run,
+        )
         return
     _run_gui(target_dir=target_dir, filename=filename, port=port)
 
 
-def _run_print_only(*, target_dir: Path, filename: str, var_pairs: tuple[str, ...]) -> None:
+def _run_headless(
+    *,
+    target_dir: Path,
+    filename: str,
+    var_pairs: tuple[str, ...],
+    dry_run: bool,
+) -> None:
     light: dict[str, str] = {}
     dark: dict[str, str] = {}
 
@@ -109,8 +159,9 @@ def _run_print_only(*, target_dir: Path, filename: str, var_pairs: tuple[str, ..
             click.echo(f"  - {err.field}: {err.message}", err=True)
         sys.exit(2)
 
-    target_dir.mkdir(parents=True, exist_ok=True)
-    result = save_theme(target_dir, light=light, dark=dark, filename=filename)
+    if not dry_run:
+        target_dir.mkdir(parents=True, exist_ok=True)
+    result = save_theme(target_dir, light=light, dark=dark, filename=filename, dry_run=dry_run)
     click.echo(
         json.dumps(
             {
@@ -118,6 +169,7 @@ def _run_print_only(*, target_dir: Path, filename: str, var_pairs: tuple[str, ..
                 "light_count": result.light_count,
                 "dark_count": result.dark_count,
                 "bytes_written": result.bytes_written,
+                "dry_run": dry_run,
             },
             indent=2,
         )

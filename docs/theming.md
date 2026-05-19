@@ -13,11 +13,12 @@ uv run regstack theme design
 Opens a native pywebview window with controls for every `--rs-*`
 variable on the left and a real-time preview of the bundled SSR
 widgets on the right. Tweak a colour, watch the Sign-in card update;
-click Save to write `regstack-theme.css`. There's a `--print-only`
-mode for headless / CI use:
+click Save to write `regstack-theme.css`. There's a `--headless`
+mode for headless / CI use (pair with `--dry-run` to preview without
+writing):
 
 ```bash
-uv run regstack theme design --print-only \
+uv run regstack theme design --headless \
     --var --rs-accent=#0d9488 \
     --var --rs-radius=10 \
     --var dark:--rs-accent=#2dd4bf

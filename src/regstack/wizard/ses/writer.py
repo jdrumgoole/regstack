@@ -60,6 +60,7 @@ def merge_into_config(
     ses_profile: str | None = None,
     ses_access_key_id: str | None = None,
     ses_secret_access_key: str | None = None,
+    dry_run: bool = False,
 ) -> WriteResult:
     """Merge SES values into ``regstack.toml`` + ``regstack.secrets.env``.
 
@@ -90,7 +91,8 @@ def merge_into_config(
     Returns:
         :class:`WriteResult` describing what changed.
     """
-    target_dir.mkdir(parents=True, exist_ok=True)
+    if not dry_run:
+        target_dir.mkdir(parents=True, exist_ok=True)
     config_path = (target_dir / CONFIG_FILE).resolve()
     secrets_path = (target_dir / SECRETS_FILE).resolve()
 
@@ -102,11 +104,13 @@ def merge_into_config(
         ses_profile=ses_profile,
         ses_access_key_id=ses_access_key_id,
     )
-    config_path.write_text(tomlkit.dumps(config_doc), encoding="utf-8")
+    if not dry_run:
+        config_path.write_text(tomlkit.dumps(config_doc), encoding="utf-8")
 
     replaced_secret = _update_secrets(
         secrets_path,
         secret=ses_secret_access_key if credential_source == "explicit" else None,
+        dry_run=dry_run,
     )
 
     return WriteResult(
@@ -200,7 +204,7 @@ def _update_config(
 
 
 def _update_secrets(
-    secrets_path: Path, *, secret: str | None
+    secrets_path: Path, *, secret: str | None, dry_run: bool = False
 ) -> Literal["added", "replaced", "removed", "noop"]:
     """Write/replace the secret-access-key line.
 
@@ -208,6 +212,9 @@ def _update_secrets(
     *removes* any pre-existing line — switching mode in a re-run
     shouldn't leave a stale secret on disk. When ``secret`` is
     provided, the line is added or replaced as appropriate.
+
+    With ``dry_run=True`` the function still reports what would have
+    changed but does not write.
     """
     lines = secrets_path.read_text(encoding="utf-8").splitlines() if secrets_path.exists() else []
 
@@ -225,14 +232,17 @@ def _update_secrets(
     if secret is None and not found:
         return "noop"
     if secret is None and found:
-        _write_secrets(secrets_path, new_lines)
+        if not dry_run:
+            _write_secrets(secrets_path, new_lines)
         return "removed"
     if secret is not None and not found:
         new_lines.append(f"{SECRETS_ENV_KEY}={secret}")
-        _write_secrets(secrets_path, new_lines)
+        if not dry_run:
+            _write_secrets(secrets_path, new_lines)
         return "added"
     # secret is not None and found: replaced in-place above.
-    _write_secrets(secrets_path, new_lines)
+    if not dry_run:
+        _write_secrets(secrets_path, new_lines)
     return "replaced"
 
 

@@ -33,7 +33,7 @@ def test_init_writes_sqlite_config_with_defaults(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(
         cli,
-        ["init", "--target", str(tmp_path)],
+        ["init", "--config", str(tmp_path)],
         input=_accept_all(_SQLITE_HAPPY_PATH_PROMPTS),
     )
     assert result.exit_code == 0, result.output
@@ -69,7 +69,7 @@ def test_init_postgres_backend(tmp_path: Path) -> None:
     # Net = 15. Sequence: 3x default (app, base, proxy), "postgres",
     # then 11x default.
     inputs = "\n\n\n" + "postgres\n" + "\n" * 11
-    result = runner.invoke(cli, ["init", "--target", str(tmp_path)], input=inputs)
+    result = runner.invoke(cli, ["init", "--config", str(tmp_path)], input=inputs)
     assert result.exit_code == 0, result.output
 
     secrets_text = (tmp_path / "regstack.secrets.env").read_text()
@@ -81,7 +81,7 @@ def test_init_mongo_backend(tmp_path: Path) -> None:
     # 3x default (app, base, proxy), "mongo", then default host, default db,
     # then 10x default.
     inputs = "\n\n\n" + "mongo\n" + "\n\n" + "\n" * 10
-    result = runner.invoke(cli, ["init", "--target", str(tmp_path)], input=inputs)
+    result = runner.invoke(cli, ["init", "--config", str(tmp_path)], input=inputs)
     assert result.exit_code == 0, result.output
 
     cfg_text = (tmp_path / "regstack.toml").read_text()
@@ -96,7 +96,7 @@ def test_init_refuses_to_overwrite_without_force(tmp_path: Path) -> None:
     runner = CliRunner()
     # The overwrite confirm prompt defaults to "no" (abort=True).
     # Sending "n\n" rejects the prompt -> Click aborts with exit 1.
-    result = runner.invoke(cli, ["init", "--target", str(tmp_path)], input="n\n")
+    result = runner.invoke(cli, ["init", "--config", str(tmp_path)], input="n\n")
     assert result.exit_code == 1
     assert "Overwrite?" in result.output
 
@@ -106,7 +106,7 @@ def test_init_force_overwrites(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(
         cli,
-        ["init", "--target", str(tmp_path), "--force"],
+        ["init", "--config", str(tmp_path), "--force"],
         input=_accept_all(_SQLITE_HAPPY_PATH_PROMPTS),
     )
     assert result.exit_code == 0, result.output
@@ -126,7 +126,7 @@ def test_init_does_not_offer_cookie_transport(tmp_path: Path) -> None:
     """
     runner = CliRunner()
     result = runner.invoke(
-        cli, ["init", "--target", str(tmp_path)], input=_accept_all(_SQLITE_HAPPY_PATH_PROMPTS)
+        cli, ["init", "--config", str(tmp_path)], input=_accept_all(_SQLITE_HAPPY_PATH_PROMPTS)
     )
     assert result.exit_code == 0, result.output
     # No "cookie" string anywhere in the prompt output the operator sees.
@@ -158,7 +158,7 @@ def test_init_smtp_backend_records_smtp_settings(tmp_path: Path) -> None:
         + "\n\n\n\n\n"  # sms, admin, ui, register, verify
     )
     runner = CliRunner()
-    result = runner.invoke(cli, ["init", "--target", str(tmp_path)], input=inputs)
+    result = runner.invoke(cli, ["init", "--config", str(tmp_path)], input=inputs)
     assert result.exit_code == 0, result.output
 
     cfg_text = (tmp_path / "regstack.toml").read_text()

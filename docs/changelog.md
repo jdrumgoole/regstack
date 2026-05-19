@@ -5,6 +5,24 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+### Changed
+
+- **CLI flag unification.** `--config` is now the canonical flag on
+  every command that loads or writes regstack config. It accepts
+  either a path to `regstack.toml` or a directory containing it.
+  `--target` is retained as a deprecated alias on `init`,
+  `oauth setup`, `ses setup`, and `theme design` (emits a one-line
+  warning; removed in 1.0). `migrate --target` keeps its existing
+  meaning (Alembic revision) since the conflict is contextual.
+
+- **Wizard mode flags.** The three pywebview wizards now use
+  `--headless` to mean "skip the GUI, write the config from CLI
+  flags, emit a JSON summary" and `--dry-run` to mean "validate
+  and print the diff but do **not** touch the files." `--print-only`
+  is retained as a deprecated alias for `--headless` (removed in 1.0).
+  The old name was misleading — all three wizards already wrote to
+  disk despite the "print-only" label.
+
 ## 0.8.0 — 2026-05-19
 
 ### Headline

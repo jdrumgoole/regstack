@@ -1,6 +1,6 @@
 """Tests for ``regstack theme design``.
 
-Covers --print-only end-to-end (writes the file from --var pairs),
+Covers --headless end-to-end (writes the file from --var pairs),
 the GUI orchestration in _run_gui (mocked pywebview + serve so no
 real desktop session is needed), and the lazy CLI group wiring.
 """
@@ -54,7 +54,7 @@ def test_init_help_does_not_load_designer(
 
 
 # ---------------------------------------------------------------------------
-# --print-only
+# --headless
 # ---------------------------------------------------------------------------
 
 
@@ -65,8 +65,8 @@ def test_print_only_writes_file_from_var_pairs(tmp_path: Path) -> None:
         [
             "theme",
             "design",
-            "--print-only",
-            "--target",
+            "--headless",
+            "--config",
             str(tmp_path),
             "--var",
             "--rs-accent=#0d9488",
@@ -91,7 +91,7 @@ def test_print_only_with_no_vars_writes_defaults(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(
         cli,
-        ["theme", "design", "--print-only", "--target", str(tmp_path)],
+        ["theme", "design", "--headless", "--config", str(tmp_path)],
     )
     assert result.exit_code == 0, result.output
     text = (tmp_path / THEME_FILE).read_text()
@@ -105,8 +105,8 @@ def test_print_only_rejects_bad_value(tmp_path: Path) -> None:
         [
             "theme",
             "design",
-            "--print-only",
-            "--target",
+            "--headless",
+            "--config",
             str(tmp_path),
             "--var",
             "--rs-accent=not-a-colour",
@@ -124,8 +124,8 @@ def test_print_only_rejects_malformed_var(tmp_path: Path) -> None:
         [
             "theme",
             "design",
-            "--print-only",
-            "--target",
+            "--headless",
+            "--config",
             str(tmp_path),
             "--var",
             "no-equals-sign",
@@ -162,7 +162,7 @@ def test_run_gui_happy_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     runner = CliRunner()
     result = runner.invoke(
         cli,
-        ["theme", "design", "--target", str(tmp_path), "--port", "0"],
+        ["theme", "design", "--config", str(tmp_path), "--port", "0"],
     )
     assert result.exit_code == 0, result.output
     assert "Designer URL:" in result.output
@@ -184,7 +184,7 @@ def test_run_gui_window_error_exits_nonzero(
     runner = CliRunner()
     result = runner.invoke(
         cli,
-        ["theme", "design", "--target", str(tmp_path), "--port", "0"],
+        ["theme", "design", "--config", str(tmp_path), "--port", "0"],
     )
     assert result.exit_code == 1
     assert "no display" in result.output

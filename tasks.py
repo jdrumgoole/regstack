@@ -106,44 +106,95 @@ def test_serial(c: Context, k: str = "") -> None:
     c.run(cmd, pty=True)
 
 
+_ALL_BACKENDS = ("sqlite", "mongo", "postgres")
+
+
+def _resolve_coverage_backends(requested: str) -> tuple[list[str], list[str]]:
+    """Return ``(usable, excluded)`` from the requested backend list.
+
+    ``requested`` is a comma-separated list (the ``--backends`` flag).
+    For each requested backend we probe its port; sqlite is always
+    counted as usable since it's in-process. Returns ``usable`` (the
+    ones the test run will exercise) and ``excluded`` (requested but
+    missing — surfaced in the COVERAGE_PARTIAL banner so the operator
+    knows what got skipped).
+    """
+    requested_set = {b.strip() for b in requested.split(",") if b.strip()}
+    unknown = requested_set - set(_ALL_BACKENDS)
+    if unknown:
+        raise Exit(f"Unknown backend(s): {', '.join(sorted(unknown))}", code=2)
+    usable: list[str] = []
+    excluded: list[str] = []
+    for backend in _ALL_BACKENDS:
+        if backend not in requested_set:
+            continue
+        if backend == "sqlite":
+            usable.append(backend)
+            continue
+        if _port_open(_PORTS[backend]):
+            usable.append(backend)
+        else:
+            excluded.append(backend)
+    return usable, excluded
+
+
 @task
 def coverage(
     c: Context,
     pg_url: str = _DEFAULT_PG_URL,
     html: bool = True,
     fail_under: int = 0,
+    backends: str = ",".join(_ALL_BACKENDS),
+    allow_partial: bool = False,
 ) -> None:
-    """Run the full backend matrix under coverage.
+    """Run the backend matrix under coverage and emit a line report.
 
-    Combines per-worker .coverage.* files (pytest-xdist runs one
-    coverage instance per worker; settings.parallel = true plus
-    `coverage combine` glues them back together) and prints the
-    line-coverage report. With --html (default), also writes an
-    HTML report under ``htmlcov/``.
+    By default ``--backends=sqlite,mongo,postgres`` and every requested
+    backend must be reachable; this is the release gate. In a
+    restricted-network environment (CCR with apt PPAs blocked, etc.)
+    pass ``--allow-partial`` and the task will run against whichever
+    of the requested backends actually came up, emitting a
+    ``COVERAGE_PARTIAL`` banner naming the excluded backends — useful
+    for tracking trends in environments that can't host the full
+    matrix.
 
-    Set ``--fail-under=N`` to make the task exit non-zero when total
-    line coverage drops below N percent — useful in CI.
+    Subset coverage for an ad-hoc inner-loop run:
+
+        inv coverage --backends=sqlite --no-html
+
+    The task always wipes ``.coverage.*`` first so a re-run doesn't
+    double-count. With ``--html`` (default), an HTML report lands at
+    ``htmlcov/``.
+
+    Set ``--fail-under=N`` to exit non-zero when total line coverage
+    drops below N percent — useful in CI.
     """
-    # Pre-flight: every backend in the matrix must be reachable. A coverage
-    # number computed against a partial backend matrix is meaningless — the
-    # entire mongo backend tree would be marked uncovered purely because
-    # mongod wasn't running, not because of any code change. Fail fast with
-    # a distinct marker so scheduled runs can recognise an infra problem
-    # instead of filing a coverage-regression issue.
-    missing = [f"{_NAMES[k]} (:{p})" for k, p in _PORTS.items() if not _port_open(p)]
-    if missing:
+    usable, excluded = _resolve_coverage_backends(backends)
+    if excluded and not allow_partial:
+        missing = ", ".join(f"{_NAMES[b]} (:{_PORTS[b]})" for b in excluded)
         raise Exit(
             "COVERAGE_INFRA_UNAVAILABLE: required backends not reachable: "
-            f"{', '.join(missing)}. Bring services up with `inv db-up` "
-            "(or run `python scripts/ccr_coverage_setup.py` in a fresh CCR "
-            "container) and re-run. No coverage number was produced.",
+            f"{missing}. Bring services up with `inv db-up` (or run "
+            "`python scripts/ccr_coverage_setup.py` in a fresh CCR "
+            "container) and re-run, or pass `--allow-partial` to accept "
+            "a partial-matrix number. No coverage number was produced.",
             code=2,
         )
+
+    if excluded:
+        print(
+            f"\n\033[33mCOVERAGE_PARTIAL\033[0m: running against "
+            f"{', '.join(usable)} only (excluded: {', '.join(excluded)}). "
+            "Numbers will not be comparable to a full-matrix run — "
+            "treat them as a trend signal, not a regression gate.\n",
+            flush=True,
+        )
+
     # Wipe stale coverage state so partial reruns don't leave double-counted
     # data files behind.
     c.run("uv run coverage erase", pty=True, warn=True)
     env = {
-        "REGSTACK_TEST_BACKENDS": "sqlite,mongo,postgres",
+        "REGSTACK_TEST_BACKENDS": ",".join(usable),
         "REGSTACK_TEST_POSTGRES_URL": pg_url,
         # pytest-cov picks settings up from [tool.coverage.*] in pyproject.toml.
         "COVERAGE_PROCESS_START": "pyproject.toml",
@@ -161,6 +212,13 @@ def coverage(
     if html:
         c.run("uv run coverage html", pty=True)
         print("\nHTML report: htmlcov/index.html")
+
+    if excluded:
+        print(
+            f"\n\033[33mNote\033[0m: partial-matrix coverage. Excluded "
+            f"backends: {', '.join(excluded)}.",
+            flush=True,
+        )
 
 
 @task

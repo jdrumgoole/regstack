@@ -33,7 +33,9 @@ def test_from_name_defaults_to_app_name_when_unset() -> None:
         app_name="Acme",
     )
     message = composer.verification(
-        to="alice@example.com", full_name=None, url="https://acme.example/verify?token=t",
+        to="alice@example.com",
+        full_name=None,
+        url="https://acme.example/verify?token=t",
         ttl_hours=24,
     )
     assert message.from_name == "Acme"
@@ -53,7 +55,9 @@ def test_explicit_from_name_overrides_app_name() -> None:
         app_name="acme-internal",
     )
     message = composer.verification(
-        to="alice@example.com", full_name=None, url="https://acme.example/verify?token=t",
+        to="alice@example.com",
+        full_name=None,
+        url="https://acme.example/verify?token=t",
         ttl_hours=24,
     )
     assert message.from_name == "Acme Customer Service"
@@ -100,7 +104,9 @@ def test_host_template_dir_overrides_defaults(tmp_path: Path) -> None:
         host_template_dirs=[host_dir],
     )
     message = composer.verification(
-        to="x@example.com", full_name=None, url="https://x/verify?token=t",
+        to="x@example.com",
+        full_name=None,
+        url="https://x/verify?token=t",
         ttl_hours=24,
     )
     assert message.subject == "Welcome to MyApp!"
@@ -116,7 +122,9 @@ def test_add_template_dir_after_construction(tmp_path: Path) -> None:
         app_name="MyApp",
     )
     base_subject = composer.verification(
-        to="x@example.com", full_name=None, url="https://x/verify?token=t",
+        to="x@example.com",
+        full_name=None,
+        url="https://x/verify?token=t",
         ttl_hours=24,
     ).subject
 
@@ -126,7 +134,9 @@ def test_add_template_dir_after_construction(tmp_path: Path) -> None:
     composer.add_template_dir(host_dir)
 
     new_subject = composer.verification(
-        to="x@example.com", full_name=None, url="https://x/verify?token=t",
+        to="x@example.com",
+        full_name=None,
+        url="https://x/verify?token=t",
         ttl_hours=24,
     ).subject
     assert new_subject == "Custom subject"

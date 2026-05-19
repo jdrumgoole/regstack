@@ -1,0 +1,11 @@
+{# Shared body for SSR pages that auto-POST a query-string token on load
+   (currently: verify.html and email_change_confirm.html). regstack.js
+   reads ``data-rs-token`` and ``data-rs-status`` on the same page; the
+   page's role is just to render the right heading + status message
+   while the JS runs. #}
+{% macro token_handoff(heading, pending_message, ui_prefix) %}
+<h1 class="rs-title">{{ heading }}</h1>
+<p class="rs-meta" data-rs-status="pending">{{ pending_message }}</p>
+<input type="hidden" data-rs-token>
+<p class="rs-meta"><a href="{{ ui_prefix }}/login">Back to sign in</a></p>
+{% endmacro %}

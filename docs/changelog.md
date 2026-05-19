@@ -23,6 +23,14 @@ All notable changes to this project are documented here. Versions follow
   The old name was misleading — all three wizards already wrote to
   disk despite the "print-only" label.
 
+- **Token-handoff SSR pages share a macro.** ``verify.html`` and
+  ``email_change_confirm.html`` were near-duplicates — same DOM, same
+  ``data-rs-token`` / ``data-rs-status`` shape, only the heading and
+  pending-message strings differed. Factored the shared body into
+  ``auth/_token_handoff.html``. Rendered output is unchanged; hosts
+  that override either file individually still win against the bundled
+  default via ``RegStack.add_template_dir(...)``.
+
 ## 0.8.0 — 2026-05-19
 
 ### Headline

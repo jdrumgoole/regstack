@@ -103,6 +103,31 @@ async def test_host_template_dir_overrides_login_page(make_client, tmp_path: Pat
 
 
 @pytest.mark.asyncio
+async def test_token_handoff_pages_share_structure(make_client) -> None:
+    """``verify.html`` and ``email_change_confirm.html`` are rendered
+    via a single ``_token_handoff.html`` macro — they must continue to
+    emit the same structural elements (heading, pending status, hidden
+    token input, back-to-sign-in link) so ``regstack.js`` can drive
+    them without page-specific branches.
+    """
+    async with make_client(enable_ui_router=True) as (rs, _client):
+        app = FastAPI()
+        app.include_router(rs.ui_router, prefix=rs.config.ui_prefix)
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as ui_client:
+            for path, expected_heading in [
+                (VERIFY, "Confirming your email…"),
+                (CONFIRM_EMAIL, "Confirming your new email…"),
+            ]:
+                r = await ui_client.get(path)
+                assert r.status_code == 200, path
+                assert f'<h1 class="rs-title">{expected_heading}</h1>' in r.text
+                assert 'data-rs-status="pending"' in r.text
+                assert '<input type="hidden" data-rs-token>' in r.text
+                assert '<a href="/account/login">Back to sign in</a>' in r.text
+
+
+@pytest.mark.asyncio
 async def test_theme_css_url_renders_link(make_client) -> None:
     async with make_client(
         enable_ui_router=True,

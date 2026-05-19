@@ -5,6 +5,22 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+### Changed
+
+- **Coverage routine survives restricted-network containers.** The
+  weekly CCR coverage run used to refuse any partial-matrix
+  invocation outright (issue #71). `scripts/ccr_coverage_setup.py`
+  is now tolerant: each backend (Mongo, Postgres, Playwright) is
+  attempted independently and the script reports a status table
+  showing which came up; failures don't abort siblings. `inv
+  coverage` gained `--backends=<csv>` (default
+  `sqlite,mongo,postgres`) and `--allow-partial`. The default
+  still hard-fails when something's missing — partial-matrix
+  numbers are not a release gate — but `--allow-partial` produces
+  a number with a `COVERAGE_PARTIAL` banner naming the excluded
+  backends, which is useful for tracking trends in restricted
+  environments. CI continues to run the full matrix on every push.
+
 ## 0.8.1 — 2026-05-19
 
 ### Headline

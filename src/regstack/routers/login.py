@@ -19,11 +19,28 @@ if TYPE_CHECKING:
     from regstack.models.user import BaseUser
 
 
-_INVALID = HTTPException(
-    status_code=status.HTTP_401_UNAUTHORIZED,
-    detail="Invalid email or password.",
-)
 _LOGIN_MFA_PURPOSE = "login_mfa"
+
+
+async def _build_invalid(rs: RegStack, email: str) -> HTTPException:
+    """Build a 401 that includes the user-facing attempts-remaining
+    count when lockout is enabled — matches the shape MFA uses for
+    its wrong-code response so the two flows feel symmetrical to a
+    user typing the wrong credentials. (Review #15.)
+
+    Returns a fresh exception each call because ``attempts_remaining``
+    changes between calls; the previous module-level constant was
+    cached and couldn't carry per-call state.
+    """
+    remaining = await rs.lockout.attempts_remaining(email)
+    if remaining is None or remaining == 0:
+        # remaining == 0 means lockout is about to fire on the next
+        # attempt; the 429 from `lockout.check` carries the
+        # "Try again in N seconds" message — don't pre-announce it.
+        detail = "Invalid email or password."
+    else:
+        detail = f"Invalid email or password. {remaining} attempt(s) remaining."
+    return HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
 
 
 class MfaPendingResponse(BaseModel):
@@ -69,7 +86,7 @@ def build_login_router(rs: RegStack) -> APIRouter:
         user = await rs.users.get_by_email(payload.email)
         if user is None or user.id is None:
             await rs.lockout.record_failure(payload.email)
-            raise _INVALID
+            raise await _build_invalid(rs, payload.email)
         # Password verification runs first so the is_active and
         # is_verified branches below are only reachable by an attacker
         # who already knows the password. Without this ordering, an
@@ -83,7 +100,7 @@ def build_login_router(rs: RegStack) -> APIRouter:
             payload.password, user.hashed_password
         ):
             await rs.lockout.record_failure(payload.email)
-            raise _INVALID
+            raise await _build_invalid(rs, payload.email)
         # Even with the right password, disabled / unverified accounts
         # must still increment the lockout counter — otherwise a
         # password-stuffing attacker who happens to be holding the
@@ -122,7 +139,7 @@ def build_login_router(rs: RegStack) -> APIRouter:
         except TokenError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="MFA token is invalid or has expired.",
+                detail="Sign-in session is invalid or has expired. Start over from sign-in.",
             ) from exc
 
         result = await rs.mfa_codes.verify(user_id=user_id, kind="login_mfa", raw_code=payload.code)

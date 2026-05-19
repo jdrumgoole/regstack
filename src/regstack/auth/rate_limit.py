@@ -54,6 +54,9 @@ ROUTE_LIMIT_MAP: dict[str, str] = {
     "confirm_email_change_rate_limit": "/confirm-email-change",
     "delete_account_rate_limit": "/account",
     "oauth_exchange_rate_limit": "/oauth/exchange",
+    "phone_start_rate_limit": "/phone/start",
+    "phone_confirm_rate_limit": "/phone/confirm",
+    "phone_disable_rate_limit": "/phone",
 }
 
 

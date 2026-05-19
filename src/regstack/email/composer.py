@@ -89,7 +89,9 @@ class MailComposer:
 
     # --- Public renderers -------------------------------------------------
 
-    def verification(self, *, to: str, full_name: str | None, url: str) -> EmailMessage:
+    def verification(
+        self, *, to: str, full_name: str | None, url: str, ttl_hours: int
+    ) -> EmailMessage:
         return self._compose(
             kind="verification",
             to=to,
@@ -97,6 +99,7 @@ class MailComposer:
                 "app_name": self._app_name,
                 "full_name": full_name or "",
                 "url": url,
+                "ttl_hours": ttl_hours,
             },
         )
 

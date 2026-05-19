@@ -22,18 +22,37 @@ SECRETS_FILE = "regstack.secrets.env"
     help="Directory to write config files into.",
 )
 @click.option("--force", is_flag=True, help="Overwrite existing config files without prompting.")
-def init(target_dir: Path, *, force: bool) -> None:
+@click.option(
+    "--if-missing",
+    is_flag=True,
+    help=(
+        "Exit 0 silently when either config file already exists. Useful "
+        "for idempotent infrastructure-as-code: `regstack init --if-missing` "
+        "in a Dockerfile entrypoint produces config the first time and "
+        "no-ops on every subsequent boot."
+    ),
+)
+def init(target_dir: Path, *, force: bool, if_missing: bool) -> None:
+    if force and if_missing:
+        raise click.UsageError("--force and --if-missing are mutually exclusive.")
     target_dir = Path(target_dir).resolve()
     target_dir.mkdir(parents=True, exist_ok=True)
 
     config_path = target_dir / CONFIG_FILE
     secrets_path = target_dir / SECRETS_FILE
 
-    if (config_path.exists() or secrets_path.exists()) and not force:
-        click.confirm(
-            f"Config already exists at {config_path} or {secrets_path}. Overwrite?",
-            abort=True,
-        )
+    if config_path.exists() or secrets_path.exists():
+        if if_missing:
+            click.echo(
+                f"Config already present at {config_path} or {secrets_path}; "
+                "no action taken (--if-missing).",
+            )
+            sys.exit(0)
+        if not force:
+            click.confirm(
+                f"Config already exists at {config_path} or {secrets_path}. Overwrite?",
+                abort=True,
+            )
 
     click.echo(click.style("regstack init — app configuration only.\n", bold=True))
     click.echo("This wizard never provisions infrastructure. It only writes config files.\n")
@@ -95,11 +114,12 @@ def init(target_dir: Path, *, force: bool) -> None:
         type=click.Choice(["console", "smtp", "ses"]),
         default="console",
     )
-    if email_backend != "console":
+    if email_backend == "ses":
         click.echo(
             click.style(
-                f"Note: {email_backend!r} backend lands in M2; the wizard will write your "
-                "config, but the running app will refuse to send mail until then.",
+                "Tip: `regstack ses setup` is a guided wizard that validates "
+                "credentials and sender-domain verification against AWS before "
+                "writing the config. Consider that instead.",
                 fg="yellow",
             )
         )
@@ -116,6 +136,16 @@ def init(target_dir: Path, *, force: bool) -> None:
         smtp_starttls = click.confirm("Use STARTTLS?", default=True)
         smtp_user = click.prompt("SMTP username", default="")
         smtp_pass = click.prompt("SMTP password", default="", hide_input=True) or None
+        if smtp_user and smtp_pass is None:
+            click.echo(
+                click.style(
+                    "Warning: SMTP username set but no password — leaving "
+                    "REGSTACK_EMAIL__SMTP_PASSWORD unset. Set it via the secrets "
+                    "file or env var before the app starts, or authenticated "
+                    "SMTP sends will fail.",
+                    fg="yellow",
+                )
+            )
     elif email_backend == "ses":
         ses_region = click.prompt("AWS region", default="eu-west-1")
 

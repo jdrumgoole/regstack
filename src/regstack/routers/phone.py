@@ -122,7 +122,7 @@ def build_phone_router(rs: RegStack) -> APIRouter:
         except TokenError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Pending token is invalid or has expired.",
+                detail="Phone-setup session is invalid or has expired. Start setup again.",
             ) from exc
 
         result = await rs.mfa_codes.verify(
@@ -164,6 +164,11 @@ def build_phone_router(rs: RegStack) -> APIRouter:
         await rs.users.set_phone(user.id, None)
         await rs.users.set_mfa_enabled(user.id, is_mfa_enabled=False)
         await rs.mfa_codes.delete(user_id=user.id)
+        # Fire phone_setup_disabled (factor-specific) before mfa_disabled
+        # (any factor). Subscribers that care which factor was removed
+        # listen for the former; subscribers that just want "MFA is off
+        # for this user" listen for the latter.
+        await rs.hooks.fire("phone_setup_disabled", user=user)
         await rs.hooks.fire("mfa_disabled", user=user)
         return MessageResponse(message="SMS 2FA disabled.")
 

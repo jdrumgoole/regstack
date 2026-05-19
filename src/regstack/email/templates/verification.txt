@@ -1,6 +1,6 @@
 Hi{% if full_name %} {{ full_name }}{% endif %},
 
-Thanks for signing up to {{ app_name }}. Please confirm your email address by visiting the link below:
+Thanks for signing up to {{ app_name }}. Please confirm your email address by visiting the link below. It is valid for {{ ttl_hours }} hours.
 
   {{ url }}
 

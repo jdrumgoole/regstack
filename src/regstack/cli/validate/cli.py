@@ -251,7 +251,9 @@ def validate(
             timeout=timeout,
         )
     )
-    sys.exit(exit_code)
+    # Clamp to 0/1 for predictable shell composition; the per-check
+    # failure count is rendered in the report above. (Review #4.)
+    sys.exit(1 if exit_code else 0)
 
 
 async def _run(

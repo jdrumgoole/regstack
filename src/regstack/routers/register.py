@@ -91,6 +91,7 @@ async def _start_verification(
         to=payload.email,
         full_name=payload.full_name,
         url=url,
+        ttl_hours=max(ttl // 3600, 1),
     )
     await rs.email.send(message)
     await rs.hooks.fire("verification_requested", email=payload.email, url=url)

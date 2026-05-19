@@ -234,9 +234,39 @@ uv run regstack doctor [--config ...] [--check-dns] [--send-test-email <addr>]
 
 `doctor` reports JWT secret strength, database reachability, indexes,
 the email backend's instantiability, and optionally DNS (SPF/DKIM/MX)
-and a real email send. Exit code is the number of failed checks —
-wire it into a container health check or a Kubernetes liveness probe
-for production probes that need more than a TCP hit.
+and a real email send. Exits 0 if every check passed and 1 otherwise;
+the failure count is printed to stderr. Wire it into a container
+health check or a Kubernetes liveness probe for production probes
+that need more than a TCP hit.
+
+## Extension surface — `RegStack.deps` and `RegStack.oauth`
+
+The façade exposes two helper handles that hosts can reach for when
+they're building on top of the JSON router rather than alongside it:
+
+- **`regstack.deps`** is an `AuthDependencies` factory. Call
+  `regstack.deps.current_user()` / `.current_admin()` /
+  `.current_user_optional()` to get FastAPI `Depends(...)`-ready
+  callables for the host's own endpoints — same JWT decoder, same
+  blacklist + bulk-revoke checks regstack uses internally, no
+  duplication needed. `current_user_optional()` is the one most
+  often used: it returns `BaseUser | None` instead of raising 401,
+  for endpoints that render differently for signed-in vs anonymous
+  callers (cart icon, comment-author prefill, "your recent X"
+  sections). Available since 0.7.0.
+
+- **`regstack.oauth`** is the `OAuthRegistry` of configured
+  providers (`Google` ships in 0.3.0; the registry is open for
+  hosts to add their own subclasses of `OAuthProvider`). Reach for
+  it when you want to enumerate `regstack.oauth.names()` for a
+  custom "sign in with…" UI or look up a provider instance by name
+  to drive a non-standard flow.
+
+Both handles are closure-bound to the `RegStack` instance — two
+`RegStack` instances in the same process don't share state via
+module globals, which is the property that lets multi-tenant
+deployments mount independent regstacks per tenant under different
+URL prefixes.
 
 ## What regstack does *not* do
 

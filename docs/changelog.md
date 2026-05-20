@@ -5,6 +5,18 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+### Added
+
+- **`regstack doctor` flags out-of-date MongoDB servers.** A new
+  advisory check (mongo backend only) compares the connected server's
+  version against the CVE-2025-14847 ("MongoBleed") patched baseline and
+  prints a ⚠ warning when it's behind. Advisory warnings are surfaced
+  but do **not** fail the command (exit stays 0), so
+  `regstack doctor && deploy` is unaffected. `CheckResult` gained a
+  `warn` state and doctor renders three symbols now: ✔ / ⚠ / ✘.
+  Minimum supported server versions are documented in
+  [embedding.md](embedding.md). (Security review 2026-05-20 · I-3.)
+
 ### Security
 
 - **`sms.log_bodies` now defaults to `False`.** The `null` SMS backend

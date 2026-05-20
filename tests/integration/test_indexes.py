@@ -96,3 +96,25 @@ async def test_install_indexes_is_a_noop_on_canonical_state(
     await regstack.install_schema()
     info_after = await users.index_information()
     assert info_after.keys() == info_before.keys()
+
+
+@pytest.mark.asyncio
+async def test_doctor_mongo_server_version_check_runs_against_live_server(
+    regstack: RegStack,
+) -> None:
+    """End-to-end wiring for the CVE-2025-14847 advisory (security review
+    2026-05-20 · I-3): the check must reach the live server via
+    ``buildInfo`` and produce a ``mongo server`` result. The local CI
+    mongo is a recent, patched release, so we expect a non-failing
+    result — but the point of the test is that the buildInfo path works,
+    not the verdict."""
+    from regstack.cli.doctor import _check_mongo_server_version
+
+    result = await _check_mongo_server_version(regstack.config)
+    assert result is not None
+    assert result.name == "mongo server"
+    # Recent server → not a hard failure. ``warn`` may be True only if the
+    # CI image is somehow on an affected build; either way it must not be
+    # a hard failure (ok stays True for advisory results).
+    assert result.ok is True
+    assert "server" in result.detail

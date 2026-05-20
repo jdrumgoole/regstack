@@ -25,6 +25,28 @@ database_url = "postgresql+asyncpg://<username>:<password>@dbhost.example.com:54
 database_url = "mongodb://<username>:<password>@dbhost.example.com:27017/dbname"
 ```
 
+### Minimum MongoDB server version
+
+regstack works with any MongoDB server that speaks the standard wire
+protocol, but for security run a release patched against
+[CVE-2025-14847](https://www.mongodb.com/) ("MongoBleed", CVSS 8.7), an
+unauthenticated memory-disclosure bug in the **server** (the pymongo
+driver is unaffected). The patched minimums per LTS track are:
+
+| Track | Patched ≥ |
+|-------|-----------|
+| 8.2.x | 8.2.3 |
+| 8.0.x | 8.0.17 |
+| 7.0.x | 7.0.28 |
+| 6.0.x | 6.0.27 |
+| 5.0.x | 5.0.32 |
+| 4.4.x | 4.4.30 |
+
+`regstack doctor` checks the connected server's version against this
+table and prints a ⚠ advisory (not a hard failure) when it's behind.
+If you can't upgrade immediately, disable zlib compression in
+`mongod.conf` (`net.compression.compressors: snappy`) as a mitigation.
+
 Hosts that already manage their own connection pool — for example, an
 app that talks to Postgres for its own data and wants regstack to
 reuse the same engine — can skip the URL and pass an explicit Backend:

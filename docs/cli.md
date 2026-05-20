@@ -280,8 +280,12 @@ exits non-zero if Alembic raises.
 ## `regstack doctor`
 
 Runs read-only validation against the loaded config and reports each
-check on a green/red line. Exit code is the number of failed checks —
-suitable for use in container health checks.
+check on a green ✔ / red ✘ / yellow ⚠ line. Exit code is 0 when nothing
+*failed* and 1 otherwise — advisory ⚠ warnings (things outside
+regstack's control that the operator should act on, like an out-of-date
+database server) are surfaced but do **not** fail the command, so
+`regstack doctor && deploy` stays predictable. Suitable for use in
+container health checks.
 
 ```bash
 uv run regstack doctor
@@ -305,6 +309,7 @@ Default checks:
 | `jwt secret` | Present, ≥ 32 chars |
 | `backend` | `Backend.ping()` succeeds (works for any backend) |
 | `schema` | Mongo: required indexes present. SQL: `users` table responds to `count(*)` |
+| `mongo server` | *(mongo backend only)* server version is at or above the CVE-2025-14847 patched baseline. ⚠ advisory, never a hard failure |
 | `email backend` | `build_email_service(config.email)` instantiates |
 
 Optional checks:

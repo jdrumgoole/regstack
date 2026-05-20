@@ -5,7 +5,24 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+### Security
+
+- **`sms.log_bodies` now defaults to `False`.** The `null` SMS backend
+  used to log the message body (including the 6-digit MFA code) at INFO
+  by default, asymmetric with `email.log_bodies`. A misconfigured
+  deployment left on the `null` backend could leak codes into shared
+  logs. The default is now off; flip it on for local dev when you want
+  the code in stdout (the bundled examples surface it via an
+  `mfa_login_started` hook, so they're unaffected). (Security review
+  2026-05-19.)
+
 ### Changed
+
+- **OAuth JWKS fetch no longer blocks the event loop.** Google ID-token
+  verification ran `PyJWKClient.get_signing_key_from_jwt` (synchronous
+  `urllib`) directly on the event loop; a JWKS cache-miss fetch could
+  stall concurrent requests for the round-trip to Google. It now runs
+  via `asyncio.to_thread`. (Security review 2026-05-20 · I-2.)
 
 - **Coverage routine survives restricted-network containers.** The
   weekly CCR coverage run used to refuse any partial-matrix

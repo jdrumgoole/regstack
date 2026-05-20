@@ -16,6 +16,7 @@ installed and turns ``enable_oauth`` on.
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
@@ -162,7 +163,14 @@ class GoogleProvider(OAuthProvider):
         expected_nonce: str,
     ) -> OAuthUserInfo:
         try:
-            signing_key = self._jwks_client.get_signing_key_from_jwt(id_token).key
+            # PyJWKClient's fetch is synchronous urllib; on a cache miss it
+            # would block the event loop for the round-trip to Google's JWKS
+            # endpoint. Push it to a worker thread so concurrent requests
+            # aren't stalled. (Security review 2026-05-20 · I-2.)
+            signing_key_obj = await asyncio.to_thread(
+                self._jwks_client.get_signing_key_from_jwt, id_token
+            )
+            signing_key = signing_key_obj.key
         except Exception as exc:  # PyJWKClient raises a grab-bag — collapse to ours
             raise OAuthIdTokenError(f"jwks lookup failed: {exc}") from exc
         try:

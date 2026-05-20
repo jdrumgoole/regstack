@@ -233,6 +233,34 @@ def test_authorization_url_includes_required_params(
 
 
 @pytest.mark.asyncio
+async def test_verify_id_token_jwks_fetch_runs_off_event_loop(
+    rsa_key: RSAPrivateKey, mock_jwks_url: str
+) -> None:
+    """Regression for the 2026-05-20 security review (I-2): the
+    synchronous ``PyJWKClient.get_signing_key_from_jwt`` must be
+    dispatched to a worker thread so a JWKS cache-miss fetch can't
+    block the event loop. Wrap the client method, record which thread
+    it ran on, and assert it wasn't the loop's (main) thread."""
+    import threading
+
+    provider = _make_provider(rsa_key, mock_jwks_url)
+    token = _mint_id_token(rsa_key, nonce="n1")
+
+    ran_on: dict[str, bool] = {}
+    original = provider._jwks_client.get_signing_key_from_jwt
+
+    def _recording(*args: Any, **kwargs: Any):
+        ran_on["was_main_thread"] = threading.current_thread() is threading.main_thread()
+        return original(*args, **kwargs)
+
+    provider._jwks_client.get_signing_key_from_jwt = _recording  # type: ignore[method-assign]
+
+    info = await provider.verify_id_token(token, expected_nonce="n1")
+    assert info.subject_id == "1234567890"
+    assert ran_on.get("was_main_thread") is False
+
+
+@pytest.mark.asyncio
 async def test_verify_id_token_happy_path(rsa_key: RSAPrivateKey, mock_jwks_url: str) -> None:
     provider = _make_provider(rsa_key, mock_jwks_url)
     token = _mint_id_token(rsa_key, nonce="n1")

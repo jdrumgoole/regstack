@@ -10,14 +10,15 @@ log = logging.getLogger("regstack.sms.null")
 class NullSmsService(SmsService):
     """Default backend. Records messages in ``self.outbox`` so tests and dev
     runs can inspect them without contacting a real SMS gateway. Logs each
-    send at INFO so the demo can grep the code out of stdout.
+    send at INFO.
 
-    ``log_bodies`` (default True) controls whether the message body
-    (containing the 6-digit code) is included in the log line. Operators
-    in shared environments who want call-only audit lines can flip it off.
+    ``log_bodies`` (default False) controls whether the message body
+    (containing the 6-digit code) is included in the log line. It defaults
+    off so a misconfigured deployment can't leak codes into shared logs;
+    flip it on for local dev when you want to read the code out of stdout.
     """
 
-    def __init__(self, *, log_bodies: bool = True) -> None:
+    def __init__(self, *, log_bodies: bool = False) -> None:
         self.outbox: list[SmsMessage] = []
         self._log_bodies = log_bodies
 

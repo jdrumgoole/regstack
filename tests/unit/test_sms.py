@@ -72,6 +72,17 @@ def test_factory_threads_log_bodies_flag() -> None:
     assert service._log_bodies is False
 
 
+def test_log_bodies_defaults_off_for_safety() -> None:
+    """Regression for the 2026-05-19 security review: the null backend
+    must NOT log MFA codes by default. A misconfigured deployment that
+    leaves the null backend in place shouldn't leak codes into shared
+    logs. Symmetric with ``email.log_bodies`` (also False by default)."""
+    assert SmsConfig().log_bodies is False
+    assert NullSmsService()._log_bodies is False
+    # The factory must thread the secure default through, too.
+    assert build_sms_service(SmsConfig(backend="null"))._log_bodies is False  # type: ignore[attr-defined]
+
+
 def test_sns_requires_extra(monkeypatch: pytest.MonkeyPatch) -> None:
     real_import = builtins.__import__
 

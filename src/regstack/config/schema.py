@@ -98,11 +98,15 @@ class SmsConfig(BaseModel):
     twilio_account_sid: str | None = None
     twilio_auth_token: SecretStr | None = None
 
-    log_bodies: bool = True
-    """When True (default), the ``null`` backend logs the SMS body
-    (including the 6-digit code) at INFO. Set to False to silence
-    code logging in shared environments. Other backends ignore this
-    flag — they never log message bodies."""
+    log_bodies: bool = False
+    """When True, the ``null`` backend logs the SMS body (including the
+    6-digit MFA code) at INFO. Defaults to False so a misconfigured
+    deployment can't leak codes into shared logs — symmetric with
+    ``email.log_bodies``. Set it True for local dev when you want to
+    read the code out of stdout (the bundled examples instead surface
+    it via an ``mfa_login_started`` hook, so they don't need this).
+    Other backends ignore this flag — they never log message bodies.
+    (Security review 2026-05-19.)"""
 
 
 class OAuthConfig(BaseModel):

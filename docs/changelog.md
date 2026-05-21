@@ -5,6 +5,29 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+## 0.8.2 — 2026-05-21
+
+### Headline
+
+Security hardening from two daily reviews, and a `doctor` check that
+nudges operators off vulnerable MongoDB servers.
+
+This release closes the findings from the 2026-05-19 and 2026-05-20
+security reviews. `regstack doctor` learns a new advisory check: on a
+Mongo backend it reads the connected server's version and warns when
+it's behind the CVE-2025-14847 ("MongoBleed") patched baseline — a
+server-side bug the pymongo driver isn't exposed to, but one host
+operators should still patch. The warning is advisory (a yellow ⚠),
+so it surfaces the risk without failing `regstack doctor && deploy`.
+
+Two smaller security fixes round it out: the `null` SMS backend no
+longer logs the 6-digit MFA code by default (symmetric with the email
+backend, so a misconfigured deployment can't leak codes into shared
+logs), and Google ID-token verification no longer runs its JWKS fetch
+on the event loop. Plus the weekly coverage routine now survives
+restricted-network CI containers instead of refusing to produce a
+number.
+
 ### Added
 
 - **`regstack doctor` flags out-of-date MongoDB servers.** A new

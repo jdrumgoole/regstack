@@ -164,6 +164,8 @@ async def test_signup_creates_user_and_identity(oauth_client) -> None:
     body = exchange.json()
     assert body["access_token"]
     assert body["redirect_to"] == "/account/me"
+    # Brand-new account on first sign-in — the exchange must say so.
+    assert body["was_new_account"] is True
 
     user = await rs.users.get_by_email("newcomer@example.com")
     assert user is not None
@@ -197,6 +199,8 @@ async def test_repeat_signin_uses_existing_identity(oauth_client) -> None:
     assert cb2.status_code == 302
     ex2 = await _exchange(client, s2)
     assert ex2.status_code == 200
+    # Existing account — not a new signup.
+    assert ex2.json()["was_new_account"] is False
 
     # Touch_last_used must have moved past None.
     identity = await rs.oauth_identities.find_by_subject(provider="google", subject_id="g-002")

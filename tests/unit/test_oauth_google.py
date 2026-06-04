@@ -415,16 +415,25 @@ async def test_exchange_code_happy_path(rsa_key: RSAPrivateKey, mock_jwks_url: s
 
 @pytest.mark.asyncio
 async def test_exchange_code_raises_on_non_200(rsa_key: RSAPrivateKey, mock_jwks_url: str) -> None:
+    """The exception carries the HTTP status but NOT the provider's
+    response body — the router logs the exception text at WARNING, and
+    the body is logged at DEBUG only (Security review 2026-05-22 · I-3).
+    """
+
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(400, json={"error": "invalid_grant"})
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
         provider = _make_provider(rsa_key, mock_jwks_url, http=client)
-        with pytest.raises(OAuthTokenExchangeError, match="invalid_grant"):
+        with pytest.raises(OAuthTokenExchangeError, match="HTTP 400") as exc_info:
             await provider.exchange_code(
                 code="bad", redirect_uri="http://localhost/cb", code_verifier="v"
             )
+        # The verbose provider body must not ride along in the exception
+        # the router logs at WARNING.
+        assert "invalid_grant" not in str(exc_info.value)
+        assert all("invalid_grant" not in str(a) for a in exc_info.value.args)
 
 
 @pytest.mark.asyncio

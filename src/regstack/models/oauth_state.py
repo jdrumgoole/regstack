@@ -77,6 +77,13 @@ class OAuthState(BaseModel):
     ``id`` for this value via ``POST /oauth/exchange``; the row is
     deleted on exchange."""
 
+    result_was_new: bool = False
+    """Whether the callback created a brand-new account (vs. signing in
+    an existing one). Set alongside ``result_token`` so the
+    ``POST /oauth/exchange`` response can surface ``was_new_account``
+    accurately — the callback computes this but had no field to persist
+    it on before (Security review 2026-05-22 · I-1)."""
+
     def to_mongo(self) -> dict[str, Any]:
         data = self.model_dump(by_alias=True, exclude_none=True)
         return data

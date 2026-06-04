@@ -168,7 +168,7 @@ def build_oauth_router(rs: RegStack) -> APIRouter:
         if _is_mfa_pending_token(state.result_token):
             return ExchangeResponse(
                 redirect_to=state.redirect_to,
-                was_new_account=False,
+                was_new_account=state.result_was_new,
                 expires_in=rs.config.mfa_pending_token_ttl_seconds,
                 mfa_required=True,
                 mfa_pending_token=state.result_token,
@@ -176,7 +176,7 @@ def build_oauth_router(rs: RegStack) -> APIRouter:
         return ExchangeResponse(
             access_token=state.result_token,
             redirect_to=state.redirect_to,
-            was_new_account=False,
+            was_new_account=state.result_was_new,
             expires_in=rs.config.jwt_ttl_seconds,
         )
 
@@ -361,6 +361,7 @@ def build_oauth_router(rs: RegStack) -> APIRouter:
                 pending_token,
                 new_expires_at=rs.clock.now()
                 + timedelta(seconds=rs.config.mfa_pending_token_ttl_seconds),
+                was_new=was_new,
             )
         else:
             # Mint the session JWT, stash it on the state row for the
@@ -376,6 +377,7 @@ def build_oauth_router(rs: RegStack) -> APIRouter:
                 token,
                 new_expires_at=rs.clock.now()
                 + timedelta(seconds=rs.config.oauth.completion_ttl_seconds),
+                was_new=was_new,
             )
 
         await rs.hooks.fire(

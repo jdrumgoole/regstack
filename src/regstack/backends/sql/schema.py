@@ -162,6 +162,7 @@ def _oauth_states(table_name: str) -> Table:
         Column("created_at", UtcDateTime(), nullable=False),
         Column("expires_at", UtcDateTime(), nullable=False),
         Column("result_token", Text, nullable=True),
+        Column("result_was_new", Boolean, nullable=False, default=False),
         Index("ix_oauth_states_expires_at", "expires_at"),
         CheckConstraint("mode IN ('signin', 'link')", name="mode_valid"),
     )

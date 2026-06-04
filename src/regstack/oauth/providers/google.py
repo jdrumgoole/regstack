@@ -17,6 +17,7 @@ installed and turns ``enable_oauth`` on.
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
@@ -30,12 +31,21 @@ from regstack.oauth.errors import OAuthIdTokenError, OAuthTokenExchangeError
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+log = logging.getLogger("regstack.oauth.google")
+
 GOOGLE_ISSUER = "https://accounts.google.com"
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs"
 
 DEFAULT_SCOPES: tuple[str, ...] = ("openid", "email", "profile")
+
+# Bound the synchronous JWKS fetch so a slow or unreachable Google JWKS
+# endpoint can't pin a worker thread indefinitely. The fetch is offloaded
+# to `asyncio.to_thread`, but `urllib` defaults to no timeout — under a
+# sustained JWKS outage that would let cache-miss requests exhaust the
+# bounded asyncio thread pool. (Security review 2026-05-22 · W-1.)
+JWKS_FETCH_TIMEOUT_SECONDS = 5
 
 
 class GoogleProvider(OAuthProvider):
@@ -80,7 +90,9 @@ class GoogleProvider(OAuthProvider):
         self._owns_http = http is None
         self._issuer = issuer
         self._scopes = tuple(scopes)
-        self._jwks_client = PyJWKClient(jwks_url, cache_keys=True)
+        self._jwks_client = PyJWKClient(
+            jwks_url, cache_keys=True, timeout=JWKS_FETCH_TIMEOUT_SECONDS
+        )
 
     @property
     def name(self) -> str:
@@ -141,8 +153,18 @@ class GoogleProvider(OAuthProvider):
             if self._owns_http and client is not self._http:
                 await client.aclose()
         if response.status_code != 200:
+            # Keep the provider's response body at DEBUG only. It doesn't
+            # carry our client secret or the auth code, but Google's error
+            # bodies are verbose and there's no reason to put them in
+            # production WARNING logs — the status code is the actionable
+            # signal. (Security review 2026-05-22 · I-3.)
+            log.debug(
+                "google token exchange response body (HTTP %s): %s",
+                response.status_code,
+                response.text,
+            )
             raise OAuthTokenExchangeError(
-                f"google token exchange failed: {response.status_code} {response.text}"
+                f"google token exchange failed: HTTP {response.status_code}"
             )
         body: dict[str, Any] = response.json()
         try:

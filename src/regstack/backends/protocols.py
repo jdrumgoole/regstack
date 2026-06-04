@@ -295,6 +295,7 @@ class OAuthStateRepoProtocol(Protocol):
         token: str,
         *,
         new_expires_at: datetime | None = None,
+        was_new: bool = False,
     ) -> None:
         """Stash the session JWT after a successful callback so the
         SPA can pick it up via :meth:`consume`.
@@ -305,6 +306,10 @@ class OAuthStateRepoProtocol(Protocol):
         ``oauth.state_ttl_seconds`` (covering the round-trip with
         the provider) to ``oauth.completion_ttl_seconds`` (covering
         only the SPA's exchange call after the callback lands).
+
+        ``was_new`` records whether the callback created a brand-new
+        account, so the exchange response can report
+        ``was_new_account`` accurately.
         """
         ...
 

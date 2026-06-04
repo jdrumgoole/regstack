@@ -31,8 +31,9 @@ class MongoOAuthStateRepo:
         token: str,
         *,
         new_expires_at: datetime | None = None,
+        was_new: bool = False,
     ) -> None:
-        updates: dict[str, Any] = {"result_token": token}
+        updates: dict[str, Any] = {"result_token": token, "result_was_new": was_new}
         if new_expires_at is not None:
             updates["expires_at"] = new_expires_at
         await self._collection.update_one(

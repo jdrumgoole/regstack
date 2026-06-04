@@ -34,6 +34,7 @@ class SqlOAuthStateRepo:
             "created_at": state.created_at,
             "expires_at": state.expires_at,
             "result_token": state.result_token,
+            "result_was_new": state.result_was_new,
         }
         async with self._engine.begin() as conn:
             await conn.execute(self._t.insert().values(values))
@@ -50,8 +51,9 @@ class SqlOAuthStateRepo:
         token: str,
         *,
         new_expires_at: datetime | None = None,
+        was_new: bool = False,
     ) -> None:
-        values: dict[str, Any] = {"result_token": token}
+        values: dict[str, Any] = {"result_token": token, "result_was_new": was_new}
         if new_expires_at is not None:
             values["expires_at"] = new_expires_at
         stmt = update(self._t).where(self._t.c.id == state_id).values(**values)

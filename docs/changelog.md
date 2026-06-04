@@ -5,6 +5,55 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+### Headline
+
+Four findings from the 2026-05-21 / 2026-05-22 daily security reviews:
+a JWKS-fetch timeout, quieter OAuth token-exchange error logging, an
+accurate `was_new_account` on the OAuth exchange, and a documented note
+about the admin user listing's `phone_number` exposure.
+
+### Fixed
+
+- **Google JWKS fetch now has a timeout.** `PyJWKClient` was built
+  without a `timeout`, so its synchronous `urllib` fetch — offloaded to
+  `asyncio.to_thread` since 0.8.2 — could pin a worker thread
+  indefinitely during a Google JWKS outage. Under sustained OAuth load
+  that risks exhausting the bounded asyncio thread pool, stalling every
+  `to_thread` call in the app. Added `JWKS_FETCH_TIMEOUT_SECONDS = 5`.
+  (Security review 2026-05-22 · W-1.)
+
+- **`/oauth/exchange` reports `was_new_account` accurately.** The field
+  was hardcoded `False`. The callback already computes whether it created
+  a brand-new account but had no field to persist it on, so SPAs relying
+  on the flag to show a "welcome, account created" prompt never saw it.
+  Added `oauth_states.result_was_new` (Alembic migration `0003`,
+  `batch_alter_table` ADD COLUMN with a `False` server default for
+  SQLite). The callback sets it on both the session-token and
+  MFA-pending branches; the exchange endpoint returns it.
+  (Security review 2026-05-22 · I-1.)
+
+### Security
+
+- **OAuth token-exchange errors no longer log the full provider response
+  body at WARNING.** On a non-200 token exchange, `google.py` now logs
+  the response body at DEBUG and raises `OAuthTokenExchangeError` carrying
+  only `HTTP <status>` — which the router logs at WARNING. The body
+  doesn't contain our client secret or the auth code, but there's no
+  reason to put Google's verbose error JSON in production WARNING logs.
+  (Security review 2026-05-22 · I-3.)
+
+### Documented
+
+- **`phone_number` in the admin user listing.** `docs/security.md` now
+  documents that `UserPublic.phone_number` is returned in plaintext on
+  `GET /admin/users` (a superuser can bulk-export every user's MFA phone
+  number, which is regulated PII in some jurisdictions) and that hosts
+  who treat it as restricted should wrap the admin listing in their own
+  masked/omitting response model. The field stays on the default
+  projection so `/me` and the admin detail view remain simple — the
+  masking policy is a host decision driven by the deployment's
+  regulatory context. (Security review 2026-05-21 · I-2.)
+
 ## 0.8.2 — 2026-05-21
 
 ### Headline

@@ -208,6 +208,20 @@ async def test_state_set_result_token(regstack) -> None:
     found = await regstack.oauth_states.find(state.id)
     assert found is not None
     assert found.result_token == "the-session-jwt"
+    # Default when not signalled — an existing-account sign-in.
+    assert found.result_was_new is False
+
+
+@pytest.mark.asyncio
+async def test_state_set_result_token_records_was_new(regstack) -> None:
+    state = _state_row()
+    await regstack.oauth_states.create(state)
+
+    await regstack.oauth_states.set_result_token(state.id, "the-session-jwt", was_new=True)
+
+    found = await regstack.oauth_states.find(state.id)
+    assert found is not None
+    assert found.result_was_new is True
 
 
 @pytest.mark.asyncio

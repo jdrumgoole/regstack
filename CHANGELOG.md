@@ -7,6 +7,34 @@ Sphinx docs.
 
 ## Unreleased
 
+Four findings from the 2026-05-21 / 2026-05-22 daily security reviews.
+
+**Fixed: Google JWKS fetch now has a timeout.** `PyJWKClient` was
+constructed without a `timeout`, so the synchronous `urllib` fetch
+(offloaded to `asyncio.to_thread`) could pin a worker thread
+indefinitely during a Google JWKS outage and, under sustained load,
+exhaust the bounded asyncio thread pool. Added a 5-second
+`JWKS_FETCH_TIMEOUT_SECONDS`. (Daily security review 2026-05-22 · W-1.)
+
+**Fixed: Google OAuth token-exchange error no longer logs the full
+provider response body at WARNING.** On a non-200 token exchange the
+provider's response body is now logged at DEBUG; the raised
+`OAuthTokenExchangeError` (which the router logs at WARNING) carries only
+`HTTP <status>`. (Daily security review 2026-05-22 · I-3.)
+
+**Fixed: `/oauth/exchange` now reports `was_new_account` accurately.**
+The field was hardcoded `False`; the callback computed whether it created
+a brand-new account but had nowhere to persist it. Added
+`oauth_states.result_was_new` (migration `0003`) which the callback sets
+and the exchange endpoint reads. (Daily security review 2026-05-22 · I-1.)
+
+**Documented: `phone_number` exposure in the admin user listing.**
+`docs/security.md` now spells out that `UserPublic.phone_number` is
+returned in plaintext on `GET /admin/users` (regulated PII in some
+jurisdictions) and that hosts wanting to mask/omit it should wrap the
+admin listing in their own response model. (Daily security review
+2026-05-21 · I-2.)
+
 ## 0.8.0 — 2026-05-19
 
 `regstack ses setup` guided wizard, plus two security fixes from

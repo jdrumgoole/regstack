@@ -101,6 +101,27 @@ their own API wrapper layer — regstack does not currently expose a
 config knob to suppress it, since doing so would silently break the
 SPA-polling pattern the field exists for.
 
+### `phone_number` in the admin user listing
+
+`UserPublic` also carries `phone_number` (the SMS-2FA number, in
+plaintext), and the same projection backs both `GET /me` and the admin
+endpoints. On `GET /me` returning the caller their own number is
+expected; on `GET /admin/users` it means a superuser can bulk-export
+every user's phone number.
+
+This is a deliberate, documented exposure rather than a leak — no secret
+value is involved — but a phone number is regulated PII in many
+jurisdictions (GDPR/CCPA). The `limit=200` cap on admin pagination
+(`routers/admin.py`) bounds throughput but does not prevent export.
+
+Hosts that treat MFA phone numbers as restricted PII their operators
+should not be able to bulk-export should wrap the admin listing in their
+own response model that masks (e.g. last four digits) or omits
+`phone_number`. regstack keeps the field on the default projection so the
+self-service `/me` flow and the admin detail view stay simple; the
+masking policy is a host decision because the right answer depends on the
+deployment's regulatory context.
+
 ## Account enumeration
 
 Account enumeration is when an attacker can tell whether a given

@@ -21,6 +21,48 @@ from regstack.email.console import ConsoleEmailService
 # workers running the same test never see each other's writes.
 _WORKER_ID = os.environ.get("PYTEST_XDIST_WORKER", "gw0")
 
+_MONGO_URL = "mongodb://localhost:27017"
+
+# Every Mongo DB created by this run carries the run token in its name so
+# pytest_sessionfinish can sweep the whole run's leftovers — including DBs
+# whose per-test teardown never ran (worker crash, -x abort). The token is
+# minted once in the xdist controller and inherited by workers via env, and
+# scopes the sweep to THIS run only: parallel test runs in other worktrees
+# must never have their live DBs dropped out from under them.
+_RUN_TOKEN_ENV = "REGSTACK_TEST_RUN_TOKEN"
+
+
+def pytest_configure(config: Any) -> None:
+    os.environ.setdefault(_RUN_TOKEN_ENV, secrets.token_hex(4))
+
+
+def _run_token() -> str:
+    return os.environ[_RUN_TOKEN_ENV]
+
+
+def _mongo_db_prefix() -> str:
+    return f"regstack_test_{_run_token()}_"
+
+
+def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        return  # workers exit first; the controller does the sweep
+    if "mongo" not in _BACKENDS_AVAILABLE:
+        return
+    from pymongo import MongoClient
+
+    prefix = _mongo_db_prefix()
+    try:
+        client: MongoClient[dict[str, Any]] = MongoClient(_MONGO_URL, serverSelectionTimeoutMS=2000)
+        try:
+            for name in client.list_database_names():
+                if name.startswith(prefix):
+                    client.drop_database(name)
+        finally:
+            client.close()
+    except Exception as exc:  # a failed sweep must not mask test results
+        print(f"\nwarning: could not sweep leftover test databases ({prefix}*): {exc}")
+
 
 def _resolve_backends() -> list[str]:
     """Pick which backends the parametrized fixture covers.
@@ -54,8 +96,8 @@ def _make_database_url(backend: str, token: str, *, file_dir: Path) -> tuple[str
         path = file_dir / f"regstack-{_WORKER_ID}-{token}.sqlite"
         return f"sqlite+aiosqlite:///{path}", None
     if backend == "mongo":
-        db_name = f"regstack_test_{_WORKER_ID}_{token}"
-        return f"mongodb://localhost:27017/{db_name}", db_name
+        db_name = f"{_mongo_db_prefix()}{_WORKER_ID}_{token}"
+        return f"{_MONGO_URL}/{db_name}", db_name
     if backend == "postgres":
         base = os.environ["REGSTACK_TEST_POSTGRES_URL"].rstrip("/")
         db_name = f"regstack_test_{_WORKER_ID}_{token}"
@@ -154,11 +196,36 @@ async def _ensure_postgres_db(
             await conn.close()
 
 
+@pytest_asyncio.fixture
+async def _ensure_mongo_db_dropped(
+    backend_kind: str, database_url: tuple[str, str | None]
+) -> AsyncIterator[None]:
+    """Drop the per-test Mongo DB after the test, whoever created it.
+
+    The drop lives here — not in the ``regstack`` fixture — because tests
+    using only the ``make_client`` factory never construct that fixture,
+    and their DBs used to leak. ``config`` depends on this, so every path
+    that can touch the database is covered.
+    """
+    yield
+    if backend_kind != "mongo":
+        return
+    from pymongo import AsyncMongoClient
+
+    url, db_name = database_url
+    client: AsyncMongoClient[dict[str, Any]] = AsyncMongoClient(url)
+    try:
+        await client.drop_database(db_name)
+    finally:
+        await client.aclose()
+
+
 @pytest.fixture
 def config(
     jwt_secret: str,
     database_url: tuple[str, str | None],
     _ensure_postgres_db,
+    _ensure_mongo_db_dropped,
 ) -> RegStackConfig:
     url, mongo_db = database_url
     return _build_config(jwt_secret=jwt_secret, database_url=url, mongo_db_name=mongo_db)
@@ -167,7 +234,6 @@ def config(
 @pytest_asyncio.fixture
 async def regstack(
     config: RegStackConfig,
-    backend_kind: str,
     frozen_clock: FrozenClock,
 ) -> AsyncIterator[RegStack]:
     rs = RegStack(
@@ -179,11 +245,6 @@ async def regstack(
     try:
         yield rs
     finally:
-        if backend_kind == "mongo":
-            from regstack.backends.mongo import MongoBackend
-
-            assert isinstance(rs.backend, MongoBackend)
-            await rs.backend.client.drop_database(config.mongodb_database)
         await rs.aclose()
 
 
@@ -252,10 +313,10 @@ async def mongo_client():
     from regstack.backends.mongo import make_client
     from regstack.config.schema import RegStackConfig as _Cfg
 
-    db_name = f"regstack_legacy_{_WORKER_ID}_{_unique_token()}"
+    db_name = f"{_mongo_db_prefix()}legacy_{_WORKER_ID}_{_unique_token()}"
     cfg = _Cfg(
         jwt_secret=secrets.token_urlsafe(32),
-        database_url=f"mongodb://localhost:27017/{db_name}",
+        database_url=f"{_MONGO_URL}/{db_name}",
         mongodb_database=db_name,
     )
     client = make_client(cfg)

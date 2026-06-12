@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import os
+import secrets
 from pathlib import Path
 
 from click.testing import CliRunner
 
 from regstack.cli.__main__ import cli
+from tests.conftest import _mongo_db_prefix
 
 
 def _write_config(tmp_path: Path, *, db_name: str, jwt_secret: str) -> Path:
@@ -71,13 +73,13 @@ def test_create_admin_short_password_rejected(tmp_path: Path) -> None:
 
 
 def test_doctor_runs_against_local_mongo(tmp_path: Path, jwt_secret: str, monkeypatch) -> None:
-    db_name = f"regstack_doctor_test_{__import__('secrets').token_hex(4)}"
     """End-to-end smoke for `regstack doctor` against the live local Mongo.
 
     Skips network-dependent checks (DNS, real email) — exercises the
     config + connectivity + index + email-factory paths and asserts
     the index check correctly flips from red to green after install_indexes.
     """
+    db_name = f"{_mongo_db_prefix()}doctor_{secrets.token_hex(4)}"
     cfg_path = _write_config(tmp_path, db_name=db_name, jwt_secret=jwt_secret)
 
     monkeypatch.setenv("REGSTACK_CONFIG", str(cfg_path))
@@ -96,38 +98,36 @@ def test_doctor_runs_against_local_mongo(tmp_path: Path, jwt_secret: str, monkey
 
     runner = CliRunner()
 
-    # Pre-install: doctor reports schema missing.
-    result = runner.invoke(cli, ["doctor", "--config", str(cfg_path)])
-    assert "backend" in result.output
-    assert "email backend" in result.output
-    assert "schema" in result.output
-    assert "missing" in result.output
-    assert result.exit_code >= 1
-
-    # Install schema via the live façade, then re-run doctor — green.
     import asyncio
 
+    from regstack.backends.mongo import make_client
     from regstack.cli._runtime import open_regstack
+    from regstack.config.schema import RegStackConfig
 
     async def _install() -> None:
         async with open_regstack(cfg_path) as rs:
             await rs.install_schema()
 
-    asyncio.run(_install())
-
-    result = runner.invoke(cli, ["doctor", "--config", str(cfg_path)])
-    assert result.exit_code == 0, result.output
-    assert "core indexes present" in result.output
-
-    # Drop the test DB so we don't leak.
-    from regstack.backends.mongo import make_client
-    from regstack.config.schema import RegStackConfig
-
-    cfg = RegStackConfig.load(toml_path=cfg_path)
-
     async def _drop() -> None:
+        cfg = RegStackConfig.load(toml_path=cfg_path)
         client = make_client(cfg)
         await client.drop_database(cfg.mongodb_database)
         await client.aclose()
 
-    asyncio.run(_drop())
+    try:
+        # Pre-install: doctor reports schema missing.
+        result = runner.invoke(cli, ["doctor", "--config", str(cfg_path)])
+        assert "backend" in result.output
+        assert "email backend" in result.output
+        assert "schema" in result.output
+        assert "missing" in result.output
+        assert result.exit_code >= 1
+
+        # Install schema via the live façade, then re-run doctor — green.
+        asyncio.run(_install())
+
+        result = runner.invoke(cli, ["doctor", "--config", str(cfg_path)])
+        assert result.exit_code == 0, result.output
+        assert "core indexes present" in result.output
+    finally:
+        asyncio.run(_drop())

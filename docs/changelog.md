@@ -5,12 +5,31 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+## 0.8.3 — 2026-06-12
+
 ### Headline
 
-Four findings from the 2026-05-21 / 2026-05-22 daily security reviews:
-a JWKS-fetch timeout, quieter OAuth token-exchange error logging, an
-accurate `was_new_account` on the OAuth exchange, and a documented note
-about the admin user listing's `phone_number` exposure.
+Closing out the May security-review series, an accurate
+`was_new_account` on the OAuth exchange, and leak-proof test databases.
+
+This release resolves every remaining finding from the 2026-05-21 and
+2026-05-22 daily security reviews — and with them, the full
+2026-05-15 → 2026-05-22 report series. Google ID-token verification now
+puts a 5-second timeout on JWKS fetches, so a Google outage can no
+longer pin asyncio worker threads indefinitely; OAuth token-exchange
+failures keep the provider's verbose error body out of production
+WARNING logs; and the two CVEs flagged for monitoring
+(CVE-2026-2978/2979) were triaged as not applicable once their details
+published — they affect the third-party "FastApiAdmin" project, not the
+`fastapi` library regstack depends on.
+
+SPA hosts get one behavioural fix: `/oauth/exchange` now reports
+`was_new_account` accurately instead of hardcoding `False`, backed by a
+new `oauth_states.result_was_new` column (Alembic migration `0003`), so
+a "welcome, account created" prompt finally has something to key off.
+On the development side, the test suite no longer leaks MongoDB
+databases — per-test drops now cover every fixture path, and a
+run-scoped sweep cleans up after crashed workers.
 
 ### Fixed
 
@@ -53,6 +72,19 @@ about the admin user listing's `phone_number` exposure.
   re-raise it. (Security review 2026-05-22 · I-2.)
 
 ### Fixed (test infrastructure)
+
+- **`FrozenClock` now defaults to 2125-01-01 — the future, not the
+  past.** MongoDB's TTL monitor reaps documents by comparing
+  `expires_at` against real wall-clock time every ~60s; it knows
+  nothing about the injected test clock. With the old 2025-01-01
+  default, every TTL-indexed row a test wrote (`oauth_states`,
+  `pending_registrations`, `mfa_codes`, `login_attempts`, blacklist)
+  was born already-expired, and a test whose flow straddled a TTL sweep
+  had its rows deleted mid-flight — a rare, mongo-only parallel flake
+  (caught as `test_link_flow_attaches_to_authenticated_user[mongo]`
+  losing its `oauth_states` row between link-start and callback). A
+  far-future pin keeps the reaper permanently out of reach while
+  staying deterministic.
 
 - **Test runs no longer leak MongoDB databases.** Tests built on the
   `make_client` factory never went through the `regstack` fixture's

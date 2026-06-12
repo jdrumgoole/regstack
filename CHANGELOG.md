@@ -7,7 +7,11 @@ Sphinx docs.
 
 ## Unreleased
 
-Four findings from the 2026-05-21 / 2026-05-22 daily security reviews.
+## 0.8.3 — 2026-06-12
+
+Closes out the 2026-05-15 → 2026-05-22 daily security-review series,
+fixes `was_new_account` on the OAuth exchange (new migration `0003`),
+and stops the test suite leaking MongoDB databases.
 
 **Fixed: Google JWKS fetch now has a timeout.** `PyJWKClient` was
 constructed without a `timeout`, so the synchronous `urllib` fetch
@@ -34,6 +38,13 @@ returned in plaintext on `GET /admin/users` (regulated PII in some
 jurisdictions) and that hosts wanting to mask/omit it should wrap the
 admin listing in their own response model. (Daily security review
 2026-05-21 · I-2.)
+
+**Fixed: `FrozenClock` now defaults to the far future (2125-01-01).**
+MongoDB's TTL monitor uses real wall-clock time, so the old 2025-01-01
+default meant every TTL-indexed test row was born already-expired and
+could be reaped mid-test when a ~60s TTL sweep landed — a rare,
+mongo-only parallel flake. A far-future pin keeps the reaper out of
+reach while staying deterministic.
 
 **Fixed: test runs no longer leak MongoDB databases.** Tests using the
 `make_client` factory bypassed the only fixture that dropped the

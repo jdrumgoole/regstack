@@ -471,3 +471,32 @@ def db_down(c: Context, mongo: bool = True, postgres: bool = True) -> None:
                 f"{name}: brew failed to stop {brew_svc}: "
                 f"{res.stderr.strip() or res.stdout.strip()}"
             )
+
+
+@task(name="clean-test-dbs")
+def clean_test_dbs(c: Context, dry_run: bool = False) -> None:
+    """Drop leftover regstack test databases from the local MongoDB.
+
+    Per-test teardown and the end-of-run sweep normally remove these;
+    leftovers mean a run was killed before cleanup. Don't run this while
+    a test run is active in another worktree — it drops every database
+    matching the test prefixes, including a live run's.
+    """
+    from pymongo import MongoClient
+
+    prefixes = ("regstack_test_", "regstack_legacy_", "regstack_doctor_test_")
+    client: MongoClient = MongoClient("mongodb://localhost:27017", serverSelectionTimeoutMS=2000)
+    try:
+        victims = [name for name in client.list_database_names() if name.startswith(prefixes)]
+        if not victims:
+            _ok("no leftover test databases")
+            return
+        for name in victims:
+            if dry_run:
+                _info(f"would drop {name}")
+            else:
+                client.drop_database(name)
+        verb = "would drop" if dry_run else "dropped"
+        _ok(f"{verb} {len(victims)} leftover test database(s)")
+    finally:
+        client.close()

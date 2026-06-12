@@ -42,6 +42,18 @@ about the admin user listing's `phone_number` exposure.
   reason to put Google's verbose error JSON in production WARNING logs.
   (Security review 2026-05-22 · I-3.)
 
+### Fixed (test infrastructure)
+
+- **Test runs no longer leak MongoDB databases.** Tests built on the
+  `make_client` factory never went through the `regstack` fixture's
+  teardown, leaking one `regstack_test_*` database per test per run
+  (6,625 had accumulated locally). A `_ensure_mongo_db_dropped` fixture
+  wired into `config` now drops the per-test DB on every path, every
+  test-run's DB names carry a run token so a `pytest_sessionfinish`
+  sweep on the xdist controller removes anything a crashed worker left
+  behind, and `regstack doctor`'s CLI test drops its DB in a `finally`.
+  `inv clean-test-dbs` purges leftovers from hard-killed runs.
+
 ### Documented
 
 - **`phone_number` in the admin user listing.** `docs/security.md` now

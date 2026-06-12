@@ -35,6 +35,14 @@ jurisdictions) and that hosts wanting to mask/omit it should wrap the
 admin listing in their own response model. (Daily security review
 2026-05-21 · I-2.)
 
+**Fixed: test runs no longer leak MongoDB databases.** Tests using the
+`make_client` factory bypassed the only fixture that dropped the
+per-test database, leaking one `regstack_test_*` DB per test per run.
+A teardown fixture wired into `config` now drops the DB on every path,
+a run-token-scoped `pytest_sessionfinish` sweep catches anything a
+crashed worker leaves behind, and `inv clean-test-dbs` purges leftovers
+from hard-killed runs.
+
 ## 0.8.0 — 2026-05-19
 
 `regstack ses setup` guided wizard, plus two security fixes from

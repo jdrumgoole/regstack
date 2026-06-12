@@ -43,6 +43,14 @@ a run-token-scoped `pytest_sessionfinish` sweep catches anything a
 crashed worker leaves behind, and `inv clean-test-dbs` purges leftovers
 from hard-killed runs.
 
+**Triaged: CVE-2026-2978 / CVE-2026-2979 not applicable.** Flagged for
+monitoring in the 2026-05-22 review; published NVD details show both
+affect the third-party "FastApiAdmin" project, not the `fastapi`
+library. regstack has no `fastapi-admin` dependency and no fastapi-core
+advisories affect versions ≥ 0.120.0 (our floor). Triage note recorded
+beside the floor in `pyproject.toml`. (Daily security review
+2026-05-22 · I-2.)
+
 ## 0.8.0 — 2026-05-19
 
 `regstack ses setup` guided wizard, plus two security fixes from

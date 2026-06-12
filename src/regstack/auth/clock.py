@@ -42,14 +42,23 @@ class FrozenClock:
     """
 
     def __init__(self, start: datetime | None = None) -> None:
-        """Pin the clock at ``start`` (default 2025-01-01 UTC).
+        """Pin the clock at ``start`` (default 2125-01-01 UTC).
+
+        The default is deliberately ~100 years in the *future*. MongoDB's
+        TTL monitor deletes documents by comparing their ``expires_at``
+        against real wall-clock time on a ~60s cycle — it knows nothing
+        about this injected clock. A frozen "now" in the past would give
+        every TTL-indexed test row (oauth_states, pending_registrations,
+        mfa_codes, login_attempts, blacklist) an already-elapsed
+        ``expires_at``, and any test straddling a TTL sweep would have
+        its rows reaped mid-flight. A far-future pin keeps the reaper
+        permanently out of reach while staying deterministic.
 
         Args:
             start: The initial timestamp. Should be tz-aware. Defaults
-                to ``2025-01-01T00:00:00Z`` so test datetimes are
-                memorable.
+                to ``2125-01-01T00:00:00Z``.
         """
-        self._now = start or datetime(2025, 1, 1, tzinfo=UTC)
+        self._now = start or datetime(2125, 1, 1, tzinfo=UTC)
 
     def now(self) -> datetime:
         """Return the currently-pinned timestamp."""

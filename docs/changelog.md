@@ -42,6 +42,16 @@ about the admin user listing's `phone_number` exposure.
   reason to put Google's verbose error JSON in production WARNING logs.
   (Security review 2026-05-22 · I-3.)
 
+- **CVE-2026-2978 / CVE-2026-2979 triaged: not applicable.** The
+  2026-05-22 review flagged two then-undetailed FastAPI-adjacent CVEs
+  for monitoring. Published NVD details show both affect the
+  third-party "FastApiAdmin" project (unrestricted-upload flaws in its
+  own controllers), not the `fastapi` library; regstack has no
+  `fastapi-admin` dependency, and no fastapi-core advisories affect
+  versions ≥ 0.120.0 (our floor; 0.136.x current). Triage note recorded
+  next to the floor in `pyproject.toml` so future reviews don't
+  re-raise it. (Security review 2026-05-22 · I-2.)
+
 ### Fixed (test infrastructure)
 
 - **Test runs no longer leak MongoDB databases.** Tests built on the

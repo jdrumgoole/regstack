@@ -19,6 +19,9 @@ classifiers = [
 dependencies = [
     # fastapi>=0.120.0 picks up CVE-2025-62727 (Starlette DoS via large
     # request bodies after multipart processing).
+    # CVE-2026-2978 / CVE-2026-2979 (flagged for monitoring in the
+    # 2026-05-22 security review, I-2) affect the third-party
+    # "FastApiAdmin" project, not fastapi itself — no floor bump needed.
     "fastapi>=0.120.0",
     "pydantic>=2.6",
     "pydantic-settings>=2.2",

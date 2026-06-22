@@ -118,6 +118,11 @@ dev = [
     # the setup/theme-designer routes, writers, and Playwright e2e.
     "pywebview>=5.0",
     "tomlkit>=0.13",
+    # Optional email/SMS backend drivers, in dev so the coverage run
+    # actually exercises the SES/SNS/Twilio code paths (and the SES setup
+    # wizard) instead of skipping them on a missing import.
+    "aioboto3>=12.3",
+    "twilio>=9.0",
 ]
 
 [project.scripts]
@@ -225,6 +230,13 @@ parallel = true
 # `concurrency = ["thread"]` is implicit; pytest-xdist workers each write
 # their own .coverage.<host>.<pid>.<token> file and `coverage combine`
 # folds them together — see the `coverage` invoke task.
+omit = [
+    # Native pywebview window-launch shims. Each opens a desktop window over
+    # a local uvicorn server; there is no headless test path, so counting
+    # them only depresses the number with no way to improve it. The route
+    # handlers, validators, and writers behind each window ARE tested.
+    "*/wizard/*/window.py",
+]
 
 [tool.coverage.report]
 show_missing = true

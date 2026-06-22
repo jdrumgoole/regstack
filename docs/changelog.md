@@ -12,8 +12,10 @@ All notable changes to this project are documented here. Versions follow
   fail. Restricted-network CCR containers that 403 on the
   `repo.mongodb.org` apt repo can still provision MongoDB, so the weekly
   coverage routine produces a full-matrix number instead of
-  `COVERAGE_INFRA_UNAVAILABLE`. Dev/CI tooling only — not shipped in the
-  wheel.
+  `COVERAGE_INFRA_UNAVAILABLE`. The download is verified against a pinned
+  per-arch SHA-256 before extraction, so a corrupted or tampered tarball
+  is rejected rather than installed. Dev/CI tooling only — not shipped in
+  the wheel.
 
 ## 0.8.3 — 2026-06-12
 

@@ -110,6 +110,51 @@ def test_install_mongod_from_tarball_bails_on_unsupported_arch(
     assert called is False
 
 
+def test_tarball_sha256_pins_cover_both_supported_arches(setup_mod: Any) -> None:
+    """Every arch the installer accepts must have a pinned hash, else the
+    download can't be verified and the install is refused. The two pins
+    must be distinct 64-char hex digests."""
+    pins = setup_mod.MONGO_TARBALL_SHA256
+    assert set(pins) == {"x86_64", "aarch64"}
+    for sha in pins.values():
+        assert len(sha) == 64 and all(c in "0123456789abcdef" for c in sha)
+    assert pins["x86_64"] != pins["aarch64"]
+
+
+def test_sha256_file_matches_hashlib(setup_mod: Any, tmp_path: Path) -> None:
+    """The streamed hasher agrees with a one-shot hashlib digest."""
+    import hashlib
+
+    blob = b"regstack-mongo-tarball" * 100_000  # exceed the 1 MiB chunk
+    f = tmp_path / "blob.bin"
+    f.write_bytes(blob)
+    assert setup_mod._sha256_file(f) == hashlib.sha256(blob).hexdigest()
+
+
+def test_install_mongod_refuses_on_checksum_mismatch(
+    setup_mod: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A downloaded tarball whose hash doesn't match the pin is rejected
+    before extraction — `tar` and `sudo install` never run."""
+    monkeypatch.setattr(setup_mod.platform, "machine", lambda: "x86_64")
+    monkeypatch.setattr(setup_mod, "_have", lambda _cmd: True)
+    monkeypatch.setattr(setup_mod.tempfile, "mkdtemp", lambda **_k: str(tmp_path))
+
+    ran: list[str] = []
+
+    def _fake_run(cmd: list[str], **_k: Any) -> Any:
+        ran.append(cmd[0])
+        if cmd[0] == "curl":
+            # Simulate the CDN handing us a tampered/corrupt tarball.
+            (tmp_path / "mongodb.tgz").write_bytes(b"not the real tarball")
+            return None
+        raise AssertionError(f"must not run {cmd[0]!r} after a checksum mismatch")
+
+    monkeypatch.setattr(setup_mod, "_run", _fake_run)
+    assert setup_mod._install_mongod_from_tarball() is False
+    assert ran == ["curl"]  # downloaded, then stopped — no tar, no install
+
+
 # --- tasks.py::_resolve_coverage_backends ----------------------------------
 
 

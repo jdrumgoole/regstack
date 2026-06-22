@@ -28,6 +28,7 @@ on a maintainer's macOS laptop use `inv db-up` instead.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -59,6 +60,18 @@ POSTGRES_PORT = 5432
 # return HTTP 200 from fastdl.mongodb.org.
 MONGO_VERSION = "7.0.14"
 MONGO_TARBALL_DISTRO = "ubuntu2004"
+
+# SHA-256 of each supported-arch tarball, PINNED here rather than fetched
+# from the CDN. The `.sha256` MongoDB publishes lives next to the tarball
+# on the same host, so fetching it would only catch corruption — an
+# attacker who can swap the tarball can swap its checksum too. A pin in
+# version control catches tampering as well (same reason a lockfile pins
+# hashes). Refresh BOTH entries whenever MONGO_VERSION / MONGO_TARBALL_DISTRO
+# changes — captured from fastdl.mongodb.org on 2026-06-22.
+MONGO_TARBALL_SHA256 = {
+    "x86_64": "458d615657d04d2f789b653d5a76d339565c795f0967dccf773a55630b33d26c",
+    "aarch64": "98ce820befcd1f5c45ba26e41ac77ffa454edc09f2e9fd8a40d5bc1472b32967",
+}
 
 # The CI workflow uses these credentials too; matching them keeps
 # REGSTACK_TEST_POSTGRES_URL identical between CI and CCR.
@@ -164,13 +177,24 @@ def _mongo_tarball_url(version: str, arch: str, distro: str) -> str:
     return f"https://fastdl.mongodb.org/linux/mongodb-linux-{arch}-{distro}-{version}.tgz"
 
 
+def _sha256_file(path: Path) -> str:
+    """Streamed SHA-256 of a file (chunked so a large tarball isn't slurped)."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _install_mongod_from_tarball(version: str = MONGO_VERSION) -> bool:
     """Fetch the official static `mongod` from fastdl.mongodb.org onto PATH.
 
     apt-independent fallback for restricted-network containers where the
-    apt repo 403s but the binary CDN is reachable. Returns True iff
-    `mongod` ends up on PATH; False (with a warning) on any miss —
-    unsupported arch, missing curl/tar, blocked CDN, or a tarball whose
+    apt repo 403s but the binary CDN is reachable. The download is verified
+    against a pinned SHA-256 before anything is extracted or installed, so a
+    corrupted or tampered tarball is rejected. Returns True iff `mongod`
+    ends up on PATH; False (with a warning) on any miss — unsupported arch,
+    missing curl/tar, blocked CDN, checksum mismatch, or a tarball whose
     layout changed.
     """
     arch = {
@@ -185,15 +209,35 @@ def _install_mongod_from_tarball(version: str = MONGO_VERSION) -> bool:
     if not _have("curl") or not _have("tar"):
         _warn("curl/tar not on PATH; cannot fetch the static MongoDB tarball")
         return False
+    expected_sha = MONGO_TARBALL_SHA256.get(arch)
+    if expected_sha is None:
+        _warn(f"no pinned SHA-256 for arch {arch!r}; refusing to install an unverified mongod")
+        return False
 
     url = _mongo_tarball_url(version, arch, MONGO_TARBALL_DISTRO)
     workdir = Path(tempfile.mkdtemp(prefix="regstack-mongo-"))
     tgz = workdir / "mongodb.tgz"
     try:
         _run(["curl", "-fsSL", "-o", str(tgz), url])
+    except subprocess.CalledProcessError:
+        _warn(f"static tarball download failed: {url}")
+        return False
+
+    actual_sha = _sha256_file(tgz)
+    if actual_sha != expected_sha:
+        _warn(
+            f"SHA-256 mismatch for {url}\n"
+            f"    expected {expected_sha}\n"
+            f"    got      {actual_sha}\n"
+            "    refusing to install a tarball that doesn't match the pin"
+        )
+        return False
+    _info(f"tarball SHA-256 verified ({actual_sha[:12]}…)")
+
+    try:
         _run(["tar", "-xzf", str(tgz), "-C", str(workdir)])
     except subprocess.CalledProcessError:
-        _warn(f"static tarball download/extract failed: {url}")
+        _warn(f"static tarball extract failed: {tgz}")
         return False
 
     binaries = sorted(workdir.glob("mongodb-linux-*/bin/mongod"))

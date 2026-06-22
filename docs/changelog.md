@@ -5,6 +5,16 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+#### Fixed
+
+- CI: `scripts/ccr_coverage_setup.py` now falls back to the official
+  static `mongod` tarball from `fastdl.mongodb.org` when both apt paths
+  fail. Restricted-network CCR containers that 403 on the
+  `repo.mongodb.org` apt repo can still provision MongoDB, so the weekly
+  coverage routine produces a full-matrix number instead of
+  `COVERAGE_INFRA_UNAVAILABLE`. Dev/CI tooling only — not shipped in the
+  wheel.
+
 ## 0.8.3 — 2026-06-12
 
 ### Headline

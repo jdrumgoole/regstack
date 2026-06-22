@@ -30,16 +30,22 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import platform
 import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 MONGO_PORT = 27017
 POSTGRES_PORT = 5432
+
+# Pinned MongoDB version for the static-tarball fallback (see
+# `_install_mongod_from_tarball`). Bump when the apt path moves off 7.0.
+MONGO_VERSION = "7.0.14"
 
 # The CI workflow uses these credentials too; matching them keeps
 # REGSTACK_TEST_POSTGRES_URL identical between CI and CCR.
@@ -132,6 +138,87 @@ def _apt_install(*packages: str) -> None:
     _run(["sudo", "apt-get", "install", "-y", "--no-install-recommends", *packages], env=env)
 
 
+# --- MongoDB static-tarball fallback ---------------------------------------
+#
+# When the apt repo (repo.mongodb.org) is blocked — the HTTP 403 a
+# restricted-network CCR container returns — the binary CDN
+# (fastdl.mongodb.org) is often still reachable. The official static
+# tarball carries a self-contained `mongod` and needs neither apt nor a
+# PPA, so it's the last apt-independent install path before we give up.
+
+
+def _distro_tag_from_os_release(text: str) -> str:
+    """Map ``/etc/os-release`` contents to a MongoDB tarball distro tag.
+
+    MongoDB publishes per-distro static tarballs (``ubuntu2204``,
+    ``debian12``, …). An unknown or missing distro defaults to
+    ``ubuntu2204`` (jammy) — the same release the apt path targets.
+    """
+    data: dict[str, str] = {}
+    for line in text.splitlines():
+        key, sep, val = line.partition("=")
+        if sep:
+            data[key.strip()] = val.strip().strip('"')
+    distro_id = data.get("ID", "").lower()
+    major = data.get("VERSION_ID", "").split(".")[0]
+    if distro_id == "debian":
+        return {"11": "debian11", "12": "debian12"}.get(major, "debian12")
+    return {"20": "ubuntu2004", "22": "ubuntu2204", "24": "ubuntu2404"}.get(major, "ubuntu2204")
+
+
+def _linux_distro_tag() -> str:
+    osr = Path("/etc/os-release")
+    return _distro_tag_from_os_release(osr.read_text() if osr.exists() else "")
+
+
+def _mongo_tarball_url(version: str, arch: str, distro: str) -> str:
+    return f"https://fastdl.mongodb.org/linux/mongodb-linux-{arch}-{distro}-{version}.tgz"
+
+
+def _install_mongod_from_tarball(version: str = MONGO_VERSION) -> bool:
+    """Fetch the official static `mongod` from fastdl.mongodb.org onto PATH.
+
+    apt-independent fallback for restricted-network containers where the
+    apt repo 403s but the binary CDN is reachable. Returns True iff
+    `mongod` ends up on PATH; False (with a warning) on any miss —
+    unsupported arch, missing curl/tar, blocked CDN, or a tarball whose
+    layout changed.
+    """
+    arch = {
+        "x86_64": "x86_64",
+        "amd64": "x86_64",
+        "aarch64": "aarch64",
+        "arm64": "aarch64",
+    }.get(platform.machine().lower())
+    if arch is None:
+        _warn(f"no MongoDB static tarball for arch {platform.machine()!r}")
+        return False
+    if not _have("curl") or not _have("tar"):
+        _warn("curl/tar not on PATH; cannot fetch the static MongoDB tarball")
+        return False
+
+    url = _mongo_tarball_url(version, arch, _linux_distro_tag())
+    workdir = Path(tempfile.mkdtemp(prefix="regstack-mongo-"))
+    tgz = workdir / "mongodb.tgz"
+    try:
+        _run(["curl", "-fsSL", "-o", str(tgz), url])
+        _run(["tar", "-xzf", str(tgz), "-C", str(workdir)])
+    except subprocess.CalledProcessError:
+        _warn(f"static tarball download/extract failed: {url}")
+        return False
+
+    binaries = sorted(workdir.glob("mongodb-linux-*/bin/mongod"))
+    if not binaries:
+        _warn("static tarball extracted but contained no mongod binary")
+        return False
+    try:
+        _run(["sudo", "install", "-m", "0755", str(binaries[0]), "/usr/local/bin/mongod"])
+    except subprocess.CalledProcessError:
+        _warn("could not install mongod into /usr/local/bin")
+        return False
+    return _have("mongod")
+
+
 # --- Per-service setup ------------------------------------------------------
 
 
@@ -139,9 +226,10 @@ def setup_mongo() -> StepResult:
     """Install and start MongoDB on :27017. Returns a StepResult.
 
     Doesn't raise on failure — the caller decides whether a partial
-    matrix is acceptable. Tries (in order): the mongodb-org apt repo,
-    the distro `mongodb` package, and the `mongod` binary if it's
-    already on PATH.
+    matrix is acceptable. Tries (in order): an already-present `mongod`
+    on PATH, the mongodb-org apt repo, the distro `mongodb` package, and
+    finally the official static tarball from fastdl.mongodb.org (the
+    apt-independent path that survives a 403 on the apt repo).
     """
     if _port_open(MONGO_PORT):
         return StepResult(name="MongoDB", ok=True, detail=f"already listening on :{MONGO_PORT}")
@@ -165,23 +253,23 @@ def setup_mongo() -> StepResult:
             _info("mongodb-org install failed; trying distro `mongodb` as fallback")
             try:
                 _apt_install("mongodb")
-            except subprocess.CalledProcessError as exc:
-                return StepResult(
-                    name="MongoDB",
-                    ok=False,
-                    detail=(
-                        "install failed — neither the mongodb-org apt repo "
-                        "nor the distro `mongodb` package were reachable "
-                        f"(apt exit {exc.returncode}). Restricted-network "
-                        "CCR container?"
-                    ),
+            except subprocess.CalledProcessError:
+                _info(
+                    "apt paths unreachable (403 on the repo / blocked PPA?); "
+                    "falling back to the static binary tarball from fastdl.mongodb.org"
                 )
+                _install_mongod_from_tarball()
 
     if not _have("mongod"):
         return StepResult(
             name="MongoDB",
             ok=False,
-            detail="install reported success but `mongod` is still not on PATH",
+            detail=(
+                "install failed — the mongodb-org apt repo, the distro "
+                "`mongodb` package, and the fastdl.mongodb.org static "
+                "tarball were all unreachable. Restricted-network CCR "
+                "container with the MongoDB CDN blocked too?"
+            ),
         )
 
     dbpath = Path("/var/lib/mongodb")

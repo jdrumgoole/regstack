@@ -43,9 +43,22 @@ from pathlib import Path
 MONGO_PORT = 27017
 POSTGRES_PORT = 5432
 
-# Pinned MongoDB version for the static-tarball fallback (see
-# `_install_mongod_from_tarball`). Bump when the apt path moves off 7.0.
+# Pinned MongoDB version + distro tag for the static-tarball fallback
+# (see `_install_mongod_from_tarball`). Bump when the apt path moves off
+# 7.0 — and keep `MONGO_TARBALL_DISTRO` at the OLDEST distro tag that
+# still publishes BOTH x86_64 and aarch64 builds for the chosen version.
+#
+# Why ubuntu2004 rather than detecting the container's own distro:
+#   * It is the lowest-glibc 7.0.x build (glibc 2.31), so the binary runs
+#     on every newer Debian/Ubuntu CCR container via forward compat — a
+#     jammy build (glibc 2.35) would NOT run on an older container.
+#   * 7.0.x ships no ubuntu2404 build, and no Debian aarch64 build, so
+#     mapping a container's real distro can yield a URL that 404s. One
+#     fixed tag that always exists is strictly more reliable.
+# Verified 2026-06-22: ubuntu2004 x86_64 + aarch64 7.0.14 tarballs both
+# return HTTP 200 from fastdl.mongodb.org.
 MONGO_VERSION = "7.0.14"
+MONGO_TARBALL_DISTRO = "ubuntu2004"
 
 # The CI workflow uses these credentials too; matching them keeps
 # REGSTACK_TEST_POSTGRES_URL identical between CI and CCR.
@@ -147,30 +160,6 @@ def _apt_install(*packages: str) -> None:
 # PPA, so it's the last apt-independent install path before we give up.
 
 
-def _distro_tag_from_os_release(text: str) -> str:
-    """Map ``/etc/os-release`` contents to a MongoDB tarball distro tag.
-
-    MongoDB publishes per-distro static tarballs (``ubuntu2204``,
-    ``debian12``, …). An unknown or missing distro defaults to
-    ``ubuntu2204`` (jammy) — the same release the apt path targets.
-    """
-    data: dict[str, str] = {}
-    for line in text.splitlines():
-        key, sep, val = line.partition("=")
-        if sep:
-            data[key.strip()] = val.strip().strip('"')
-    distro_id = data.get("ID", "").lower()
-    major = data.get("VERSION_ID", "").split(".")[0]
-    if distro_id == "debian":
-        return {"11": "debian11", "12": "debian12"}.get(major, "debian12")
-    return {"20": "ubuntu2004", "22": "ubuntu2204", "24": "ubuntu2404"}.get(major, "ubuntu2204")
-
-
-def _linux_distro_tag() -> str:
-    osr = Path("/etc/os-release")
-    return _distro_tag_from_os_release(osr.read_text() if osr.exists() else "")
-
-
 def _mongo_tarball_url(version: str, arch: str, distro: str) -> str:
     return f"https://fastdl.mongodb.org/linux/mongodb-linux-{arch}-{distro}-{version}.tgz"
 
@@ -197,7 +186,7 @@ def _install_mongod_from_tarball(version: str = MONGO_VERSION) -> bool:
         _warn("curl/tar not on PATH; cannot fetch the static MongoDB tarball")
         return False
 
-    url = _mongo_tarball_url(version, arch, _linux_distro_tag())
+    url = _mongo_tarball_url(version, arch, MONGO_TARBALL_DISTRO)
     workdir = Path(tempfile.mkdtemp(prefix="regstack-mongo-"))
     tgz = workdir / "mongodb.tgz"
     try:

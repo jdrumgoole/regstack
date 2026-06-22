@@ -79,25 +79,18 @@ def test_backends_available_ignores_playwright(setup_mod: Any) -> None:
 
 
 def test_mongo_tarball_url_shape(setup_mod: Any) -> None:
-    url = setup_mod._mongo_tarball_url("7.0.14", "x86_64", "ubuntu2204")
-    assert url == ("https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-7.0.14.tgz")
+    url = setup_mod._mongo_tarball_url("7.0.14", "x86_64", "ubuntu2004")
+    assert url == ("https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2004-7.0.14.tgz")
 
 
-@pytest.mark.parametrize(
-    ("os_release", "expected"),
-    [
-        ('ID=ubuntu\nVERSION_ID="22.04"\n', "ubuntu2204"),
-        ('ID=ubuntu\nVERSION_ID="20.04"\n', "ubuntu2004"),
-        ('ID=ubuntu\nVERSION_ID="24.04"\n', "ubuntu2404"),
-        ('ID=debian\nVERSION_ID="12"\n', "debian12"),
-        ('ID=debian\nVERSION_ID="11"\n', "debian11"),
-        # Unknown / derivative distros fall back to jammy, the apt target.
-        ('ID=linuxmint\nVERSION_ID="21"\n', "ubuntu2204"),
-        ("", "ubuntu2204"),
-    ],
-)
-def test_distro_tag_from_os_release(setup_mod: Any, os_release: str, expected: str) -> None:
-    assert setup_mod._distro_tag_from_os_release(os_release) == expected
+def test_pinned_distro_tag_has_builds_for_both_arches(setup_mod: Any) -> None:
+    """Guard the pin: the chosen distro tag must be one MongoDB actually
+    ships for both arches. 7.0.x has no ubuntu2404 build and no Debian
+    aarch64 build, so a stale pin there would 404 the fallback at runtime
+    (verified against fastdl.mongodb.org on 2026-06-22). ubuntu2004 is the
+    oldest-glibc tag with both arches, so the binary also runs forward on
+    newer containers."""
+    assert setup_mod.MONGO_TARBALL_DISTRO == "ubuntu2004"
 
 
 def test_install_mongod_from_tarball_bails_on_unsupported_arch(

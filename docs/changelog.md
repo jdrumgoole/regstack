@@ -5,17 +5,80 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
-#### Fixed
+## 0.8.4 — 2026-06-22
 
-- CI: `scripts/ccr_coverage_setup.py` now falls back to the official
-  static `mongod` tarball from `fastdl.mongodb.org` when both apt paths
-  fail. Restricted-network CCR containers that 403 on the
-  `repo.mongodb.org` apt repo can still provision MongoDB, so the weekly
-  coverage routine produces a full-matrix number instead of
-  `COVERAGE_INFRA_UNAVAILABLE`. The download is verified against a pinned
+### Headline
+
+A security dependency-floor bump for the June-2026 PyJWT and Starlette
+CVEs, plus a coverage routine that survives a locked-down network.
+
+The shipped change in this release is two raised dependency floors.
+PyJWT moves to `>=2.13.0`, closing the June-2026 `PyJWKClient` advisory
+cluster — an algorithm allow-list bypass on `get_signing_key_from_jwt`
+(CVE-2026-48523), algorithm confusion (CVE-2026-48526), an SSRF via the
+JWKS URI scheme (CVE-2026-48522), and an unauthenticated DoS in
+detached-payload JWS (CVE-2026-48525). The first two sit directly on
+regstack's Google OAuth ID-token verification path, which calls exactly
+`get_signing_key_from_jwt` + `decode`. Starlette is pinned `>=1.0.1` for
+CVE-2026-48710 ("BadHost"), a `Host`-header path-injection that bypasses
+path-based auth; regstack doesn't route auth off `request.url.path`, but
+Starlette ships transitively to every host, so the floor closes the door
+for them too.
+
+The rest of this release is development-side hardening that never reaches
+the published wheel. The weekly coverage routine now provisions MongoDB
+from the official static tarball — verified against a pinned per-arch
+SHA-256 — when a restricted-network CI container blocks the apt repo, so
+it produces a full-matrix number instead of failing outright. And the
+coverage measurement itself was made honest: the optional SES/SNS/Twilio
+backends are now actually exercised, the untestable native-GUI shims are
+excluded, and the SMS/SES/validate surfaces were backfilled with tests,
+taking line coverage from 85% to 89%.
+
+### Security
+
+- **PyJWT floor raised to `>=2.13.0`.** Closes the June-2026
+  `PyJWKClient` cluster: CVE-2026-48523 (algorithm allow-list bypass on
+  the `get_signing_key_from_jwt` flow), CVE-2026-48526 (algorithm
+  confusion via a public JWK used as an HMAC secret), CVE-2026-48522
+  (SSRF via `PyJWKClient` URI-scheme handling), and CVE-2026-48525
+  (unauthenticated DoS in detached-payload JWS decode). regstack's Google
+  OAuth ID-token verification uses `get_signing_key_from_jwt` + `decode`
+  directly, so 48523/48526 are on its verification code path. Bumped in
+  the base dependencies, the `oauth` extra (alongside the existing
+  `cryptography>=46.0.7`), and the `dev` extra; `uv.lock` resolves PyJWT
+  2.13.0. (Security review 2026-06-20 · W-1.)
+
+- **Starlette floor pinned `>=1.0.1`.** Closes CVE-2026-48710
+  ("BadHost"): a `Host` header containing `/`, `?`, or `#` poisons the
+  re-parsed `request.url.path`, bypassing path-based auth checks.
+  regstack doesn't make auth decisions off `request.url.path`, but
+  Starlette ships transitively (via FastAPI) to every host, so pinning
+  the floor protects hosts that do. `uv.lock` resolves Starlette 1.3.1.
+  A test-client-only `StarletteDeprecationWarning` (httpx2) introduced by
+  Starlette ≥ 1.3 is silenced with a targeted `filterwarnings` ignore
+  rather than by capping the floor. (Security review 2026-06-20 · W-2.)
+
+### Development
+
+- **Restricted-network MongoDB provisioning for the coverage routine.**
+  `scripts/ccr_coverage_setup.py` now falls back to the official static
+  `mongod` tarball from `fastdl.mongodb.org` when both apt paths fail —
+  the HTTP 403 a locked-down CI container returns on the
+  `repo.mongodb.org` apt repo. The download is verified against a pinned
   per-arch SHA-256 before extraction, so a corrupted or tampered tarball
-  is rejected rather than installed. Dev/CI tooling only — not shipped in
-  the wheel.
+  is rejected rather than installed; the tag is pinned to `ubuntu2004`,
+  the oldest-glibc build that ships both x86_64 and aarch64 so one binary
+  runs forward on any newer container. The routine now produces a
+  full-matrix coverage number instead of `COVERAGE_INFRA_UNAVAILABLE`.
+
+- **Honest coverage measurement, 85% → 89%.** The `dev` extra now
+  installs `aioboto3` + `twilio` so the SES/SNS/Twilio backends and the
+  SES setup wizard are exercised rather than skipped, and the native
+  pywebview window-launch shims (untestable headless) are excluded from
+  the report. The previously-untested SMS/SES backends, the SES wizard's
+  AWS layer, and the `regstack validate` phases were backfilled with
+  tests. All dev/CI tooling — no runtime change.
 
 ## 0.8.3 — 2026-06-12
 

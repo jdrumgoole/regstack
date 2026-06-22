@@ -567,17 +567,43 @@ Areas that were reviewed and found to be secure.
 If the codebase is clean, report a clean bill of health with the date
 and what was checked.
 
-## File a PR
+## Land the report — and leave NOTHING behind
 
-After writing the report:
+The report is a docs-only addition to the dated archive under
+`docs/security-reports/`. It must end up on `main` with **no leftover
+branch and no open PR**. Every run cleans up after itself — a dangling
+`security-review/*` branch or an unmerged report PR is a process bug,
+not an artifact. (`main` is unprotected and the repo has "Automatically
+delete head branches" enabled, so the merge below is immediate and the
+branch is removed on merge.)
+
+After writing the report file:
 
 1. Create a branch named `security-review/YYYY-MM-DD`.
-2. Commit the report file to the branch.
-3. Open a PR with:
-   - Title: `Security Review — YYYY-MM-DD`
-   - Body: A short summary of findings (number of critical / warning
-     / info issues, or "Clean bill of health").
-   - Severity tag in the title:
-     - CRITICAL findings: prepend `[security-critical]` to the title.
-     - WARNING findings: prepend `[security-warning]` to the title.
-     - Clean: prepend `[security-clean]` to the title.
+2. Commit **only** the report file to the branch.
+3. Open a PR:
+   - Title: `Security Review — YYYY-MM-DD`, with a severity-tag prefix —
+     `[security-critical]` if any CRITICAL, else `[security-warning]` if
+     any WARNING, else `[security-clean]`.
+   - Body: the short findings summary (counts by severity, or "Clean
+     bill of health").
+4. **Immediately squash-merge your own PR and delete the branch:**
+   `gh pr merge --squash --delete-branch`. The report is docs-only, so
+   there is nothing to review-gate — merging it now lands it on the
+   `main` archive and removes the branch. Do not leave the PR open.
+   (If branch protection is ever added and blocks an immediate merge,
+   use `gh pr merge --squash --delete-branch --auto` so it merges and
+   self-cleans once checks pass — never leave it dangling.)
+5. Verify cleanup before finishing: there must be **no** open
+   `security-review/*` PR and **no** `security-review/*` branch left on
+   the remote. If you find stale ones from a previous run, close and
+   delete those too.
+
+### Actionable findings (CRITICAL / WARNING)
+
+Merging the report documents findings; it does not fix them. For any
+CRITICAL or WARNING that needs a code change, **open a separate GitHub
+Issue** (label `security`, title `[security] <one-line summary>`) so the
+work is tracked on a primitive that doesn't spawn a branch. Never use a
+lingering report PR or branch as the tracking mechanism — that is the
+exact accumulation this process exists to prevent.

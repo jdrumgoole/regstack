@@ -356,3 +356,26 @@ Concretely:
 - **Comments are rare.** Add one only when *why* is non-obvious — a
   workaround, a constraint that isn't visible from the code, an invariant
   a future reader would otherwise break. Don't restate *what* the code does.
+
+## Releasing
+
+Releases are tag-triggered: pushing a `vX.Y.Z` tag runs `publish.yml`,
+which builds and does an OIDC-trusted publish to PyPI (no tokens). Bump
+the version in **both** `src/regstack/version.py` and `pyproject.toml`
+(then `uv lock`) and promote `docs/changelog.md`'s `## [Unreleased]` to
+a dated `## X.Y.Z — YYYY-MM-DD` section in the same commit. After PyPI
+has the wheel + sdist, create the matching GitHub Release with notes
+taken from that changelog section.
+
+- **Reflow the changelog prose before it becomes the GitHub release
+  body.** `docs/changelog.md` is hard-wrapped at ~70 columns (correct
+  for the repo + ReadTheDocs), but GitHub renders GFM with *hard line
+  breaks* — every newline becomes a `<br>`, so wrapped paragraphs and
+  multi-line bullets display broken mid-sentence every ~70 chars. Before
+  `gh release create`/`edit`, join each paragraph and each bullet onto a
+  single line (keep blank lines between blocks, and `###`/`-`/`*` markers
+  and list indentation). It's a whitespace-only transform — the word
+  sequence must stay identical (`body.split() == reflowed.split()`), so
+  it's still verbatim from the changelog, just rewrapped for the
+  renderer. Reflow only the release body, never the `docs/changelog.md`
+  file itself.

@@ -16,10 +16,10 @@ All five changes are `pyproject.toml` floor raises with a matching
 `uv lock` run — no product code was touched. The bumps protect
 downstream consumers who resolve any affected version within the
 previously-permitted range; the locked versions in 0.8.4 were already
-safe for three of the five packages (starlette, aiosmtplib, pydantic-
-settings resolved one version below the safe threshold), but the floor
-must match the safe version so `pip install regstack` with no lock file
-doesn't silently install a vulnerable dependency.
+safe for three of the five packages (starlette, aiosmtplib,
+pydantic-settings resolved one version below the safe threshold), but
+the floor must match the safe version so `pip install regstack` with
+no lock file doesn't silently install a vulnerable dependency.
 
 ### Security
 
@@ -345,11 +345,11 @@ away in 1.0. `migrate --target` keeps its existing meaning (Alembic
 revision) since the conflict is contextual — the helptext now spells
 that out.
 
-Alongside that, the three pywebview wizards swap their misleadingly-
-named `--print-only` flag (which actually wrote to disk) for two
-honest flags: `--headless` writes the config from CLI flags and prints
-a JSON summary; `--dry-run` validates and prints the same diff but
-leaves the filesystem untouched. `--print-only` survives as a
+Alongside that, the three pywebview wizards swap their
+misleadingly-named `--print-only` flag (which actually wrote to disk)
+for two honest flags: `--headless` writes the config from CLI flags
+and prints a JSON summary; `--dry-run` validates and prints the same
+diff but leaves the filesystem untouched. `--print-only` survives as a
 deprecated alias for `--headless`; it also goes away in 1.0. The
 emitted JSON now carries `"dry_run": <bool>` so scripted consumers
 can branch on it.
@@ -417,14 +417,13 @@ shape was malformed).
 
 ### Added
 
-- **`regstack ses setup` CLI command.** Guided pywebview wizard for
-  the SES email backend. Nine steps walk through region selection,
-  credential source (`profile` / `explicit` / `chain`), sender-
-  domain identity verification (via SES
-  `GetIdentityVerificationAttributes`), sandbox detection (via
-  `GetAccount` with a `GetSendQuota` heuristic fallback for
-  IAM-restricted policies), and a live test send (via `SendEmail`).
-  Non-clobbering tomlkit + secrets.env merge.
+- **`regstack ses setup` CLI command.** Guided pywebview wizard for the
+  SES email backend. Nine steps walk through region selection,
+  credential source (`profile` / `explicit` / `chain`), sender-domain
+  identity verification (via SES `GetIdentityVerificationAttributes`),
+  sandbox detection (via `GetAccount` with a `GetSendQuota` heuristic
+  fallback for IAM-restricted policies), and a live test send (via
+  `SendEmail`). Non-clobbering tomlkit + secrets.env merge.
 
   Headless `--print-only` mode runs the same merge without the GUI
   for CI / scripting. Gated behind the joint extra:
@@ -672,12 +671,11 @@ The security half of the release closes everything outstanding from the 2026-05-
   uniquely-indexed-by-email index whose name isn't
   `email_unique`, drops it, and proceeds. Idempotent — re-running
   on a healthy database leaves indexes alone.
-- **`POST /verify` no longer 500s on the admin-promote-meets-
-  user-clicks-verify race.** The endpoint now catches
-  `UserAlreadyExistsError` from `users.create` and returns a
-  graceful 400 ("This email is already registered. Please sign
-  in.") instead of letting the unique-constraint violation bubble
-  up as a 500.
+- **`POST /verify` no longer 500s on the
+  admin-promote-meets-user-clicks-verify race.** The endpoint now
+  catches `UserAlreadyExistsError` from `users.create` and returns a
+  graceful 400 ("This email is already registered. Please sign in.")
+  instead of letting the unique-constraint violation bubble up as a 500.
 
 ### Internal
 
@@ -1091,9 +1089,9 @@ this is the release cut that wraps them up.
   - `DELETE /oauth/{provider}/link` (auth)
   - `GET    /oauth/providers` (auth)
 - New SSR page `/account/oauth-complete` (token-handoff round-trip).
-- "Sign in with Google" button on `/account/login` and a Connected-
-  accounts panel on `/account/me`. Login page surfaces callback
-  errors via `?error=<code>` with translated banners.
+- "Sign in with Google" button on `/account/login` and a
+  Connected-accounts panel on `/account/me`. Login page surfaces
+  callback errors via `?error=<code>` with translated banners.
 - Two new repo protocols: `OAuthIdentityRepoProtocol`,
   `OAuthStateRepoProtocol`. Mongo + SQL implementations with
   parametrized integration tests over all three backends.

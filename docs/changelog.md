@@ -5,6 +5,38 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+## 0.8.6 — 2026-07-19
+
+### Headline
+
+A changelog rendering fix — hyphenated words no longer break across
+line wraps
+
+The changelog is hard-wrapped at roughly seventy columns, which reads
+well in the repository and on ReadTheDocs. Five hyphenated compounds
+had landed with the wrap falling immediately after the hyphen, and
+because Markdown joins a soft line break with a space, those words
+rendered with a gap in the middle — `pydantic- settings` rather than
+`pydantic-settings`. The defect showed up anywhere the file was
+rendered rather than read as plain text: the Sphinx documentation, the
+GitHub file view, and the release notes generated from it.
+
+This release contains no code changes. The package installs and
+behaves identically to 0.8.5, including the five security dependency
+floors that release introduced. It exists so the published
+documentation matches what was always intended, and so future release
+notes can be generated from the changelog without a manual repair
+step.
+
+#### Fixed
+
+- Five hyphenated compounds in `docs/changelog.md` no longer straddle
+  a line wrap: `pydantic-settings`, `misleadingly-named`,
+  `sender-domain`, `admin-promote-meets-user-clicks-verify`, and
+  `Connected-accounts`. The affected paragraphs and bullets were
+  rewrapped; the change is whitespace-only and the character sequence
+  of the prose is unchanged.
+
 ## 0.8.5 — 2026-07-19
 
 ### Headline

@@ -1,6 +1,6 @@
 [project]
 name = "regstack"
-version = "0.8.4"
+version = "0.8.5"
 description = "Embeddable user registration, login, and account management for FastAPI apps. SQLite / Postgres / MongoDB."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,24 +23,35 @@ dependencies = [
     # 2026-05-22 security review, I-2) affect the third-party
     # "FastApiAdmin" project, not fastapi itself — no floor bump needed.
     "fastapi>=0.120.0",
-    # starlette>=1.0.1 picks up CVE-2026-48710 ("BadHost"): a malformed
-    # Host header (containing `/`, `?`, or `#`) poisons the re-parsed
-    # request.url.path, bypassing path-based auth checks. regstack itself
-    # doesn't route auth off request.url.path, but the framework ships
-    # transitively to every host and the floor closes the door for them
-    # too. Pulled in by fastapi; pinned directly so the floor is explicit.
-    "starlette>=1.0.1",
+    # starlette>=1.3.1 closes a four-CVE cluster affecting 1.0.0–1.3.0:
+    # CVE-2026-48710 ("BadHost" — malformed Host header bypasses path-
+    # based auth; fixed in 1.0.1), CVE-2026-48818 (Windows StaticFiles
+    # UNC path leaks NTLMv2 hash; fixed in 1.1.0), CVE-2026-54282
+    # (attacker-controlled request.url.hostname via non-/ path; fixed in
+    # 1.3.0), and CVE-2026-54283 (x-www-form-urlencoded ignores
+    # max_fields/max_part_size — unauthenticated DoS; fixed in 1.3.1).
+    # regstack itself doesn't route auth off request.url.path but ships
+    # Starlette transitively to every host. Pulled in by fastapi; pinned
+    # directly so the floor is explicit.
+    "starlette>=1.3.1",
     "pydantic>=2.6",
-    "pydantic-settings>=2.2",
+    # pydantic-settings>=2.14.2 closes CVE-2026-32690 (CWE-22:
+    # validate_secrets_path() size-check skips symlinked dirs, enabling
+    # secrets_dir_max_size bypass) and CVE-2026-58203 (CWE-59:
+    # NestedSecretsSettingsSource follows symlinks outside the configured
+    # secrets tree). RegStackConfig extends BaseSettings.
+    "pydantic-settings>=2.14.2",
     "pwdlib[argon2]>=0.2.1",
     # pyjwt>=2.13.0 includes the fix for CVE-2026-32597 (`crit` header
-    # bypass) plus the June-2026 PyJWKClient cluster: CVE-2026-48523
-    # (algorithm allow-list bypass on the get_signing_key_from_jwt flow),
-    # CVE-2026-48526 (algorithm confusion via a public JWK used as an HMAC
-    # secret), CVE-2026-48522 (SSRF via PyJWKClient URI scheme handling),
-    # and CVE-2026-48525 (unauthenticated DoS in detached-payload JWS).
-    # The OAuth ID-token path uses exactly get_signing_key_from_jwt + decode,
-    # so 48523/48526 are directly on regstack's verification code path.
+    # bypass) plus the June-2026 PyJWKClient cluster: CVE-2026-48522
+    # (SSRF via PyJWKClient URI-scheme handling), CVE-2026-48523
+    # (algorithm allow-list bypass on get_signing_key_from_jwt),
+    # CVE-2026-48524 (fresh JWKS fetch on every cache miss — connection-
+    # pool exhaustion under load), CVE-2026-48525 (unauthenticated DoS in
+    # detached-payload JWS), and CVE-2026-48526 (algorithm confusion via
+    # a public JWK used as an HMAC secret). The OAuth ID-token path uses
+    # exactly get_signing_key_from_jwt + decode, so 48523/48526 are
+    # directly on regstack's verification code path.
     "pyjwt>=2.13.0",
     # jinja2>=3.1.6 picks up CVE-2025-27516 (sandbox breakout via the
     # `|attr` filter; only relevant if hosts allow user-controlled
@@ -48,12 +59,24 @@ dependencies = [
     "jinja2>=3.1.6",
     "click>=8.1",
     "dnspython>=2.6",
-    # python-multipart>=0.0.27 picks up CVE-2026-40347 (DoS via oversized
-    # multipart preamble) and CVE-2026-42561 (DoS via unbounded part-header
-    # count/size — CVSS 7.5, network-exploitable).
-    "python-multipart>=0.0.27",
+    # python-multipart>=0.0.32 closes a six-CVE cluster: CVE-2026-40347
+    # (DoS via oversized multipart preamble), CVE-2026-42561 (DoS via
+    # unbounded part-header count/size, CVSS 7.5), CVE-2026-53537 (RFC
+    # 2231/5987 Content-Disposition header smuggling), CVE-2026-53538
+    # (`;`-separator WAF bypass — parameter smuggling), CVE-2026-53539
+    # (CVSS 7.5 — QuerystringParser O(B²) DoS with `;` separators,
+    # directly reachable via login/register), and CVE-2026-53540 (negative
+    # Content-Length read-until-EOF — memory DoS). >=0.0.32 is the first
+    # version clear of all six CVEs.
+    "python-multipart>=0.0.32",
     "email-validator>=2.1",
-    "aiosmtplib>=3.0",
+    # aiosmtplib>=5.1.1 closes CVE-2026-53533 (SMTP command injection,
+    # CVSS 6.5): SMTP.mail()/rcpt()/vrfy()/expn() did not reject C0
+    # control characters (including CR/LF) in caller-supplied addresses,
+    # allowing wire-level SMTP command injection below Jinja2 rendering.
+    # Practical risk is reduced by EmailStr validation rejecting literal
+    # CR/LF, but the floor must be correct.
+    "aiosmtplib>=5.1.1",
     # SQL stack — bundled by default because SQLite is the default backend.
     "sqlalchemy[asyncio]>=2.0",
     "aiosqlite>=0.20",
@@ -66,9 +89,13 @@ mongo = ["pymongo>=4.9"]
 ses = ["aioboto3>=12.3"]
 sns = ["aioboto3>=12.3"]
 twilio = ["twilio>=9.0"]
-# cryptography>=46.0.7 picks up CVE-2026-26007 (ECC subgroup attack on the
-# JWKS code path) plus CVE-2026-34073 and CVE-2026-39892.
-oauth = ["pyjwt[crypto]>=2.13.0", "cryptography>=46.0.7"]
+# cryptography>=48.0.1 closes CVE-2026-26007 (ECC subgroup attack on the
+# JWKS code path), CVE-2026-34073, CVE-2026-39892, and CVE-2026-45447
+# (heap use-after-free in PKCS7_verify() triggered by a crafted empty
+# digestAlgorithms SET in a PKCS#7/S/MIME message — CVSS 7.5). The
+# previous floor (>=46.0.7) locked to 47.0.0 which is in the affected
+# range; 48.0.1 is the first clean release.
+oauth = ["pyjwt[crypto]>=2.13.0", "cryptography>=48.0.1"]
 # Interactive setup wizards (`regstack oauth setup`, `regstack theme
 # design`). These open a native pywebview window over a local 127.0.0.1
 # FastAPI server and use tomlkit for non-destructive TOML merging.
@@ -109,7 +136,7 @@ dev = [
     "asyncpg>=0.29",
     # OAuth provider tests need the crypto bits to verify ID tokens.
     "pyjwt[crypto]>=2.13.0",
-    "cryptography>=46.0.7",
+    "cryptography>=48.0.1",
     # E2E tests for the OAuth setup wizard (drives the SPA in headless Chromium).
     "pytest-playwright>=0.5",
     # Rate-limit tests exercise the slowapi integration.
@@ -190,12 +217,12 @@ filterwarnings = [
     # thread warnings to errors — silence at the source.
     "ignore::DeprecationWarning:websockets.*",
     "ignore::DeprecationWarning:uvicorn.*",
-    # Starlette >=1.3 (pulled in by the CVE-2026-48710 "BadHost" floor,
-    # starlette>=1.0.1) deprecates its TestClient's use of `httpx` in
-    # favour of `httpx2`. This is a test-client-only deprecation — the
-    # production ASGI path is unaffected — so we silence it rather than
-    # cap the starlette floor (an upper bound would deny hosts future
-    # framework fixes). Revisit when migrating the TestClient to httpx2.
+    # Starlette >=1.3 (now pinned at the starlette>=1.3.1 CVE floor)
+    # deprecates its TestClient's use of `httpx` in favour of `httpx2`.
+    # This is a test-client-only deprecation — the production ASGI path
+    # is unaffected — so we silence it rather than cap the floor (an
+    # upper bound would deny hosts future framework fixes). Revisit when
+    # migrating the TestClient to httpx2.
     "ignore::starlette.exceptions.StarletteDeprecationWarning",
     # CI surfaces PytestUnraisableExceptionWarning when async fixtures
     # from a previous test leak sockets/event loops past their cleanup

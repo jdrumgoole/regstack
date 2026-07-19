@@ -5,6 +5,81 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+## 0.8.5 — 2026-07-19
+
+### Headline
+
+Five security dependency-floor bumps resolving a cluster of CVEs that
+have been tracked across the June–July 2026 daily security reviews.
+
+All five changes are `pyproject.toml` floor raises with a matching
+`uv lock` run — no product code was touched. The bumps protect
+downstream consumers who resolve any affected version within the
+previously-permitted range; the locked versions in 0.8.4 were already
+safe for three of the five packages (starlette, aiosmtplib, pydantic-
+settings resolved one version below the safe threshold), but the floor
+must match the safe version so `pip install regstack` with no lock file
+doesn't silently install a vulnerable dependency.
+
+### Security
+
+- **python-multipart floor raised to `>=0.0.32`.** Closes a six-CVE
+  cluster: CVE-2026-40347 (DoS via oversized multipart preamble),
+  CVE-2026-42561 (DoS via unbounded part-header count/size, CVSS 7.5),
+  CVE-2026-53537 (RFC 2231/5987 Content-Disposition header smuggling),
+  CVE-2026-53538 (`;`-separator WAF bypass — parameter smuggling),
+  CVE-2026-53539 (CVSS 7.5 — `QuerystringParser` O(B²) DoS with `;`
+  separators, directly reachable via login/register in any regstack
+  host), and CVE-2026-53540 (negative `Content-Length` turns bounded
+  read into read-until-EOF — memory DoS). `>=0.0.32` is the first
+  version clear of all six. (Security reviews 2026-06-23 – 2026-07-19,
+  W-1.)
+
+- **starlette floor raised to `>=1.3.1`.** Closes a four-CVE cluster
+  affecting 1.0.0–1.3.0: CVE-2026-48710 ("BadHost" — malformed `Host`
+  header bypasses path-based auth; fixed in 1.0.1), CVE-2026-48818
+  (Windows `StaticFiles` UNC path leaks NTLMv2 hash; fixed in 1.1.0),
+  CVE-2026-54282 (attacker-controlled `request.url.hostname` via non-`/`
+  path; fixed in 1.3.0), and CVE-2026-54283 (`x-www-form-urlencoded`
+  ignores `max_fields`/`max_part_size` — unauthenticated DoS; fixed in
+  1.3.1). The `uv.lock` already resolved 1.3.1; this is a floor-only
+  fix that protects consumers who resolve without a lock file. (Security
+  reviews 2026-06-24 – 2026-07-19, W-2.)
+
+- **cryptography floor raised to `>=48.0.1`** (in the `oauth` extra and
+  `dev` extra). Closes CVE-2026-45447 (heap use-after-free in
+  `PKCS7_verify()` triggered by a crafted empty `digestAlgorithms` SET
+  in a PKCS#7/S/MIME message — CVSS 7.5) in addition to the three CVEs
+  already covered by the previous `>=46.0.7` floor (CVE-2026-26007,
+  CVE-2026-34073, CVE-2026-39892). The 0.8.4 lock resolved 47.0.0,
+  which is in the affected range. (Security reviews 2026-06-26 –
+  2026-07-19, W-3.)
+
+- **aiosmtplib floor raised to `>=5.1.1`.** Closes CVE-2026-53533
+  (SMTP command injection, CVSS 6.5): `SMTP.mail()`, `SMTP.rcpt()`,
+  `SMTP.vrfy()`, and `SMTP.expn()` did not reject C0 control characters
+  (including CR/LF) in caller-supplied email addresses, allowing
+  wire-level SMTP command injection below Jinja2 template rendering.
+  Practical risk is reduced by `EmailStr` validation rejecting literal
+  CR/LF, but the floor must be correct regardless. (Security reviews
+  2026-06-26 – 2026-07-19, W-4.)
+
+- **pydantic-settings floor raised to `>=2.14.2`.** Closes
+  CVE-2026-32690 (CWE-22: `validate_secrets_path()` size-check skips
+  symlinked directories, enabling `secrets_dir_max_size` bypass) and
+  CVE-2026-58203 (CWE-59: `NestedSecretsSettingsSource` follows
+  symlinks outside the configured secrets tree). `RegStackConfig`
+  extends `BaseSettings`; deployments that point the secrets source at a
+  directory where an attacker can place symlinks are at risk. (Security
+  reviews 2026-06-26 – 2026-07-19, W-5.)
+
+- **CVE-2026-48524 added to pyjwt comment** (editorial, no floor change).
+  The `pyjwt>=2.13.0` floor was already correct; the inline comment
+  in `pyproject.toml` was missing this CVE (connection-pool exhaustion
+  via fresh JWKS fetch on every cache miss) from the June-2026 cluster.
+  Enumerated alongside the other five CVEs it already listed. (Security
+  review 2026-07-19, I-4.)
+
 ## 0.8.4 — 2026-06-22
 
 ### Headline

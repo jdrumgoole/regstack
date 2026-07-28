@@ -8,10 +8,12 @@ The provider is constructed once per :class:`~regstack.app.RegStack`
 and reused. It holds the configured ``client_id`` / ``client_secret``
 plus an :class:`httpx.AsyncClient` for token-endpoint calls.
 
-The ``cryptography`` and ``pyjwt`` imports happen at module top
-level — that's fine because this module is itself imported lazily
-from :mod:`regstack.app` only when the host has the ``oauth`` extra
-installed and turns ``enable_oauth`` on.
+The ``httpx``, ``cryptography`` and ``pyjwt`` imports happen at
+module top level. That's fine because this module is itself imported
+lazily from :mod:`regstack.app` only when the host turns
+``enable_oauth`` on — but it does mean every one of them has to be
+declared in the ``oauth`` extra, not just the crypto pair.
+``tests/unit/test_extra_declares_its_imports.py`` enforces that.
 """
 
 from __future__ import annotations

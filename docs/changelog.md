@@ -5,6 +5,22 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+### Fixed
+
+- The `oauth` extra now declares `httpx`.
+  `regstack/oauth/providers/google.py` imports it at module scope for
+  the token-endpoint calls, but the extra listed only `pyjwt[crypto]`
+  and `cryptography`. A host that ran `pip install regstack[oauth]`
+  and set `enable_oauth = True` got `ModuleNotFoundError: No module
+  named 'httpx'` from `RegStack.__init__` — at construction time
+  rather than import time, so nothing surfaced it until the
+  application tried to boot. The defect was invisible in development
+  because the `dev` extra installs httpx for the test suite.
+  `tests/unit/test_extra_declares_its_imports.py` now walks the
+  extra-gated subpackages and fails when any module-scope third-party
+  import is missing from the matching extra, so a new provider
+  reaching for a new library is caught before release.
+
 ## 0.8.6 — 2026-07-19
 
 ### Headline

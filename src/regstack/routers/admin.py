@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from regstack.auth.tokens import generate_verification_token
+from regstack.hooks.redaction import redact_token
 from regstack.models.pending_registration import PendingRegistration
 from regstack.models.user import BaseUser, UserPublic
 from regstack.routers._schemas import MessageResponse
@@ -191,7 +192,12 @@ def build_admin_router(rs: RegStack) -> APIRouter:
             ttl_hours=max(ttl // 3600, 1),
         )
         await rs.email.send(message)
-        await rs.hooks.fire("verification_requested", email=user.email, url=url)
+        await rs.hooks.fire(
+            "verification_requested",
+            email=user.email,
+            url=url,
+            url_without_token=redact_token(url, raw),
+        )
         return MessageResponse(message=f"Verification email sent to {user.email}.")
 
     @router.post(

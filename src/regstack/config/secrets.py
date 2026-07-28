@@ -4,6 +4,15 @@ import hashlib
 import hmac
 import secrets
 
+MIN_JWT_SECRET_LENGTH = 32
+"""Shortest master JWT secret regstack will accept.
+
+HMAC-SHA256 zero-pads a key shorter than its block size rather than
+rejecting it, so a one-character secret signs every token with a handful
+of bits of entropy and no error. Enforced at ``JwtCodec`` construction
+and reported by ``regstack doctor``.
+"""
+
 
 def derive_secret(master: str | bytes, purpose: str) -> bytes:
     """Derive a purpose-specific secret from the master JWT secret.

@@ -12,6 +12,7 @@ from regstack.backends.factory import build_backend, detect_backend_kind
 from regstack.cli._paths import resolve_toml_path
 from regstack.cli._results import CheckResult
 from regstack.cli._runtime import load_runtime_config
+from regstack.config.secrets import MIN_JWT_SECRET_LENGTH
 from regstack.email.factory import build_email_service
 
 if TYPE_CHECKING:
@@ -79,9 +80,13 @@ async def _run(
     secret_value = config.jwt_secret.get_secret_value()
     if not secret_value:
         out.append(CheckResult("jwt secret", False, "missing — run `regstack init`"))
-    elif len(secret_value) < 32:
+    elif len(secret_value) < MIN_JWT_SECRET_LENGTH:
         out.append(
-            CheckResult("jwt secret", False, f"too short ({len(secret_value)} chars; need ≥32)")
+            CheckResult(
+                "jwt secret",
+                False,
+                f"too short ({len(secret_value)} chars; need ≥{MIN_JWT_SECRET_LENGTH})",
+            )
         )
     else:
         out.append(CheckResult("jwt secret", True, f"present ({len(secret_value)} chars)"))

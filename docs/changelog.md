@@ -5,6 +5,70 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+### Headline
+
+Two ways a secret could quietly leak, closed
+
+A JWT signing secret shorter than thirty-two characters used to be
+accepted without comment. HMAC-SHA256 pads a short key with zero bytes
+rather than refusing it, so `REGSTACK_JWT_SECRET=x` signed every
+session token in the deployment with roughly seven bits of entropy and
+produced no error, no warning, and no visible symptom. The `regstack
+doctor` command flagged it, but only for operators who thought to run
+it. That check is now enforced where the secret is first used to sign:
+building a `RegStack` with a short secret raises `ValueError` at
+startup, naming the length it got and the length it needs.
+
+The second leak was in the hook system. Every registered handler for
+`verification_requested`, `password_reset_requested` and
+`email_change_requested` received a `url` keyword argument holding the
+link that had just been emailed — including the raw single-use token.
+Handlers that log their keyword arguments wholesale, the ordinary
+shape of an audit or analytics webhook, were writing live
+password-reset tokens into log aggregators, where anyone with
+log-read access could use them to take over an account. Those three
+events now also carry `url_without_token`: the same URL with the token
+replaced by `[REDACTED]`. Redaction matches the token string itself
+rather than a `token=` query key, so it holds for hosts that use the
+URL templates to put the token in a path segment or hash fragment.
+
+#### Added
+
+- `url_without_token` keyword argument on the `verification_requested`,
+  `password_reset_requested` and `email_change_requested` hook events —
+  a loggable copy of the emailed link with the single-use token
+  replaced by `[REDACTED]`. Exported as `regstack.hooks.redact_token`
+  for hosts composing their own links.
+- `MIN_JWT_SECRET_LENGTH` in `regstack.config.secrets`, shared by the
+  runtime guard and the `regstack doctor` check so the two can't drift.
+
+#### Changed
+
+- `JwtCodec.__init__` rejects a `jwt_secret` shorter than 32
+  characters. Deployments running a short secret will fail to start
+  until it is replaced; `regstack init` generates a suitable one.
+  (Issue #153.)
+
+#### Security
+
+- Verification, password-reset and email-change hook events no longer
+  force host handlers to choose between logging nothing and logging a
+  live credential. (Issue #154.)
+
+#### Documentation
+
+- The per-route IP rate limits are now explicitly flagged as
+  default-off in both the configuration reference and the security
+  model, with the reason the defaults stay off (turning them on would
+  fail closed for hosts without the `rate_limit` extra).
+
+#### Fixed
+
+- `mypy` no longer reports an unused-ignore error on the lazy Twilio
+  import. The inline ignore covered only the error code raised when the
+  optional `twilio` extra is absent; a module-level override in
+  `pyproject.toml` now covers both cases.
+
 ## 0.8.6 — 2026-07-19
 
 ### Headline

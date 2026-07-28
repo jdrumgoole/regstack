@@ -246,7 +246,18 @@ New in 0.5.4. Opt-in: install the `rate_limit` extra (`pip install
 `slowapi.Limiter` instance as `RegStack(rate_limiter=...)`.
 
 Each field is a slowapi-syntax string. Empty / unset = no limit on
-that route. The per-account `LockoutService` (see "Lockout (login)"
+that route.
+
+**Every one of these fields defaults to unset.** A regstack deployment
+that hasn't configured them has per-account lockout on `/login` and no
+IP-level limit at all on `/register`, `/forgot-password`,
+`/resend-verification` or `/verify` — one IP can drive unbounded
+registration attempts and outbound email until you set a limit. The
+defaults stay off because turning them on would make the router fail
+closed for hosts that haven't installed the `rate_limit` extra;
+choosing the numbers is yours.
+
+The per-account `LockoutService` (see "Lockout (login)"
 above) is unchanged and stacks on top of `login_rate_limit` — they
 defend different axes: lockout defends one account against
 credential-stuffing; the IP rate limits defend each endpoint

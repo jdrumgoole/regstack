@@ -290,10 +290,12 @@ class RegStackConfig(BaseSettings):
     @field_validator("jwt_secret")
     @classmethod
     def _warn_empty_secret(cls, v: SecretStr) -> SecretStr:
-        # An empty secret is allowed at construction time so defaults remain
-        # usable in tests; production callers should populate it explicitly
-        # or via the wizard. Validation that *requires* it lives at the
-        # RegStack façade boundary so test fixtures can opt out.
+        # An empty or short secret is allowed at construction time so defaults
+        # remain usable in tests; production callers should populate it
+        # explicitly or via the wizard. Both the non-empty and the
+        # >= MIN_JWT_SECRET_LENGTH requirements are enforced where the secret
+        # is first used to sign — JwtCodec.__init__, reached via the RegStack
+        # façade — so test fixtures can build a bare config and opt out.
         return v
 
     def resolve_email_link_prefix(self) -> str:

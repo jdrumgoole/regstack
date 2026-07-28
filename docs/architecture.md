@@ -213,6 +213,28 @@ is just a `defaultdict(list)`. Use this surface to push events into
 your CRM, mailing list, or analytics pipeline without modifying
 regstack itself.
 
+### The `url` kwarg is a live credential
+
+`verification_requested`, `password_reset_requested` and
+`email_change_requested` pass the link that was just emailed. That
+link contains the raw single-use token, so a handler that logs its
+`**kwargs` wholesale — the usual shape of an audit or analytics
+webhook — writes account-takeover material into the log system.
+
+Every one of those three events also passes `url_without_token`: the
+same URL with the token replaced by `[REDACTED]`. Log that one.
+
+```python
+def audit(**kwargs):
+    log.info("regstack event: %s", kwargs["url_without_token"])  # safe
+    # log.info("regstack event: %s", kwargs)                     # leaks the token
+```
+
+Redaction matches the token string itself rather than a `token=`
+query key, so it holds for hosts using `verify_url_template` /
+`password_reset_url_template` to put the token in a path segment or
+hash fragment.
+
 ## Templating
 
 Two [Jinja2](https://jinja.palletsprojects.com/) environments share

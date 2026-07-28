@@ -8,6 +8,7 @@ import pytest
 from regstack.auth.clock import FrozenClock
 from regstack.auth.jwt import JwtCodec, TokenError, is_payload_bulk_revoked
 from regstack.config.schema import RegStackConfig
+from regstack.config.secrets import MIN_JWT_SECRET_LENGTH
 
 
 def _make_codec(ttl: int = 7200) -> tuple[JwtCodec, FrozenClock]:
@@ -59,3 +60,17 @@ def test_empty_secret_rejected() -> None:
     config = RegStackConfig()  # default jwt_secret is empty
     with pytest.raises(ValueError, match="jwt_secret is empty"):
         JwtCodec(config, FrozenClock())
+
+
+@pytest.mark.parametrize("length", [1, 8, MIN_JWT_SECRET_LENGTH - 1])
+def test_short_secret_rejected(length: int) -> None:
+    config = RegStackConfig(jwt_secret="x" * length)  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="jwt_secret is too short"):
+        JwtCodec(config, FrozenClock())
+
+
+def test_secret_at_minimum_length_accepted() -> None:
+    config = RegStackConfig(jwt_secret="x" * MIN_JWT_SECRET_LENGTH)  # type: ignore[arg-type]
+    codec = JwtCodec(config, FrozenClock())
+    token, payload = codec.encode("user-1")
+    assert codec.decode(token).jti == payload.jti

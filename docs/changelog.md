@@ -48,6 +48,20 @@ URL templates to put the token in a path segment or hash fragment.
   characters. Deployments running a short secret will fail to start
   until it is replaced; `regstack init` generates a suitable one.
   (Issue #153.)
+- **The coverage routine can provision MongoDB from Docker.**
+  `scripts/ccr_coverage_setup.py` gained a fourth and final fallback:
+  when the mongodb-org apt repo, the distro `mongodb` package and the
+  fastdl.mongodb.org static tarball are all unreachable, it starts
+  `mongo:7.0` in a container instead. This is the only path that
+  contacts no MongoDB-owned host, so it survives a container whose
+  egress policy allows Docker Hub — the default for cloud environments
+  — but blocks the MongoDB CDN, which is what had produced ten
+  consecutive infrastructure failures on issue #86. The container is
+  reused across runs rather than recreated, publishes only on
+  127.0.0.1, and its image tag is pinned to the same major.minor the
+  native install paths use. When Docker is blocked too, the failure
+  message now names all four attempted paths so the cause reads as a
+  network policy rather than a broken script.
 
 #### Security
 

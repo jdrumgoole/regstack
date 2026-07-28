@@ -250,6 +250,15 @@ strict = true
 warn_unreachable = true
 plugins = ["pydantic.mypy"]
 
+# The Twilio SDK ships no py.typed marker and is an optional extra, so the
+# lazy import inside SmsService raises a different error code depending on
+# whether the extra happens to be installed (`import-not-found` without it,
+# `import-untyped` with it). An inline ignore can only be right for one of
+# those; the module override is right for both.
+[[tool.mypy.overrides]]
+module = ["twilio.*"]
+ignore_missing_imports = true
+
 [tool.coverage.run]
 source = ["src/regstack"]
 branch = true

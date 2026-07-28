@@ -31,10 +31,18 @@ the server doesn't have to remember it to validate it. That's why
 revocation needs explicit handling (see below).
 
 - **Per-purpose signing keys.** A single master `config.jwt_secret`
-  (≥32 chars) is fed through HMAC-SHA256 with a per-purpose label to
-  derive a separate signing key for each token kind: `session`,
+  is fed through HMAC-SHA256 with a per-purpose label to derive a
+  separate signing key for each token kind: `session`,
   `password_reset`, `email_change`, `phone_setup`, `login_mfa`.
   Compromise of one derived key does **not** compromise the master.
+- **The master secret must be ≥32 characters**, enforced when the
+  `RegStack` façade builds its `JwtCodec` — a short secret raises
+  `ValueError` at startup rather than silently signing tokens.
+  HMAC-SHA256 zero-pads a short key instead of rejecting it, so
+  `REGSTACK_JWT_SECRET=x` would otherwise sign every session token
+  with a few bits of entropy and no visible symptom. `regstack init`
+  generates a 64-byte URL-safe secret; `regstack doctor` reports the
+  length of whatever is configured.
 - **`iat` is a float.** RFC 7519 explicitly allows fractional
   seconds. We use them. This matters for the bulk-revoke comparison
   (see below) — without sub-second precision, a login completing in
@@ -160,7 +168,10 @@ visible to logged-out users only.
 Lockout defends each *account* against credential-stuffing. It does
 nothing for an IP that hammers `/forgot-password`, `/register`, or
 `/verify` against many accounts. For that, regstack supports
-slowapi-backed per-route IP rate limits:
+slowapi-backed per-route IP rate limits — **off until you configure
+them.** A deployment that sets none of the `*_rate_limit` fields has
+no IP-level protection on `/register`, `/forgot-password`,
+`/resend-verification` or `/verify`.
 
 - Opt in by installing the `rate_limit` extra (`pip install
   regstack[rate_limit]`) **or** by passing a host-built
@@ -370,6 +381,14 @@ avoids that:
   isn't worth letting hit Python at all.
 - **Backups, MongoDB user permissions, network-level isolation** between
   the app and the database.
+- **What your hook handlers do with what they're given.** The `url`
+  kwarg on `verification_requested`, `password_reset_requested` and
+  `email_change_requested` carries the raw single-use token — the same
+  link the user gets by email. A handler that logs `**kwargs` puts
+  account-takeover material in your log aggregator. Those three events
+  also pass `url_without_token`, the same URL with the token replaced
+  by `[REDACTED]`; log that instead. See *Hooks* in the architecture
+  guide.
 
 ## Reporting vulnerabilities
 

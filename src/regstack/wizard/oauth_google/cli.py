@@ -224,16 +224,11 @@ def _run_gui(*, target_dir: Path, api_prefix: str, port: int | None) -> None:
         open_wizard_window,
     )
 
-    server_thread_done: asyncio.Event = asyncio.Event()
-
     def _serve_forever() -> None:
-        async def _go() -> None:
-            try:
-                await serve(server)
-            finally:
-                server_thread_done.set()
-
-        asyncio.run(_go())
+        # The loop lives entirely inside this thread. Nothing outside it may
+        # touch an asyncio primitive belonging to it — shutdown crosses the
+        # thread boundary via the threading.Event in server.settings.
+        asyncio.run(serve(server))
 
     import threading
 

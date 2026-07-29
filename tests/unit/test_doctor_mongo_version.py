@@ -10,7 +10,11 @@ from __future__ import annotations
 import pytest
 
 from regstack.cli._results import CheckResult
-from regstack.cli.doctor import _assess_mongo_server_version, _parse_mongo_version
+from regstack.cli.doctor import (
+    _assess_mongo_server_version,
+    _parse_mongo_version,
+    _secantus_version,
+)
 
 
 @pytest.mark.parametrize(
@@ -96,6 +100,41 @@ def test_assess_unparseable_version_does_not_fail() -> None:
     ok, detail = _assess_mongo_server_version("not-a-version")
     assert ok is True
     assert "could not parse" in detail
+
+
+# --- SecantusDB is not mongod ----------------------------------------------
+
+
+def test_secantus_build_info_is_recognised() -> None:
+    """SecantusDB reports the MongoDB *compatibility level* in `version`
+    and its own version in `secantusVersion`. Both end up in the detail."""
+    detail = _secantus_version({"version": "7.0.0", "secantusVersion": "0.6.0b2"})
+    assert detail == "SecantusDB 0.6.0b2 (MongoDB 7.0.0 compatibility)"
+
+
+def test_mongod_build_info_is_not_mistaken_for_secantus() -> None:
+    """A real mongod has no `secantusVersion`, so the CVE check still runs."""
+    assert _secantus_version({"version": "7.0.28"}) is None
+    assert _secantus_version({"version": "7.0.0", "secantusVersion": ""}) is None
+
+
+def test_secantus_reported_version_would_otherwise_trip_the_cve_check() -> None:
+    """The bug this guards. SecantusDB's deliberate `7.0.0` sits below
+    `_MONGO_PATCHED_BASELINE[(7, 0)]`, so running it through the mongod
+    assessment reports a MongoBleed exposure that no upgrade can fix —
+    the vulnerability is in mongod's zlib path, which SecantusDB doesn't
+    share. Recognising `secantusVersion` first is what avoids it."""
+    ok, detail = _assess_mongo_server_version("7.0.0")
+    assert ok is False
+    assert "CVE-2025-14847" in detail
+
+    # Same buildInfo, routed through the SecantusDB branch instead.
+    assert _secantus_version({"version": "7.0.0", "secantusVersion": "0.6.0b2"}) is not None
+
+
+def test_secantus_detail_survives_a_missing_compat_version() -> None:
+    """Defensive: a future build that omits `version` still identifies."""
+    assert _secantus_version({"secantusVersion": "0.7.0"}) == "SecantusDB 0.7.0"
 
 
 def test_checkresult_warned_is_advisory_not_failure() -> None:

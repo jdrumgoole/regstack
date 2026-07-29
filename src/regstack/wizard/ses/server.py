@@ -18,6 +18,7 @@ from pathlib import Path
 
 import uvicorn
 
+from regstack.wizard._shutdown import new_shutdown_event, wait_for_shutdown
 from regstack.wizard.ses.routes import WizardSettings, build_wizard_app
 
 
@@ -47,7 +48,7 @@ def make_wizard_server(
     settings = WizardSettings(
         target_dir=target_dir,
         launch_token=token,
-        shutdown_event=asyncio.Event(),
+        shutdown_event=new_shutdown_event(),
         existing_from_address=existing_from_address,
     )
     url = f"http://127.0.0.1:{bound_port}/?token={token}"
@@ -73,7 +74,7 @@ async def serve(server: WizardServer) -> None:
 
     serve_task = asyncio.create_task(uv.serve())
     try:
-        await server.settings.shutdown_event.wait()
+        await wait_for_shutdown(server.settings.shutdown_event)
     finally:
         uv.should_exit = True
         await serve_task

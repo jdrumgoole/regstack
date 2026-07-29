@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from regstack.auth.tokens import generate_verification_token
 from regstack.backends.protocols import PendingAlreadyExistsError, UserAlreadyExistsError
+from regstack.hooks.redaction import redact_token
 from regstack.models.pending_registration import PendingRegistration
 from regstack.models.user import BaseUser, UserCreate, UserPublic
 from regstack.routers._schemas import PendingResponse
@@ -94,5 +95,10 @@ async def _start_verification(
         ttl_hours=max(ttl // 3600, 1),
     )
     await rs.email.send(message)
-    await rs.hooks.fire("verification_requested", email=payload.email, url=url)
+    await rs.hooks.fire(
+        "verification_requested",
+        email=payload.email,
+        url=url,
+        url_without_token=redact_token(url, raw),
+    )
     return PendingResponse(email=payload.email, expires_at=expires_at.isoformat())

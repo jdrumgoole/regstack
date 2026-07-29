@@ -34,6 +34,7 @@ def _exclude_set() -> set[str]:
 _REQUIRED_EXCLUDES = frozenset(
     {
         ".git",  # worktree-pointer leak
+        ".claude/",  # settings.local.json carries absolute home paths
         ".github/",
         ".python-version",
         ".readthedocs.yaml",
@@ -56,6 +57,21 @@ def test_sdist_exclude_covers_required_paths() -> None:
         f"sdist exclude list dropped required entries: {sorted(missing)} "
         "(re-introduces W-2 from the security review)"
     )
+
+
+def test_local_claude_state_is_gitignored() -> None:
+    """The second layer of the 0.9.0 sdist leak fix.
+
+    Hatchling's sdist sweep picks up files that are untracked *and* not
+    gitignored, which is how ``.claude/settings.local.json`` — carrying
+    the permission allowlist with absolute developer home paths — reached
+    a built tarball despite never being committed. The exclude list above
+    stops it at the packaging layer; these ignore rules stop it at the
+    source, and also keep the file from being committed by accident.
+    """
+    ignored = (_REPO_ROOT / ".gitignore").read_text().splitlines()
+    for pattern in (".claude/settings.local.json", ".claude/*.lock"):
+        assert pattern in ignored, f".gitignore no longer covers {pattern!r}"
 
 
 def test_sdist_exclude_block_exists() -> None:

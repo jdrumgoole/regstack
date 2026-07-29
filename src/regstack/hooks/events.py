@@ -86,6 +86,15 @@ class HookRegistry:
             **kwargs: Keyword arguments forwarded to every handler.
                 regstack passes a contextually-relevant set per event
                 (e.g. ``user`` for ``"user_registered"``).
+
+        Warning:
+            The ``url`` kwarg on ``verification_requested``,
+            ``password_reset_requested`` and ``email_change_requested``
+            embeds a **live single-use credential**. A handler that logs
+            its ``**kwargs`` wholesale writes usable password-reset
+            tokens into the log system. Log the ``url_without_token``
+            kwarg those events also carry — same URL with the token
+            replaced by ``[REDACTED]``.
         """
         handlers = self._handlers.get(event, ())
         if not handlers:

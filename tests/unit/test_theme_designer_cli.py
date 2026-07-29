@@ -16,6 +16,7 @@ from click.testing import CliRunner
 
 import regstack.wizard.theme_designer.cli as designer_cli
 from regstack.cli.__main__ import cli
+from regstack.wizard._shutdown import wait_for_shutdown
 from regstack.wizard.theme_designer.writer import THEME_FILE
 
 # ---------------------------------------------------------------------------
@@ -142,7 +143,11 @@ def test_print_only_rejects_malformed_var(tmp_path: Path) -> None:
 def _stub_serve_factory(call_log: list[str]) -> Any:
     async def _stub(server: Any) -> None:
         call_log.append("serve-called")
-        await server.settings.shutdown_event.wait()
+        # Mirror the real serve(): shutdown_event is a threading.Event, so it
+        # must be awaited through the bridge. `await event.wait()` raises
+        # TypeError here — inside a daemon thread, where it is swallowed and
+        # the stub silently stops waiting.
+        await wait_for_shutdown(server.settings.shutdown_event)
 
     return _stub
 

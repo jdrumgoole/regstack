@@ -19,7 +19,7 @@ class TwilioSmsService(SmsService):
 
     def __init__(self, config: SmsConfig) -> None:
         try:
-            from twilio.rest import Client  # type: ignore[import-not-found]  # noqa: F401
+            from twilio.rest import Client  # noqa: F401
         except ImportError as exc:
             raise RuntimeError(
                 "The Twilio SMS backend requires the 'twilio' extra. "

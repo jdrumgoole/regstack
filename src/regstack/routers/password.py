@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from regstack.auth.jwt import TokenError
+from regstack.hooks.redaction import redact_token
 from regstack.routers._schemas import MessageResponse, PasswordStr
 
 if TYPE_CHECKING:
@@ -67,7 +68,12 @@ def build_password_router(rs: RegStack) -> APIRouter:
             ttl_minutes=max(ttl // 60, 1),
         )
         await rs.email.send(message)
-        await rs.hooks.fire("password_reset_requested", user=user, url=url)
+        await rs.hooks.fire(
+            "password_reset_requested",
+            user=user,
+            url=url,
+            url_without_token=redact_token(url, token),
+        )
         return ack
 
     @router.post(

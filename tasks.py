@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import shutil
 import socket
 import subprocess
@@ -76,11 +77,22 @@ def test_postgres(
     _pytest(c, env=env, k=k, verbose=verbose)
 
 
+@task(name="test-secantus")
+def test_secantus(c: Context, k: str = "", verbose: bool = False) -> None:
+    """Run only the SecantusDB parametrization.
+
+    Needs no external service: the suite embeds its own server per xdist
+    worker on a kernel-assigned port with in-memory storage. Requires the
+    `secantus` extra (`uv sync --extra dev`).
+    """
+    _pytest(c, env={"REGSTACK_TEST_BACKENDS": "secantus"}, k=k, verbose=verbose)
+
+
 @task(name="test-all")
 def test_all(c: Context, verbose: bool = False, pg_url: str = _DEFAULT_PG_URL) -> None:
-    """Run the suite against all three backends + e2e wizard tests."""
+    """Run the suite against all four backends + e2e wizard tests."""
     env = {
-        "REGSTACK_TEST_BACKENDS": "sqlite,mongo,postgres",
+        "REGSTACK_TEST_BACKENDS": "sqlite,mongo,postgres,secantus",
         "REGSTACK_TEST_POSTGRES_URL": pg_url,
     }
     _pytest(c, env=env, verbose=verbose)
@@ -106,7 +118,7 @@ def test_serial(c: Context, k: str = "") -> None:
     c.run(cmd, pty=True)
 
 
-_ALL_BACKENDS = ("sqlite", "mongo", "postgres")
+_ALL_BACKENDS = ("sqlite", "mongo", "postgres", "secantus")
 
 
 def _resolve_coverage_backends(requested: str) -> tuple[list[str], list[str]]:
@@ -130,6 +142,15 @@ def _resolve_coverage_backends(requested: str) -> tuple[list[str], list[str]]:
             continue
         if backend == "sqlite":
             usable.append(backend)
+            continue
+        if backend == "secantus":
+            # Embedded — no port to probe. The test suite starts its own
+            # server per worker, so availability is purely "is the package
+            # importable", not "is a service listening".
+            if importlib.util.find_spec("secantus") is not None:
+                usable.append(backend)
+            else:
+                excluded.append(backend)
             continue
         if _port_open(_PORTS[backend]):
             usable.append(backend)
@@ -171,7 +192,7 @@ def coverage(
     """
     usable, excluded = _resolve_coverage_backends(backends)
     if excluded and not allow_partial:
-        missing = ", ".join(f"{_NAMES[b]} (:{_PORTS[b]})" for b in excluded)
+        missing = ", ".join(_describe_missing_backend(b) for b in excluded)
         raise Exit(
             "COVERAGE_INFRA_UNAVAILABLE: required backends not reachable: "
             f"{missing}. Bring services up with `inv db-up` (or run "
@@ -252,10 +273,15 @@ def clean(c: Context) -> None:
 
 @task
 def docs(c: Context, warning_as_error: bool = True) -> None:
-    """Build the Sphinx HTML docs into docs/_build/html."""
+    """Build the Sphinx HTML docs into docs/_build/html.
+
+    ``--extra docs`` is passed explicitly: without it, ``uv run`` falls
+    through to whatever ``sphinx-build`` is on PATH when the docs extra
+    isn't synced — which under pyenv is a shim for an unrelated Python.
+    """
     flags = "-W --keep-going" if warning_as_error else ""
     c.run(
-        f"uv run sphinx-build -b html {flags} docs docs/_build/html",
+        f"uv run --extra docs sphinx-build -b html {flags} docs docs/_build/html",
         pty=True,
     )
 
@@ -270,7 +296,7 @@ def docs_clean(c: Context) -> None:
 def docs_serve(c: Context, port: int = 8001) -> None:
     """Live-rebuild docs and serve them on the given port."""
     c.run(
-        f"uv run sphinx-autobuild docs docs/_build/html --port {port}",
+        f"uv run --extra docs sphinx-autobuild docs docs/_build/html --port {port}",
         pty=True,
     )
 
@@ -284,7 +310,22 @@ def docs_serve(c: Context, port: int = 8001) -> None:
 # postgres container manually is still valid.
 
 _PORTS = {"mongo": 27017, "postgres": 5432}
-_NAMES = {"mongo": "MongoDB", "postgres": "Postgres"}
+_NAMES = {"mongo": "MongoDB", "postgres": "Postgres", "secantus": "SecantusDB"}
+
+
+def _describe_missing_backend(backend: str) -> str:
+    """Say why a backend is unavailable, in the terms that fix it.
+
+    Port-bound backends name the port to bring up; SecantusDB embeds its
+    own server, so the only way it can be missing is an uninstalled
+    package — reporting a port for it would send the reader to a service
+    that was never supposed to be running.
+    """
+    name = _NAMES.get(backend, backend)
+    port = _PORTS.get(backend)
+    if port is None:
+        return f"{name} (package not installed: uv sync --extra dev)"
+    return f"{name} (:{port})"
 _BREW_SERVICES = {
     # In preference order; first one that brew knows about wins.
     "mongo": ["mongodb-community", "mongodb-community@8.0", "mongodb-community@7.0"],

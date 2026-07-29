@@ -9,7 +9,6 @@ machine can't open a GUI (e.g. headless CI).
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import threading
 from typing import TYPE_CHECKING
@@ -48,11 +47,12 @@ def open_wizard_window(server: WizardServer, title: str = "regstack — Google O
         raise WizardWindowError("pywebview did not return a window handle.")
 
     def _watch_shutdown() -> None:
-        async def _wait() -> None:
-            await server.settings.shutdown_event.wait()
-
+        # A plain blocking wait: shutdown_event is a threading.Event, so this
+        # needs no event loop. Spinning one up here (asyncio.run) is what
+        # raised "bound to a different event loop" — the Event already
+        # belonged to uvicorn's loop in the server thread.
         try:
-            asyncio.run(_wait())
+            server.settings.shutdown_event.wait()
         finally:
             with contextlib.suppress(Exception):
                 window.destroy()

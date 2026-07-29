@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 import jwt as pyjwt
 
-from regstack.config.secrets import derive_secret
+from regstack.config.secrets import MIN_JWT_SECRET_LENGTH, derive_secret
 
 if TYPE_CHECKING:
     from regstack.auth.clock import Clock
@@ -106,19 +106,29 @@ class JwtCodec:
 
         Args:
             config: The active :class:`~regstack.config.schema.RegStackConfig`.
-                ``config.jwt_secret`` must be non-empty.
+                ``config.jwt_secret`` must be at least
+                :data:`~regstack.config.secrets.MIN_JWT_SECRET_LENGTH`
+                characters.
             clock: The clock used for issuing ``iat``/``exp`` and for
                 validating expiry on decode.
 
         Raises:
-            ValueError: If ``config.jwt_secret`` is empty. Use
-                ``regstack init`` to generate one, or set
+            ValueError: If ``config.jwt_secret`` is empty or shorter than
+                :data:`~regstack.config.secrets.MIN_JWT_SECRET_LENGTH`.
+                Use ``regstack init`` to generate one, or set
                 ``REGSTACK_JWT_SECRET``.
         """
-        if not config.jwt_secret.get_secret_value():
+        raw = config.jwt_secret.get_secret_value()
+        if not raw:
             raise ValueError(
                 "RegStackConfig.jwt_secret is empty. Run `regstack init` to generate one, "
                 "or set REGSTACK_JWT_SECRET."
+            )
+        if len(raw) < MIN_JWT_SECRET_LENGTH:
+            raise ValueError(
+                f"RegStackConfig.jwt_secret is too short ({len(raw)} chars; "
+                f"need at least {MIN_JWT_SECRET_LENGTH}). Run `regstack init` to generate "
+                "one, or set REGSTACK_JWT_SECRET to a strong secret."
             )
         self._config = config
         self._clock = clock

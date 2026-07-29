@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from regstack.auth.jwt import TokenError
 from regstack.backends.protocols import UserAlreadyExistsError
 from regstack.config.secrets import derive_secret
+from regstack.hooks.redaction import redact_token
 from regstack.models.user import BaseUser, UserPublic
 from regstack.routers._helpers import require_password_set
 from regstack.routers._schemas import MessageResponse, PasswordStr
@@ -164,6 +165,7 @@ def build_account_router(rs: RegStack) -> APIRouter:
             user=user,
             new_email=payload.new_email,
             url=url,
+            url_without_token=redact_token(url, token),
         )
         return accepted
 

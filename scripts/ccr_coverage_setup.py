@@ -73,6 +73,17 @@ MONGO_TARBALL_SHA256 = {
     "aarch64": "98ce820befcd1f5c45ba26e41ac77ffa454edc09f2e9fd8a40d5bc1472b32967",
 }
 
+# Docker fallback — the path that survives a network policy blocking every
+# MongoDB host. Cloud/CCR containers ship Docker, and Docker Hub sits on the
+# default "Trusted" egress allowlist while repo.mongodb.org, www.mongodb.org
+# and fastdl.mongodb.org do not, so pulling the image can succeed in exactly
+# the containers where all three native install paths 403.
+#
+# Tag tracks MONGO_VERSION's major.minor so the container serves the same
+# server version the native paths install. Bump both together.
+MONGO_DOCKER_IMAGE = "mongo:7.0"
+MONGO_CONTAINER_NAME = "regstack-coverage-mongo"
+
 # The CI workflow uses these credentials too; matching them keeps
 # REGSTACK_TEST_POSTGRES_URL identical between CI and CCR.
 PG_USER = "regstack"
@@ -126,6 +137,16 @@ def _run(
     """Run a command, streaming output. Raises CalledProcessError on failure when ``check``."""
     _info(f"$ {' '.join(cmd)}")
     return subprocess.run(cmd, check=check, text=True, env={**os.environ, **(env or {})})
+
+
+def _run_quiet(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+    """Run a command capturing its output, never raising.
+
+    For probes whose failure is an expected branch rather than an error
+    worth showing the operator (``docker info`` on a host with no daemon,
+    ``docker inspect`` on a container that was never created).
+    """
+    return subprocess.run(cmd, check=False, text=True, capture_output=True)
 
 
 # --- Probes ----------------------------------------------------------------
@@ -252,6 +273,88 @@ def _install_mongod_from_tarball(version: str = MONGO_VERSION) -> bool:
     return _have("mongod")
 
 
+# --- MongoDB via Docker ----------------------------------------------------
+#
+# The final fallback, and the only one that doesn't touch a MongoDB-owned
+# host. See MONGO_DOCKER_IMAGE for why that matters in a restricted-egress
+# container.
+
+
+def _docker_ready(timeout: float = 20.0) -> bool:
+    """True when `docker` is on PATH and its daemon answers.
+
+    A fresh container often has the client and `dockerd` installed but no
+    daemon running, so a single `docker info` probe under-reports. One
+    `service docker start` attempt then a short poll covers that case
+    without turning a missing daemon into a hard failure.
+    """
+    if not _have("docker"):
+        return False
+    if _run_quiet(["docker", "info"]).returncode == 0:
+        return True
+    if not _is_linux():
+        # `service` is a Linux-ism, and on macOS the daemon lives in a GUI
+        # app (Docker Desktop / OrbStack) this script has no business
+        # launching. Report unavailable rather than prompting for sudo.
+        _warn("docker daemon isn't running; start it yourself (this script won't)")
+        return False
+    _info("docker client present but the daemon isn't answering; trying to start it...")
+    _run_quiet(["sudo", "service", "docker", "start"])
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if _run_quiet(["docker", "info"]).returncode == 0:
+            return True
+        time.sleep(0.5)
+    return False
+
+
+def _start_mongo_in_docker(
+    image: str = MONGO_DOCKER_IMAGE, name: str = MONGO_CONTAINER_NAME
+) -> bool:
+    """Serve MongoDB on :27017 from a container. Returns True iff the port came up.
+
+    Idempotent like the rest of the script: an existing container is
+    reused (started first if it had been stopped) rather than colliding
+    on the name. The port is published on 127.0.0.1 only, matching the
+    `--bind_ip 127.0.0.1` the native path uses.
+    """
+    if not _docker_ready():
+        _warn("docker unavailable (no client, or the daemon wouldn't start)")
+        return False
+
+    state = _run_quiet(["docker", "inspect", "-f", "{{.State.Running}}", name])
+    if state.returncode == 0:
+        if state.stdout.strip() == "true":
+            _info(f"container {name!r} is already running")
+        else:
+            _info(f"restarting existing container {name!r}")
+            if _run_quiet(["docker", "start", name]).returncode != 0:
+                _warn(f"could not restart container {name!r}")
+                return False
+    else:
+        try:
+            _run(
+                [
+                    "docker",
+                    "run",
+                    "-d",
+                    "--name",
+                    name,
+                    "-p",
+                    f"127.0.0.1:{MONGO_PORT}:27017",
+                    image,
+                ]
+            )
+        except subprocess.CalledProcessError:
+            _warn(f"`docker run {image}` failed — image pull blocked, or no disk?")
+            return False
+
+    if not _wait_for_port(MONGO_PORT, timeout=60.0):
+        _warn(f"container started but :{MONGO_PORT} never came up (`docker logs {name}`)")
+        return False
+    return True
+
+
 # --- Per-service setup ------------------------------------------------------
 
 
@@ -260,9 +363,12 @@ def setup_mongo() -> StepResult:
 
     Doesn't raise on failure — the caller decides whether a partial
     matrix is acceptable. Tries (in order): an already-present `mongod`
-    on PATH, the mongodb-org apt repo, the distro `mongodb` package, and
-    finally the official static tarball from fastdl.mongodb.org (the
-    apt-independent path that survives a 403 on the apt repo).
+    on PATH, the mongodb-org apt repo, the distro `mongodb` package, the
+    official static tarball from fastdl.mongodb.org (the apt-independent
+    path that survives a 403 on the apt repo), and finally the
+    `mongo:7.0` Docker image — the only path that reaches no
+    MongoDB-owned host, so it survives an egress policy that blocks all
+    three of the others.
     """
     if _port_open(MONGO_PORT):
         return StepResult(name="MongoDB", ok=True, detail=f"already listening on :{MONGO_PORT}")
@@ -294,14 +400,23 @@ def setup_mongo() -> StepResult:
                 _install_mongod_from_tarball()
 
     if not _have("mongod"):
+        _info("no native mongod available; falling back to the Docker image")
+        if _start_mongo_in_docker():
+            return StepResult(
+                name="MongoDB",
+                ok=True,
+                detail=f"{MONGO_DOCKER_IMAGE} container listening on :{MONGO_PORT}",
+            )
         return StepResult(
             name="MongoDB",
             ok=False,
             detail=(
                 "install failed — the mongodb-org apt repo, the distro "
-                "`mongodb` package, and the fastdl.mongodb.org static "
-                "tarball were all unreachable. Restricted-network CCR "
-                "container with the MongoDB CDN blocked too?"
+                "`mongodb` package, the fastdl.mongodb.org static tarball, "
+                f"and the {MONGO_DOCKER_IMAGE} Docker image were all "
+                "unreachable. A container that blocks Docker Hub as well as "
+                "every MongoDB host needs its egress allowlist widened; see "
+                "the allowlist notes in the issue thread."
             ),
         )
 

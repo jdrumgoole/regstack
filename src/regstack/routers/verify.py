@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr
 
 from regstack.auth.tokens import generate_verification_token, hash_token
 from regstack.backends.protocols import UserAlreadyExistsError
+from regstack.hooks.redaction import redact_token
 from regstack.models.pending_registration import PendingRegistration
 from regstack.models.user import BaseUser, UserPublic
 from regstack.routers._schemas import MessageResponse
@@ -117,7 +118,12 @@ def build_verify_router(rs: RegStack) -> APIRouter:
             ttl_hours=max(ttl // 3600, 1),
         )
         await rs.email.send(message)
-        await rs.hooks.fire("verification_requested", email=pending.email, url=url)
+        await rs.hooks.fire(
+            "verification_requested",
+            email=pending.email,
+            url=url,
+            url_without_token=redact_token(url, raw),
+        )
         return _ack()
 
     return router

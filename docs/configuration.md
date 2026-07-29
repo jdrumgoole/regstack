@@ -95,7 +95,68 @@ regstack picks a backend at construction time from the URL scheme of
     (or `mongodb+srv://<username>:<password>@app.abc123.mongodb.net/dbname`)
   - Requires the `mongo` extra (pulls in `pymongo`). Database is taken
     from the URL path; falls back to ``mongodb_database`` if absent.
+* - SecantusDB
+  - `mongodb://dbhost.example.com:27017/dbname`
+  - Same scheme, same backend, same repositories — see
+    [SecantusDB](#secantusdb) below.
 ```
+
+(secantusdb)=
+
+### SecantusDB
+
+[SecantusDB](https://secantusdb.com) is an embeddable, MongoDB-compatible
+document database. It speaks the MongoDB wire protocol on the same socket
+a `mongod` would, so regstack's Mongo backend drives it **unchanged** —
+there is no separate backend kind, no separate repositories, and nothing
+to configure beyond pointing `database_url` at it.
+
+Every regstack feature that touches the database is exercised against
+SecantusDB on every CI run, as a fourth backend in the test matrix
+alongside SQLite, Postgres and real MongoDB.
+
+Running against a SecantusDB daemon needs no extra beyond `mongo`:
+
+```toml
+database_url = "mongodb://127.0.0.1:27017/regstack"
+```
+
+To embed the server in your own process instead of running a daemon,
+install the `secantus` extra (`uv sync --extra secantus`) and start one
+before constructing `RegStack`:
+
+```python
+from secantus import SecantusDBServer
+
+# port=0 lets the kernel pick a free port; drop storage_path for on-disk.
+with SecantusDBServer(port=0, storage_path=":memory:") as server:
+    config = RegStackConfig.load(
+        database_url=f"{server.uri.rstrip('/')}/regstack",
+        jwt_secret=...,
+    )
+    rs = RegStack(config=config)
+```
+
+`server.uri` ends in a slash, so strip it before appending a database
+name — pymongo rejects the `//dbname` that would otherwise result.
+
+What to know before pointing production at it:
+
+- **Single-node only by design.** Replica sets, sharding, and anything
+  depending on cluster topology are out of scope. regstack itself uses no
+  transactions or sessions, so this costs it nothing, but it does mean no
+  failover.
+- **TTL reaping runs on a sweeper**, at mongod's own 60-second default
+  cadence (`ttl_sweep_seconds` tunes it). regstack leans on TTL indexes
+  for the token blacklist, pending registrations, login attempts, MFA
+  codes and OAuth states; all of those tolerate a late sweep, because
+  every read path also checks expiry explicitly.
+- **`regstack doctor` identifies it correctly.** SecantusDB reports
+  `buildInfo.version` as its MongoDB *compatibility level*, so doctor
+  reads `secantusVersion` and reports
+  `SecantusDB <version> (MongoDB <level> compatibility)` rather than
+  measuring it against mongod's CVE patch baselines, which don't apply
+  to a separate implementation.
 
 The active backend exposes the same five repository protocols on
 ``RegStack.users``, ``.pending``, ``.blacklist``, ``.attempts``,
@@ -246,7 +307,18 @@ New in 0.5.4. Opt-in: install the `rate_limit` extra (`pip install
 `slowapi.Limiter` instance as `RegStack(rate_limiter=...)`.
 
 Each field is a slowapi-syntax string. Empty / unset = no limit on
-that route. The per-account `LockoutService` (see "Lockout (login)"
+that route.
+
+**Every one of these fields defaults to unset.** A regstack deployment
+that hasn't configured them has per-account lockout on `/login` and no
+IP-level limit at all on `/register`, `/forgot-password`,
+`/resend-verification` or `/verify` — one IP can drive unbounded
+registration attempts and outbound email until you set a limit. The
+defaults stay off because turning them on would make the router fail
+closed for hosts that haven't installed the `rate_limit` extra;
+choosing the numbers is yours.
+
+The per-account `LockoutService` (see "Lockout (login)"
 above) is unchanged and stacks on top of `login_rate_limit` — they
 defend different axes: lockout defends one account against
 credential-stuffing; the IP rate limits defend each endpoint

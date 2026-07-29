@@ -8,7 +8,10 @@ Two surfaces:
   underpins ``inv coverage --backends=...``.
 
 These are pure functions, so the tests stay unit-shaped (no
-subprocess, no apt, no Docker)."""
+subprocess, no apt, no Docker). The Docker-fallback tests patch the
+subprocess seams (``_run``, ``_run_quiet``, ``_wait_for_port``) rather
+than touching a real daemon, so they run identically on a laptop with
+Docker and in CI without it."""
 
 from __future__ import annotations
 
@@ -153,6 +156,234 @@ def test_install_mongod_refuses_on_checksum_mismatch(
     monkeypatch.setattr(setup_mod, "_run", _fake_run)
     assert setup_mod._install_mongod_from_tarball() is False
     assert ran == ["curl"]  # downloaded, then stopped — no tar, no install
+
+
+# --- MongoDB Docker fallback (the everything-MongoDB-is-403 path) ----------
+
+
+def _completed(returncode: int, stdout: str = "") -> Any:
+    """A stand-in for subprocess.CompletedProcess with just the fields used."""
+    import subprocess
+
+    return subprocess.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr="")
+
+
+def test_docker_image_tag_tracks_pinned_mongo_version(setup_mod: Any) -> None:
+    """The container must serve the same server version the native paths
+    install, or a mongo-backend coverage run would silently exercise a
+    different MongoDB than CI does."""
+    major_minor = ".".join(setup_mod.MONGO_VERSION.split(".")[:2])
+    assert f"mongo:{major_minor}" == setup_mod.MONGO_DOCKER_IMAGE
+
+
+def test_docker_ready_false_without_client_and_runs_nothing(
+    setup_mod: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(setup_mod, "_have", lambda _cmd: False)
+
+    def _boom(*_a: Any, **_k: Any) -> Any:
+        raise AssertionError("must not shell out when docker isn't on PATH")
+
+    monkeypatch.setattr(setup_mod, "_run_quiet", _boom)
+    assert setup_mod._docker_ready() is False
+
+
+def test_docker_ready_true_when_daemon_answers(
+    setup_mod: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[list[str]] = []
+    monkeypatch.setattr(setup_mod, "_have", lambda _cmd: True)
+    monkeypatch.setattr(setup_mod, "_run_quiet", lambda cmd: (calls.append(cmd), _completed(0))[1])
+    assert setup_mod._docker_ready() is True
+    assert calls == [["docker", "info"]]  # no attempt to start an already-live daemon
+
+
+def test_docker_ready_starts_a_stopped_daemon(
+    setup_mod: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`dockerd` installed but not running is the fresh-container case:
+    one `service docker start`, then the poll succeeds."""
+    calls: list[list[str]] = []
+    monkeypatch.setattr(setup_mod, "_have", lambda _cmd: True)
+    monkeypatch.setattr(setup_mod, "_is_linux", lambda: True)
+
+    def _fake(cmd: list[str]) -> Any:
+        calls.append(cmd)
+        if cmd[:2] == ["docker", "info"]:
+            # First probe fails; after `service docker start`, succeeds.
+            return _completed(0 if ["sudo", "service", "docker", "start"] in calls else 1)
+        return _completed(0)
+
+    monkeypatch.setattr(setup_mod, "_run_quiet", _fake)
+    assert setup_mod._docker_ready() is True
+    assert ["sudo", "service", "docker", "start"] in calls
+
+
+def test_docker_ready_does_not_sudo_on_macos(
+    setup_mod: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`service` doesn't exist on macOS and the daemon lives in a GUI app;
+    a dead daemon there must report unavailable, not prompt for sudo."""
+    calls: list[list[str]] = []
+    monkeypatch.setattr(setup_mod, "_have", lambda _cmd: True)
+    monkeypatch.setattr(setup_mod, "_is_linux", lambda: False)
+    monkeypatch.setattr(setup_mod, "_run_quiet", lambda cmd: (calls.append(cmd), _completed(1))[1])
+    assert setup_mod._docker_ready() is False
+    assert calls == [["docker", "info"]]
+
+
+def test_docker_ready_gives_up_when_daemon_never_answers(
+    setup_mod: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(setup_mod, "_have", lambda _cmd: True)
+    monkeypatch.setattr(setup_mod, "_run_quiet", lambda _cmd: _completed(1))
+    assert setup_mod._docker_ready(timeout=0.0) is False
+
+
+def test_start_mongo_in_docker_bails_when_docker_unavailable(
+    setup_mod: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(setup_mod, "_docker_ready", lambda **_k: False)
+
+    def _boom(*_a: Any, **_k: Any) -> Any:
+        raise AssertionError("must not run docker commands when the daemon is unavailable")
+
+    monkeypatch.setattr(setup_mod, "_run", _boom)
+    monkeypatch.setattr(setup_mod, "_run_quiet", _boom)
+    assert setup_mod._start_mongo_in_docker() is False
+
+
+def test_start_mongo_in_docker_reuses_a_running_container(
+    setup_mod: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Idempotence: a second run must not collide on the container name."""
+    monkeypatch.setattr(setup_mod, "_docker_ready", lambda **_k: True)
+    monkeypatch.setattr(setup_mod, "_run_quiet", lambda _cmd: _completed(0, "true\n"))
+    monkeypatch.setattr(setup_mod, "_wait_for_port", lambda _p, timeout=0: True)
+
+    def _boom(*_a: Any, **_k: Any) -> Any:
+        raise AssertionError("must not `docker run` when a container is already up")
+
+    monkeypatch.setattr(setup_mod, "_run", _boom)
+    assert setup_mod._start_mongo_in_docker() is True
+
+
+def test_start_mongo_in_docker_restarts_a_stopped_container(
+    setup_mod: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[list[str]] = []
+    monkeypatch.setattr(setup_mod, "_docker_ready", lambda **_k: True)
+
+    def _fake(cmd: list[str]) -> Any:
+        calls.append(cmd)
+        return _completed(0, "false\n") if cmd[1] == "inspect" else _completed(0)
+
+    monkeypatch.setattr(setup_mod, "_run_quiet", _fake)
+    monkeypatch.setattr(setup_mod, "_wait_for_port", lambda _p, timeout=0: True)
+    monkeypatch.setattr(
+        setup_mod,
+        "_run",
+        lambda *_a, **_k: pytest.fail("stopped container must be started, not recreated"),
+    )
+    assert setup_mod._start_mongo_in_docker() is True
+    assert ["docker", "start", setup_mod.MONGO_CONTAINER_NAME] in calls
+
+
+def test_start_mongo_in_docker_creates_the_container_when_absent(
+    setup_mod: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The port is published on loopback only, matching the native path's
+    `--bind_ip 127.0.0.1`."""
+    ran: list[list[str]] = []
+    monkeypatch.setattr(setup_mod, "_docker_ready", lambda **_k: True)
+    monkeypatch.setattr(
+        setup_mod, "_run_quiet", lambda _cmd: _completed(1)
+    )  # inspect: no such container
+    monkeypatch.setattr(setup_mod, "_run", lambda cmd, **_k: ran.append(cmd))
+    monkeypatch.setattr(setup_mod, "_wait_for_port", lambda _p, timeout=0: True)
+
+    assert setup_mod._start_mongo_in_docker() is True
+    assert len(ran) == 1
+    cmd = ran[0]
+    assert cmd[:3] == ["docker", "run", "-d"]
+    assert cmd[-1] == setup_mod.MONGO_DOCKER_IMAGE
+    assert f"127.0.0.1:{setup_mod.MONGO_PORT}:27017" in cmd
+    assert setup_mod.MONGO_CONTAINER_NAME in cmd
+
+
+def test_start_mongo_in_docker_false_when_port_never_opens(
+    setup_mod: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(setup_mod, "_docker_ready", lambda **_k: True)
+    monkeypatch.setattr(setup_mod, "_run_quiet", lambda _cmd: _completed(1))
+    monkeypatch.setattr(setup_mod, "_run", lambda *_a, **_k: None)
+    monkeypatch.setattr(setup_mod, "_wait_for_port", lambda _p, timeout=0: False)
+    assert setup_mod._start_mongo_in_docker() is False
+
+
+def test_start_mongo_in_docker_false_when_pull_blocked(
+    setup_mod: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Docker Hub blocked too — `docker run` exits non-zero and the
+    fallback reports failure rather than raising."""
+    import subprocess
+
+    monkeypatch.setattr(setup_mod, "_docker_ready", lambda **_k: True)
+    monkeypatch.setattr(setup_mod, "_run_quiet", lambda _cmd: _completed(1))
+
+    def _pull_fails(*_a: Any, **_k: Any) -> Any:
+        raise subprocess.CalledProcessError(1, "docker run")
+
+    monkeypatch.setattr(setup_mod, "_run", _pull_fails)
+    assert setup_mod._start_mongo_in_docker() is False
+
+
+def test_setup_mongo_reports_ok_via_docker_when_every_native_path_fails(
+    setup_mod: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The wiring that closes issue #86: apt repo, distro package and
+    static tarball all blocked, but the container comes up, so the
+    MongoDB StepResult is ok and `_backends_available` includes mongo."""
+    import subprocess
+
+    monkeypatch.setattr(setup_mod, "_port_open", lambda *_a, **_k: False)
+    monkeypatch.setattr(setup_mod, "_have", lambda _cmd: False)
+    monkeypatch.setattr(
+        setup_mod,
+        "_run",
+        lambda *_a, **_k: (_ for _ in ()).throw(subprocess.CalledProcessError(1, "apt")),
+    )
+    monkeypatch.setattr(setup_mod, "_install_mongod_from_tarball", lambda *_a, **_k: False)
+    monkeypatch.setattr(setup_mod, "_start_mongo_in_docker", lambda *_a, **_k: True)
+
+    result = setup_mod.setup_mongo()
+    assert result.ok is True
+    assert setup_mod.MONGO_DOCKER_IMAGE in result.detail
+    assert setup_mod._backends_available([result]) == ["sqlite", "mongo"]
+
+
+def test_setup_mongo_failure_detail_names_every_attempted_path(
+    setup_mod: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When Docker is blocked as well, the operator needs to see that all
+    four paths were tried — that's what distinguishes 'widen the
+    allowlist' from 'the script is broken'."""
+    import subprocess
+
+    monkeypatch.setattr(setup_mod, "_port_open", lambda *_a, **_k: False)
+    monkeypatch.setattr(setup_mod, "_have", lambda _cmd: False)
+    monkeypatch.setattr(
+        setup_mod,
+        "_run",
+        lambda *_a, **_k: (_ for _ in ()).throw(subprocess.CalledProcessError(1, "apt")),
+    )
+    monkeypatch.setattr(setup_mod, "_install_mongod_from_tarball", lambda *_a, **_k: False)
+    monkeypatch.setattr(setup_mod, "_start_mongo_in_docker", lambda *_a, **_k: False)
+
+    result = setup_mod.setup_mongo()
+    assert result.ok is False
+    for path in ("apt repo", "fastdl.mongodb.org", setup_mod.MONGO_DOCKER_IMAGE):
+        assert path in result.detail
 
 
 # --- tasks.py::_resolve_coverage_backends ----------------------------------

@@ -5,21 +5,234 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
-### Fixed
+### Headline
 
-- The `oauth` extra now declares `httpx`.
-  `regstack/oauth/providers/google.py` imports it at module scope for
-  the token-endpoint calls, but the extra listed only `pyjwt[crypto]`
-  and `cryptography`. A host that ran `pip install regstack[oauth]`
-  and set `enable_oauth = True` got `ModuleNotFoundError: No module
-  named 'httpx'` from `RegStack.__init__` — at construction time
-  rather than import time, so nothing surfaced it until the
-  application tried to boot. The defect was invisible in development
-  because the `dev` extra installs httpx for the test suite.
+Both setup wizards start again, and two guards that prove what ships
+
+`regstack oauth setup` crashed on launch. So did `regstack theme design`
+and `regstack ses setup` — the three wizards duplicate one scaffold, and
+the defect was in the part they share. Each runs three threads at once:
+pywebview owns the main thread because macOS requires it, uvicorn runs
+its event loop in a background thread, and a watcher thread waits for
+shutdown so it can close the window. The shutdown flag was an
+`asyncio.Event`, which binds to the first event loop that touches it and
+refuses every other one. The watcher started a second loop, awaited the
+flag uvicorn's loop already owned, and raised. Signalling shutdown from
+the CLI had the same flaw from the other direction, so tearing the
+wizard down was never dependable either. The flag is now a
+`threading.Event`, which belongs to no loop and is safe to set from
+anywhere.
+
+Nothing caught this before release because the window module is excluded
+from coverage: there is no headless path through a native GUI. But the
+bug was never in the window — it was in the threading arrangement around
+it, and that reproduces fine without a screen. The new tests drive the
+same three-thread shape directly, including a real server on a real port
+that has to stop when the flag is set from another thread.
+
+The packaging check took the same turn. A published source distribution
+is the one artefact nobody inspects, and the 0.9.0 tarball was caught one
+step before its tag went up carrying a local settings file with five
+absolute paths from the developer's machine. The test guarding that
+boundary had passed the whole time, correctly: it read the exclude list
+from `pyproject.toml` and confirmed every entry was still present. A list
+of things that must not ship cannot fail for a file nobody predicted. It
+now builds the real tarball and checks it against a declared allowlist.
+
+Both guards were verified the only way a guard can be — by reintroducing
+the failure and watching them fire.
+
+#### Fixed
+
+- **The `oauth` extra now declares `httpx`, so `pip install
+  regstack[oauth]` works.** `regstack/oauth/providers/google.py` imports
+  httpx at module scope for its token-endpoint calls, but the extra
+  listed only `pyjwt[crypto]` and `cryptography`. A host that ran the
+  documented install and set `enable_oauth = True` got
+  `ModuleNotFoundError: No module named 'httpx'` from
+  `RegStack.__init__` — at construction time rather than import time, so
+  nothing surfaced it until the application tried to boot. It shipped
+  that way through 0.9.0. The defect was invisible in development
+  because the `dev` extra installs httpx for the test suite, and the
+  module's own docstring asserted the opposite: that lazy importing made
+  the declaration unnecessary, which only holds for dependencies the
+  extra actually declares.
   `tests/unit/test_extra_declares_its_imports.py` now walks the
   extra-gated subpackages and fails when any module-scope third-party
-  import is missing from the matching extra, so a new provider
-  reaching for a new library is caught before release.
+  import is missing from the matching extra, so a new provider reaching
+  for a new library is caught before release.
+- **The three pywebview wizards no longer crash on launch.**
+  `settings.shutdown_event` was an `asyncio.Event` shared across the
+  pywebview main thread, uvicorn's loop thread and the shutdown watcher.
+  The watcher's `asyncio.run()` raised `RuntimeError: ... is bound to a
+  different event loop` immediately, and `Event.set()` from a non-owning
+  thread was unsafe in the same way. It is now a `threading.Event`, with
+  the async side awaiting it through `regstack.wizard._shutdown.
+  wait_for_shutdown` — a daemon bridge thread rather than
+  `asyncio.to_thread`, whose executor threads are non-daemon and joined
+  at interpreter exit, so a Ctrl-C before shutdown would have hung the
+  process. Also removes a vestigial `server_thread_done` event from two
+  wizard CLIs that was created on the main thread, set inside the server
+  loop, and never awaited.
+- Two wizard CLI tests contained `await shutdown_event.wait()` in their
+  fake `serve`. Against a `threading.Event` that raises `TypeError`
+  inside a daemon thread, where it is swallowed — the tests kept passing
+  while no longer verifying that `serve` waits for shutdown at all. Both
+  now go through the same bridge the real server uses.
+
+#### Added
+
+- `tests/unit/test_wizard_shutdown.py` — four checks across all three
+  wizards: the flag's type, an AST check that no window module starts its
+  own event loop, the reduced three-thread crash, and an end-to-end
+  shutdown of a live uvicorn signalled from another thread. Nine of the
+  twelve fail against the pre-fix code.
+- **The sdist contract is now an allowlist, checked against a real
+  build.** `tests/unit/test_sdist_contents.py` builds the actual tarball
+  and asserts its top level against a declared allowlist, plus scans
+  every file for absolute `/Users/<name>/` and `/home/<name>/` paths.
+  The existing exclude-list test can only catch the removal of an entry
+  someone already thought to name — it passed while the 0.9.0 sdist
+  shipped `.claude/settings.local.json`, because that directory was
+  untracked but not gitignored and hatchling's sweep includes files in
+  that state. An allowlist fails on anything undeclared, so a future
+  stray file at the repo root breaks the build instead of shipping. The
+  home-path pattern deliberately distinguishes filesystem paths from URL
+  segments (the OAuth wizard template legitimately links to
+  `.../projectselector2/home/dashboard`), and that discrimination has
+  its own test so a later simplification can't silently disarm it.
+
+## 0.9.0 — 2026-07-29
+
+### Headline
+
+Two quiet credential leaks closed, and a fourth database to run on
+
+A JWT signing secret shorter than thirty-two characters used to be
+accepted without comment. HMAC-SHA256 pads a short key with zero bytes
+rather than refusing it, so `REGSTACK_JWT_SECRET=x` signed every
+session token in the deployment with roughly seven bits of entropy and
+produced no error, no warning, and no visible symptom. The `regstack
+doctor` command flagged it, but only for operators who thought to run
+it. That check is now enforced where the secret is first used to sign:
+building a `RegStack` with a short secret raises `ValueError` at
+startup, naming the length it got and the length it needs. This is the
+one change in this release that can stop an existing deployment from
+booting, and that is deliberate — a server that starts with a
+guessable signing key is worse than one that refuses to.
+
+The second leak was in the hook system. Every registered handler for
+`verification_requested`, `password_reset_requested` and
+`email_change_requested` received a `url` keyword argument holding the
+link that had just been emailed — including the raw single-use token.
+Handlers that log their keyword arguments wholesale, the ordinary
+shape of an audit or analytics webhook, were writing live
+password-reset tokens into log aggregators, where anyone with
+log-read access could use them to take over an account. Those three
+events now also carry `url_without_token`: the same URL with the token
+replaced by `[REDACTED]`. Redaction matches the token string itself
+rather than a `token=` query key, so it holds for hosts that use the
+URL templates to put the token in a path segment or hash fragment.
+
+Alongside the security work, regstack gained a fourth supported
+database. SecantusDB speaks the MongoDB wire protocol, so the existing
+Mongo backend drives it with no new code — no separate backend kind, no
+separate repositories, nothing to configure beyond the connection URL.
+What made it worth doing properly was the test matrix: the entire suite
+now runs against an embedded SecantusDB on every push, alongside SQLite,
+Postgres and real MongoDB, so compatibility is something a regression
+can break rather than something a README asserts. It needs no service
+container and no local daemon, which makes it the cheapest of the four
+backends to test against.
+
+#### Added
+
+- **SecantusDB is a supported deployment target.**
+  [SecantusDB](https://secantusdb.com) speaks the MongoDB wire protocol,
+  so regstack's Mongo backend drives it unchanged — no new backend kind,
+  no new repositories, nothing to configure beyond pointing
+  `database_url` at it. A new `secantus` optional extra pulls in the
+  server for hosts that want to embed it in-process rather than run a
+  daemon; a daemon deployment needs nothing beyond the existing `mongo`
+  extra. Documented under *Backends* in the configuration reference,
+  including the single-node constraints and the TTL sweep cadence.
+- **`secantus` joins the test matrix as a fourth backend.** The whole
+  suite runs against an embedded SecantusDB — one server per xdist
+  worker on a kernel-assigned port with in-memory storage, so it needs
+  no service container in CI and no `inv db-up` locally. `inv
+  test-secantus` runs it alone; `inv test-all` now covers all four. This
+  turns "regstack works on SecantusDB" from a claim into something a
+  regression can break the build.
+- `url_without_token` keyword argument on the `verification_requested`,
+  `password_reset_requested` and `email_change_requested` hook events —
+  a loggable copy of the emailed link with the single-use token
+  replaced by `[REDACTED]`. Exported as `regstack.hooks.redact_token`
+  for hosts composing their own links.
+- `MIN_JWT_SECRET_LENGTH` in `regstack.config.secrets`, shared by the
+  runtime guard and the `regstack doctor` check so the two can't drift.
+
+#### Changed
+
+- `JwtCodec.__init__` rejects a `jwt_secret` shorter than 32
+  characters. Deployments running a short secret will fail to start
+  until it is replaced; `regstack init` generates a suitable one.
+  (Issue #153.)
+- **The coverage routine can provision MongoDB from Docker.**
+  `scripts/ccr_coverage_setup.py` gained a fourth and final fallback:
+  when the mongodb-org apt repo, the distro `mongodb` package and the
+  fastdl.mongodb.org static tarball are all unreachable, it starts
+  `mongo:7.0` in a container instead. This is the only path that
+  contacts no MongoDB-owned host, so it survives a container whose
+  egress policy allows Docker Hub — the default for cloud environments
+  — but blocks the MongoDB CDN, which is what had produced ten
+  consecutive infrastructure failures on issue #86. The container is
+  reused across runs rather than recreated, publishes only on
+  127.0.0.1, and its image tag is pinned to the same major.minor the
+  native install paths use. When Docker is blocked too, the failure
+  message now names all four attempted paths so the cause reads as a
+  network policy rather than a broken script.
+
+#### Fixed
+
+- **The source distribution no longer ships local Claude Code state.**
+  `.claude/settings.local.json` carries a permission allowlist with
+  absolute developer home paths, and `.claude/scheduled_tasks.lock`
+  carries a session id and pid. Neither is git-tracked, but hatchling's
+  sdist sweep includes untracked files that aren't gitignored, so both
+  reached the built tarball. They are now excluded at the packaging
+  layer and gitignored at the source, with regression tests pinning
+  both. Caught by a pre-publish inspection of the 0.9.0 artefacts; no
+  release containing them was ever published.
+- **`regstack doctor` no longer reports SecantusDB as vulnerable to
+  CVE-2025-14847.** SecantusDB deliberately reports
+  `buildInfo.version = "7.0.0"` — the MongoDB compatibility level drivers
+  gate features on — and puts its own version in `secantusVersion`. Read
+  literally, that sits below the patched 7.0 baseline, so doctor warned
+  about a MongoBleed exposure that no upgrade could clear: the defect is
+  in mongod's zlib decompression path, which a separate implementation
+  doesn't share. Doctor now recognises `secantusVersion` and reports the
+  product and its compatibility level instead of applying mongod's patch
+  baselines.
+
+#### Security
+
+- Verification, password-reset and email-change hook events no longer
+  force host handlers to choose between logging nothing and logging a
+  live credential. (Issue #154.)
+
+#### Documentation
+
+- The per-route IP rate limits are now explicitly flagged as
+  default-off in both the configuration reference and the security
+  model, with the reason the defaults stay off (turning them on would
+  fail closed for hosts without the `rate_limit` extra).
+
+#### Fixed
+
+- `mypy` no longer reports an unused-ignore error on the lazy Twilio
+  import. The inline ignore covered only the error code raised when the
+  optional `twilio` extra is absent; a module-level override in
+  `pyproject.toml` now covers both cases.
 
 ## 0.8.6 — 2026-07-19
 

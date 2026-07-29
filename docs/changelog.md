@@ -44,6 +44,23 @@ the failure and watching them fire.
 
 #### Fixed
 
+- **The `oauth` extra now declares `httpx`, so `pip install
+  regstack[oauth]` works.** `regstack/oauth/providers/google.py` imports
+  httpx at module scope for its token-endpoint calls, but the extra
+  listed only `pyjwt[crypto]` and `cryptography`. A host that ran the
+  documented install and set `enable_oauth = True` got
+  `ModuleNotFoundError: No module named 'httpx'` from
+  `RegStack.__init__` — at construction time rather than import time, so
+  nothing surfaced it until the application tried to boot. It shipped
+  that way through 0.9.0. The defect was invisible in development
+  because the `dev` extra installs httpx for the test suite, and the
+  module's own docstring asserted the opposite: that lazy importing made
+  the declaration unnecessary, which only holds for dependencies the
+  extra actually declares.
+  `tests/unit/test_extra_declares_its_imports.py` now walks the
+  extra-gated subpackages and fails when any module-scope third-party
+  import is missing from the matching extra, so a new provider reaching
+  for a new library is caught before release.
 - **The three pywebview wizards no longer crash on launch.**
   `settings.shutdown_event` was an `asyncio.Event` shared across the
   pywebview main thread, uvicorn's loop thread and the shutdown watcher.

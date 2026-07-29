@@ -101,7 +101,11 @@ twilio = ["twilio>=9.0"]
 # digestAlgorithms SET in a PKCS#7/S/MIME message — CVSS 7.5). The
 # previous floor (>=46.0.7) locked to 47.0.0 which is in the affected
 # range; 48.0.1 is the first clean release.
-oauth = ["pyjwt[crypto]>=2.13.0", "cryptography>=48.0.1"]
+# httpx is not optional here: regstack/oauth/providers/google.py imports
+# it at module scope for the token-endpoint calls, so `pip install
+# regstack[oauth]` + enable_oauth = True raised ModuleNotFoundError without
+# it. Covered by tests/unit/test_extra_declares_its_imports.py.
+oauth = ["pyjwt[crypto]>=2.13.0", "cryptography>=48.0.1", "httpx>=0.27"]
 # Interactive setup wizards (`regstack oauth setup`, `regstack theme
 # design`). These open a native pywebview window over a local 127.0.0.1
 # FastAPI server and use tomlkit for non-destructive TOML merging.

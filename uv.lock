@@ -2513,6 +2513,7 @@ mongo = [
 ]
 oauth = [
     { name = "cryptography" },
+    { name = "httpx" },
     { name = "pyjwt", extra = ["crypto"] },
 ]
 postgres = [
@@ -2559,6 +2560,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.120.0" },
     { name = "furo", marker = "extra == 'docs'", specifier = ">=2024.1" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
+    { name = "httpx", marker = "extra == 'oauth'", specifier = ">=0.27" },
     { name = "invoke", marker = "extra == 'dev'", specifier = ">=2.2" },
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },

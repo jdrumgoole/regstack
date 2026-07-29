@@ -55,6 +55,11 @@ jobs:
     env:
       # Drives the parametrized backend fixture in tests/conftest.py.
       # Connect as superuser so the per-test fixture can CREATE/DROP DATABASE.
+      #
+      # The fourth backend, `secantus`, needs no service container and no env
+      # var: it embeds its own MongoDB-wire server per xdist worker, and
+      # tests/conftest.py adds it to the default matrix whenever the package
+      # imports. `uv sync --extra dev` installs it from a manylinux wheel.
       REGSTACK_TEST_POSTGRES_URL: postgresql+asyncpg://regstack:regstack@localhost:5432
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -76,7 +81,7 @@ jobs:
       - name: ruff format check
         run: uv run ruff format --check src tests
 
-      - name: pytest (parallel, all backends)
+      - name: pytest (parallel, all four backends)
         run: uv run python -m pytest -n auto --tb=short
 
   docs:

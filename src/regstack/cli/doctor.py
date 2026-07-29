@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import click
 import dns.resolver
@@ -246,6 +246,27 @@ def _assess_mongo_server_version(version: str) -> tuple[bool, str]:
     )
 
 
+def _secantus_version(build_info: dict[str, Any]) -> str | None:
+    """Return a display string when ``buildInfo`` came from SecantusDB.
+
+    SecantusDB reports ``version: "7.0.0"`` deliberately — that's the
+    MongoDB compatibility level drivers key their feature gates on — and
+    puts its own version in ``secantusVersion``. Read literally, the
+    reported 7.0.0 sits below ``_MONGO_PATCHED_BASELINE[(7, 0)]`` and the
+    CVE-2025-14847 check would call it vulnerable. It isn't: MongoBleed is
+    a defect in mongod's zlib decompression path, and SecantusDB is a
+    separate implementation that shares none of that code. Applying a
+    mongod patch baseline to it reports a CVE that cannot be fixed by any
+    upgrade, so the mongod check is skipped rather than answered wrongly.
+    """
+    raw = build_info.get("secantusVersion")
+    if not raw:
+        return None
+    compat = str(build_info.get("version", "")).strip()
+    suffix = f" (MongoDB {compat} compatibility)" if compat else ""
+    return f"SecantusDB {raw}{suffix}"
+
+
 async def _check_mongo_server_version(config: RegStackConfig) -> CheckResult | None:
     """Advisory check: warn if the MongoDB *server* is below the
     CVE-2025-14847 patched baseline. Returns None for non-Mongo backends
@@ -261,6 +282,9 @@ async def _check_mongo_server_version(config: RegStackConfig) -> CheckResult | N
 
         assert isinstance(backend, MongoBackend)
         info = await backend.database.command("buildInfo")
+        secantus = _secantus_version(info)
+        if secantus is not None:
+            return CheckResult.passed("mongo server", secantus)
         version = str(info.get("version", ""))
         if not version:
             return CheckResult.warned(

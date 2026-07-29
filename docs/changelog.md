@@ -5,9 +5,23 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+## 0.9.1 — 2026-07-30
+
 ### Headline
 
-Both setup wizards start again, and two guards that prove what ships
+Three broken entry points, and the guards that should have caught them
+
+`pip install regstack[oauth]` did not work. The Google provider imports
+httpx at module scope, the extra never declared it, and the failure
+arrived at `RegStack` construction rather than at import — so a host
+following the documented instructions got a `ModuleNotFoundError` only
+when the application tried to boot. It had shipped that way for several
+releases. Development never saw it because the `dev` extra installs httpx
+for the test suite, and the provider's own docstring claimed the
+declaration was unnecessary. A guard now walks each extra-gated
+subpackage and fails when a module-scope import isn't declared in the
+matching extra, so the next provider that reaches for a new library is
+caught before release rather than by a user.
 
 `regstack oauth setup` crashed on launch. So did `regstack theme design`
 and `regstack ses setup` — the three wizards duplicate one scaffold, and
@@ -39,8 +53,11 @@ from `pyproject.toml` and confirmed every entry was still present. A list
 of things that must not ship cannot fail for a file nobody predicted. It
 now builds the real tarball and checks it against a declared allowlist.
 
-Both guards were verified the only way a guard can be — by reintroducing
-the failure and watching them fire.
+Every guard in this release was verified the only way a guard can be — by
+reintroducing the failure and watching it fire. A test written against
+already-correct code passes whether or not its logic is right, which is
+precisely how the packaging check came to pass for months while the
+tarball shipped a file it existed to stop.
 
 #### Fixed
 

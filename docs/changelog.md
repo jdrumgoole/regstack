@@ -7,25 +7,69 @@ All notable changes to this project are documented here. Versions follow
 
 ### Headline
 
-The packaging check now proves what ships, instead of listing what
-shouldn't
+Both setup wizards start again, and two guards that prove what ships
 
-A published source distribution is the one artefact nobody inspects. The
-0.9.0 tarball was caught, one step before its tag went up, carrying a
-local editor settings file with five absolute paths from the developer's
-machine. The test guarding that boundary had passed the whole time, and
-correctly so: it read the exclude list out of `pyproject.toml` and
-confirmed every entry was still present. A list of things that must not
-ship cannot fail for a file nobody predicted.
+`regstack oauth setup` crashed on launch. So did `regstack theme design`
+and `regstack ses setup` — the three wizards duplicate one scaffold, and
+the defect was in the part they share. Each runs three threads at once:
+pywebview owns the main thread because macOS requires it, uvicorn runs
+its event loop in a background thread, and a watcher thread waits for
+shutdown so it can close the window. The shutdown flag was an
+`asyncio.Event`, which binds to the first event loop that touches it and
+refuses every other one. The watcher started a second loop, awaited the
+flag uvicorn's loop already owned, and raised. Signalling shutdown from
+the CLI had the same flaw from the other direction, so tearing the
+wizard down was never dependable either. The flag is now a
+`threading.Event`, which belongs to no loop and is safe to set from
+anywhere.
 
-The check now builds the real tarball and compares its contents against
-a declared allowlist, so anything undeclared fails the build rather than
-merely not being denied, and separately scans every file for absolute
-home directories. It was verified the only way a guard can be: by
-reintroducing the failure and watching it fire.
+Nothing caught this before release because the window module is excluded
+from coverage: there is no headless path through a native GUI. But the
+bug was never in the window — it was in the threading arrangement around
+it, and that reproduces fine without a screen. The new tests drive the
+same three-thread shape directly, including a real server on a real port
+that has to stop when the flag is set from another thread.
+
+The packaging check took the same turn. A published source distribution
+is the one artefact nobody inspects, and the 0.9.0 tarball was caught one
+step before its tag went up carrying a local settings file with five
+absolute paths from the developer's machine. The test guarding that
+boundary had passed the whole time, correctly: it read the exclude list
+from `pyproject.toml` and confirmed every entry was still present. A list
+of things that must not ship cannot fail for a file nobody predicted. It
+now builds the real tarball and checks it against a declared allowlist.
+
+Both guards were verified the only way a guard can be — by reintroducing
+the failure and watching them fire.
+
+#### Fixed
+
+- **The three pywebview wizards no longer crash on launch.**
+  `settings.shutdown_event` was an `asyncio.Event` shared across the
+  pywebview main thread, uvicorn's loop thread and the shutdown watcher.
+  The watcher's `asyncio.run()` raised `RuntimeError: ... is bound to a
+  different event loop` immediately, and `Event.set()` from a non-owning
+  thread was unsafe in the same way. It is now a `threading.Event`, with
+  the async side awaiting it through `regstack.wizard._shutdown.
+  wait_for_shutdown` — a daemon bridge thread rather than
+  `asyncio.to_thread`, whose executor threads are non-daemon and joined
+  at interpreter exit, so a Ctrl-C before shutdown would have hung the
+  process. Also removes a vestigial `server_thread_done` event from two
+  wizard CLIs that was created on the main thread, set inside the server
+  loop, and never awaited.
+- Two wizard CLI tests contained `await shutdown_event.wait()` in their
+  fake `serve`. Against a `threading.Event` that raises `TypeError`
+  inside a daemon thread, where it is swallowed — the tests kept passing
+  while no longer verifying that `serve` waits for shutdown at all. Both
+  now go through the same bridge the real server uses.
 
 #### Added
 
+- `tests/unit/test_wizard_shutdown.py` — four checks across all three
+  wizards: the flag's type, an AST check that no window module starts its
+  own event loop, the reduced three-thread crash, and an end-to-end
+  shutdown of a live uvicorn signalled from another thread. Nine of the
+  twelve fail against the pre-fix code.
 - **The sdist contract is now an allowlist, checked against a real
   build.** `tests/unit/test_sdist_contents.py` builds the actual tarball
   and asserts its top level against a declared allowlist, plus scans

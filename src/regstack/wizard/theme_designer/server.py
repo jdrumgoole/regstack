@@ -15,6 +15,7 @@ from pathlib import Path
 
 import uvicorn
 
+from regstack.wizard._shutdown import new_shutdown_event, wait_for_shutdown
 from regstack.wizard.theme_designer.routes import (
     DesignerSettings,
     build_designer_app,
@@ -47,7 +48,7 @@ def make_designer_server(
     settings = DesignerSettings(
         target_dir=target_dir,
         launch_token=token,
-        shutdown_event=asyncio.Event(),
+        shutdown_event=new_shutdown_event(),
         **({"filename": filename} if filename else {}),
     )
     url = f"http://127.0.0.1:{bound_port}/?token={token}"
@@ -73,7 +74,7 @@ async def serve(server: DesignerServer) -> None:
     uv = uvicorn.Server(config)
     serve_task = asyncio.create_task(uv.serve())
     try:
-        await server.settings.shutdown_event.wait()
+        await wait_for_shutdown(server.settings.shutdown_event)
     finally:
         uv.should_exit = True
         await serve_task

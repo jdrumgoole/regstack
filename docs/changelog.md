@@ -5,6 +5,25 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+### Headline
+
+The packaging check now proves what ships, instead of listing what
+shouldn't
+
+A published source distribution is the one artefact nobody inspects. The
+0.9.0 tarball was caught, one step before its tag went up, carrying a
+local editor settings file with five absolute paths from the developer's
+machine. The test guarding that boundary had passed the whole time, and
+correctly so: it read the exclude list out of `pyproject.toml` and
+confirmed every entry was still present. A list of things that must not
+ship cannot fail for a file nobody predicted.
+
+The check now builds the real tarball and compares its contents against
+a declared allowlist, so anything undeclared fails the build rather than
+merely not being denied, and separately scans every file for absolute
+home directories. It was verified the only way a guard can be: by
+reintroducing the failure and watching it fire.
+
 #### Added
 
 - **The sdist contract is now an allowlist, checked against a real

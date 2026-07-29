@@ -1,6 +1,12 @@
-"""Mongo-specific index behaviour. Forced to backend_kind=mongo via the
-local fixture override so the parametrized backend_kind fixture in the
-top-level conftest doesn't generate a [sqlite] variant.
+"""Wire-protocol index behaviour. Pinned off the SQL matrix by the local
+backend_kind override so the parametrized fixture in the top-level
+conftest doesn't generate a [sqlite] variant.
+
+Runs against whichever wire-protocol server is active — real mongod when
+it's in the backend set, otherwise the embedded SecantusDB. These
+assertions (unique index enforcement, TTL index shape) are the ones most
+likely to catch a SecantusDB compatibility regression, so pinning them to
+mongod would forfeit the coverage a secantus run is meant to provide.
 
 Cross-backend "duplicate emails are rejected" assertions live in the
 integration suite (test_happy_path) where they verify the
@@ -14,11 +20,12 @@ from pymongo.errors import DuplicateKeyError
 
 from regstack import RegStack
 from regstack.models.user import BaseUser
+from tests.conftest import wire_protocol_backend
 
 
 @pytest.fixture
 def backend_kind() -> str:
-    return "mongo"
+    return wire_protocol_backend()
 
 
 @pytest.mark.asyncio
@@ -117,4 +124,8 @@ async def test_doctor_mongo_server_version_check_runs_against_live_server(
     # CI image is somehow on an affected build; either way it must not be
     # a hard failure (ok stays True for advisory results).
     assert result.ok is True
-    assert "server" in result.detail
+    # The detail identifies whatever answered buildInfo: mongod results read
+    # "server <version> …", SecantusDB results name the product and its
+    # MongoDB compatibility level. Either one proves the buildInfo path was
+    # walked, which is what this test is for.
+    assert "server" in result.detail or result.detail.startswith("SecantusDB")

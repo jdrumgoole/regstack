@@ -329,16 +329,26 @@ Concretely:
   **not** a release gate.
 - Before declaring a feature done — and definitely before merging /
   tagging — run `inv test-all`, which exercises sqlite + mongo +
-  postgres in one go. Use `inv db-up` first to bring the local services
-  up if they aren't already (`inv db-status` reports what's running).
-- The CI matrix runs all three backends on every push. A green local
+  postgres + secantus in one go. Use `inv db-up` first to bring the local
+  services up if they aren't already (`inv db-status` reports what's
+  running). SecantusDB needs nothing brought up: it embeds its own server.
+- The CI matrix runs all four backends on every push. A green local
   `inv test-sqlite` followed by a CI failure on `mongo` or `postgres`
   is the failure pattern this rule exists to prevent.
 - A test that's `mongo`-only or `sqlite`-only by design must
   short-circuit the parametrized fixture (see how
   `tests/integration/test_indexes.py` does it with a local
-  `backend_kind = "mongo"` fixture override). Skipping silently because
+  `backend_kind` fixture override). Skipping silently because
   a service isn't running doesn't count.
+- **`secantus` is a fourth backend, not a substitute for `mongo`.**
+  SecantusDB is a separate implementation of the wire protocol, so a
+  green `inv test-secantus` says nothing about real mongod and vice
+  versa. Never let one stand in for the other when reporting results.
+- A wire-protocol test must pin itself with
+  `tests.conftest.wire_protocol_backend()` rather than a literal
+  `"mongo"`, so it follows whichever server the run actually has.
+  Hard-coding `"mongo"` makes a secantus-only run fail on a connection
+  error instead of exercising the code.
 
 ## Conventions
 

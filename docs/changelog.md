@@ -34,6 +34,22 @@ URL templates to put the token in a path segment or hash fragment.
 
 #### Added
 
+- **SecantusDB is a supported deployment target.**
+  [SecantusDB](https://secantusdb.com) speaks the MongoDB wire protocol,
+  so regstack's Mongo backend drives it unchanged — no new backend kind,
+  no new repositories, nothing to configure beyond pointing
+  `database_url` at it. A new `secantus` optional extra pulls in the
+  server for hosts that want to embed it in-process rather than run a
+  daemon; a daemon deployment needs nothing beyond the existing `mongo`
+  extra. Documented under *Backends* in the configuration reference,
+  including the single-node constraints and the TTL sweep cadence.
+- **`secantus` joins the test matrix as a fourth backend.** The whole
+  suite runs against an embedded SecantusDB — one server per xdist
+  worker on a kernel-assigned port with in-memory storage, so it needs
+  no service container in CI and no `inv db-up` locally. `inv
+  test-secantus` runs it alone; `inv test-all` now covers all four. This
+  turns "regstack works on SecantusDB" from a claim into something a
+  regression can break the build.
 - `url_without_token` keyword argument on the `verification_requested`,
   `password_reset_requested` and `email_change_requested` hook events —
   a loggable copy of the emailed link with the single-use token
@@ -62,6 +78,19 @@ URL templates to put the token in a path segment or hash fragment.
   native install paths use. When Docker is blocked too, the failure
   message now names all four attempted paths so the cause reads as a
   network policy rather than a broken script.
+
+#### Fixed
+
+- **`regstack doctor` no longer reports SecantusDB as vulnerable to
+  CVE-2025-14847.** SecantusDB deliberately reports
+  `buildInfo.version = "7.0.0"` — the MongoDB compatibility level drivers
+  gate features on — and puts its own version in `secantusVersion`. Read
+  literally, that sits below the patched 7.0 baseline, so doctor warned
+  about a MongoBleed exposure that no upgrade could clear: the defect is
+  in mongod's zlib decompression path, which a separate implementation
+  doesn't share. Doctor now recognises `secantusVersion` and reports the
+  product and its compatibility level instead of applying mongod's patch
+  baselines.
 
 #### Security
 

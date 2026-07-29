@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import os
 import secrets
 from collections.abc import AsyncIterator, Callable
@@ -23,6 +24,44 @@ _WORKER_ID = os.environ.get("PYTEST_XDIST_WORKER", "gw0")
 
 _MONGO_URL = "mongodb://localhost:27017"
 
+# --- Embedded SecantusDB ---------------------------------------------------
+#
+# SecantusDB speaks the MongoDB wire protocol, so the `secantus`
+# parametrization drives the *same* Mongo repositories as `mongo` — the
+# point is to catch a compatibility regression, not to test different code.
+#
+# One server per xdist worker, not one per test: ~950 tests would spend all
+# their time on server startup. That mirrors the `mongo` shape (one server,
+# a fresh database per test), except the server is worker-local, so nothing
+# is shared across workers. `port=0` lets the kernel assign a free port —
+# no fixed port to collide on — and `:memory:` storage means there are no
+# files to clean up and no leftover databases for the sweep to find.
+_secantus_server_instance: Any = None
+
+
+def _secantus_uri() -> str:
+    """Start this worker's embedded server on first use and return its URI."""
+    global _secantus_server_instance
+    if _secantus_server_instance is None:
+        from secantus import SecantusDBServer
+
+        server = SecantusDBServer(port=0, storage_path=":memory:")
+        server.start()
+        _secantus_server_instance = server
+    # `server.uri` ends with a slash; callers append `/{db_name}`, and pymongo
+    # rejects the resulting `//db` as a bad database name.
+    return str(_secantus_server_instance.uri).rstrip("/")
+
+
+def _stop_secantus_server() -> None:
+    global _secantus_server_instance
+    if _secantus_server_instance is not None:
+        try:
+            _secantus_server_instance.stop()
+        finally:
+            _secantus_server_instance = None
+
+
 # Every Mongo DB created by this run carries the run token in its name so
 # pytest_sessionfinish can sweep the whole run's leftovers — including DBs
 # whose per-test teardown never ran (worker crash, -x abort). The token is
@@ -45,6 +84,9 @@ def _mongo_db_prefix() -> str:
 
 
 def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
+    # Every process that started an embedded server owns stopping it —
+    # workers included, and before the controller-only early return below.
+    _stop_secantus_server()
     if os.environ.get("PYTEST_XDIST_WORKER"):
         return  # workers exit first; the controller does the sweep
     if "mongo" not in _BACKENDS_AVAILABLE:
@@ -67,12 +109,18 @@ def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
 def _resolve_backends() -> list[str]:
     """Pick which backends the parametrized fixture covers.
 
-    Override with ``REGSTACK_TEST_BACKENDS=sqlite,mongo,postgres`` to
-    constrain a run to specific backends — used by the per-backend
-    invoke tasks (test-sqlite, test-mongo, test-postgres).
+    Override with ``REGSTACK_TEST_BACKENDS=sqlite,mongo,postgres,secantus``
+    to constrain a run to specific backends — used by the per-backend
+    invoke tasks (test-sqlite, test-mongo, test-postgres, test-secantus).
 
-    Default: sqlite + mongo. Postgres joins automatically when
+    Default: sqlite + mongo, plus secantus whenever the package is
+    importable. Postgres joins automatically when
     ``REGSTACK_TEST_POSTGRES_URL`` is set.
+
+    ``secantus`` needs no external service — it embeds its own server —
+    so it joins the default set on any machine that has the wheel. An
+    explicit override still wins: asking for a backend that isn't
+    installed should fail loudly rather than silently shrink the matrix.
     """
     override = os.environ.get("REGSTACK_TEST_BACKENDS")
     if override:
@@ -80,10 +128,27 @@ def _resolve_backends() -> list[str]:
     backends = ["sqlite", "mongo"]
     if os.environ.get("REGSTACK_TEST_POSTGRES_URL"):
         backends.append("postgres")
+    if importlib.util.find_spec("secantus") is not None:
+        backends.append("secantus")
     return backends
 
 
 _BACKENDS_AVAILABLE: list[str] = _resolve_backends()
+
+
+def wire_protocol_backend() -> str:
+    """Backend name for tests that need a MongoDB-wire server, either one.
+
+    Used by test modules that override the parametrized ``backend_kind``
+    to pin themselves off the SQL matrix. Hard-coding ``"mongo"`` there
+    would make those tests demand a real mongod even in a secantus-only
+    run — a connection error rather than an honest skip.
+    """
+    if "mongo" in _BACKENDS_AVAILABLE:
+        return "mongo"
+    if "secantus" in _BACKENDS_AVAILABLE:
+        return "secantus"
+    return "mongo"  # nothing active: let the caller's own skip logic speak
 
 
 def _unique_token() -> str:
@@ -102,6 +167,13 @@ def _make_database_url(backend: str, token: str, *, file_dir: Path) -> tuple[str
         base = os.environ["REGSTACK_TEST_POSTGRES_URL"].rstrip("/")
         db_name = f"regstack_test_{_WORKER_ID}_{token}"
         return f"{base}/{db_name}", db_name
+    if backend == "secantus":
+        db_name = f"{_mongo_db_prefix()}{_WORKER_ID}_{token}"
+        # No cleanup name returned: `:memory:` storage dies with the worker,
+        # so the mongo sweep has nothing to reap. The db name still carries
+        # the worker + token so concurrent tests can't collide inside the
+        # one embedded server.
+        return f"{_secantus_uri()}/{db_name}", db_name
     raise ValueError(f"unknown backend: {backend}")
 
 
@@ -206,9 +278,13 @@ async def _ensure_mongo_db_dropped(
     using only the ``make_client`` factory never construct that fixture,
     and their DBs used to leak. ``config`` depends on this, so every path
     that can touch the database is covered.
+
+    Applies to ``secantus`` too. Its storage is ``:memory:``, so nothing
+    survives the worker either way, but without the drop a full run would
+    accumulate a database per test in the embedded server's heap.
     """
     yield
-    if backend_kind != "mongo":
+    if backend_kind not in ("mongo", "secantus"):
         return
     from pymongo import AsyncMongoClient
 
@@ -303,20 +379,31 @@ def make_client(
 
 
 # Backwards-compat fixture for the few unit tests that still touch the
-# raw Mongo client. These tests are mongo-only by definition; if mongo
-# isn't in the active backend set (e.g. `inv test-sqlite`) skip them
-# so the SQLite-only run needs zero infrastructure.
+# raw Mongo client. These tests are wire-protocol tests, so they're
+# satisfied by either server: real mongod when it's in the active backend
+# set, otherwise this worker's embedded SecantusDB. Running them under
+# `secantus` is the point — TTL indexes, unique constraints and the
+# ObjectId guards are exactly where a compatibility regression would
+# surface, and skipping them would make a secantus-only run look greener
+# than it is. Only a run with neither server skips.
 @pytest_asyncio.fixture
 async def mongo_client():
-    if "mongo" not in _BACKENDS_AVAILABLE:
-        pytest.skip("mongo backend not active (set REGSTACK_TEST_BACKENDS to include 'mongo')")
+    if "mongo" in _BACKENDS_AVAILABLE:
+        base_url = _MONGO_URL
+    elif "secantus" in _BACKENDS_AVAILABLE:
+        base_url = _secantus_uri()
+    else:
+        pytest.skip(
+            "no wire-protocol backend active "
+            "(set REGSTACK_TEST_BACKENDS to include 'mongo' or 'secantus')"
+        )
     from regstack.backends.mongo import make_client
     from regstack.config.schema import RegStackConfig as _Cfg
 
     db_name = f"{_mongo_db_prefix()}legacy_{_WORKER_ID}_{_unique_token()}"
     cfg = _Cfg(
         jwt_secret=secrets.token_urlsafe(32),
-        database_url=f"{_MONGO_URL}/{db_name}",
+        database_url=f"{base_url}/{db_name}",
         mongodb_database=db_name,
     )
     client = make_client(cfg)

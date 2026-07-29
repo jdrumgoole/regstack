@@ -18,7 +18,7 @@ Endpoints (all under ``127.0.0.1:<port>``):
 
 from __future__ import annotations
 
-import asyncio
+import threading
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
@@ -54,7 +54,7 @@ _TOKEN_QUERY = "token"
 class WizardSettings:
     target_dir: Path
     launch_token: str
-    shutdown_event: asyncio.Event
+    shutdown_event: threading.Event
     existing_from_address: str | None = None
 
 

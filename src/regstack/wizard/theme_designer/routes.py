@@ -17,7 +17,7 @@ so a CLI invocation that doesn't enter the GUI doesn't pay the cost.
 
 from __future__ import annotations
 
-import asyncio
+import threading
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
@@ -102,7 +102,7 @@ class DesignerSettings:
 
     target_dir: Path
     launch_token: str
-    shutdown_event: asyncio.Event
+    shutdown_event: threading.Event
     filename: str = THEME_FILE
 
 

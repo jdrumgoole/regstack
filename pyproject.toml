@@ -224,6 +224,7 @@ addopts = [
 ]
 markers = [
     "e2e: end-to-end Playwright tests (run serially, slow)",
+    "sdist_build: builds a real sdist to inspect it (seconds, not milliseconds)",
 ]
 filterwarnings = [
     "error",

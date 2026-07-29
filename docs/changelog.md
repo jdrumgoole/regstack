@@ -5,6 +5,23 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+#### Added
+
+- **The sdist contract is now an allowlist, checked against a real
+  build.** `tests/unit/test_sdist_contents.py` builds the actual tarball
+  and asserts its top level against a declared allowlist, plus scans
+  every file for absolute `/Users/<name>/` and `/home/<name>/` paths.
+  The existing exclude-list test can only catch the removal of an entry
+  someone already thought to name — it passed while the 0.9.0 sdist
+  shipped `.claude/settings.local.json`, because that directory was
+  untracked but not gitignored and hatchling's sweep includes files in
+  that state. An allowlist fails on anything undeclared, so a future
+  stray file at the repo root breaks the build instead of shipping. The
+  home-path pattern deliberately distinguishes filesystem paths from URL
+  segments (the OAuth wizard template legitimately links to
+  `.../projectselector2/home/dashboard`), and that discrimination has
+  its own test so a later simplification can't silently disarm it.
+
 ## 0.9.0 — 2026-07-29
 
 ### Headline

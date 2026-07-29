@@ -44,3 +44,9 @@ docs/_autosummary/
 *.pfx
 *.jks
 *.crt
+
+# Local Claude Code state — permission allowlist with absolute home paths,
+# and a session/pid lock. Never commit these; they also keep hatchling's
+# sdist sweep from picking them up.
+.claude/settings.local.json
+.claude/*.lock

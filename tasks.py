@@ -273,10 +273,15 @@ def clean(c: Context) -> None:
 
 @task
 def docs(c: Context, warning_as_error: bool = True) -> None:
-    """Build the Sphinx HTML docs into docs/_build/html."""
+    """Build the Sphinx HTML docs into docs/_build/html.
+
+    ``--extra docs`` is passed explicitly: without it, ``uv run`` falls
+    through to whatever ``sphinx-build`` is on PATH when the docs extra
+    isn't synced — which under pyenv is a shim for an unrelated Python.
+    """
     flags = "-W --keep-going" if warning_as_error else ""
     c.run(
-        f"uv run sphinx-build -b html {flags} docs docs/_build/html",
+        f"uv run --extra docs sphinx-build -b html {flags} docs docs/_build/html",
         pty=True,
     )
 
@@ -291,7 +296,7 @@ def docs_clean(c: Context) -> None:
 def docs_serve(c: Context, port: int = 8001) -> None:
     """Live-rebuild docs and serve them on the given port."""
     c.run(
-        f"uv run sphinx-autobuild docs docs/_build/html --port {port}",
+        f"uv run --extra docs sphinx-autobuild docs docs/_build/html --port {port}",
         pty=True,
     )
 

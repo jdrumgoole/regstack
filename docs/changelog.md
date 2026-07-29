@@ -5,9 +5,11 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+## 0.9.0 — 2026-07-29
+
 ### Headline
 
-Two ways a secret could quietly leak, closed
+Two quiet credential leaks closed, and a fourth database to run on
 
 A JWT signing secret shorter than thirty-two characters used to be
 accepted without comment. HMAC-SHA256 pads a short key with zero bytes
@@ -17,7 +19,10 @@ produced no error, no warning, and no visible symptom. The `regstack
 doctor` command flagged it, but only for operators who thought to run
 it. That check is now enforced where the secret is first used to sign:
 building a `RegStack` with a short secret raises `ValueError` at
-startup, naming the length it got and the length it needs.
+startup, naming the length it got and the length it needs. This is the
+one change in this release that can stop an existing deployment from
+booting, and that is deliberate — a server that starts with a
+guessable signing key is worse than one that refuses to.
 
 The second leak was in the hook system. Every registered handler for
 `verification_requested`, `password_reset_requested` and
@@ -31,6 +36,17 @@ events now also carry `url_without_token`: the same URL with the token
 replaced by `[REDACTED]`. Redaction matches the token string itself
 rather than a `token=` query key, so it holds for hosts that use the
 URL templates to put the token in a path segment or hash fragment.
+
+Alongside the security work, regstack gained a fourth supported
+database. SecantusDB speaks the MongoDB wire protocol, so the existing
+Mongo backend drives it with no new code — no separate backend kind, no
+separate repositories, nothing to configure beyond the connection URL.
+What made it worth doing properly was the test matrix: the entire suite
+now runs against an embedded SecantusDB on every push, alongside SQLite,
+Postgres and real MongoDB, so compatibility is something a regression
+can break rather than something a README asserts. It needs no service
+container and no local daemon, which makes it the cheapest of the four
+backends to test against.
 
 #### Added
 
@@ -81,6 +97,15 @@ URL templates to put the token in a path segment or hash fragment.
 
 #### Fixed
 
+- **The source distribution no longer ships local Claude Code state.**
+  `.claude/settings.local.json` carries a permission allowlist with
+  absolute developer home paths, and `.claude/scheduled_tasks.lock`
+  carries a session id and pid. Neither is git-tracked, but hatchling's
+  sdist sweep includes untracked files that aren't gitignored, so both
+  reached the built tarball. They are now excluded at the packaging
+  layer and gitignored at the source, with regression tests pinning
+  both. Caught by a pre-publish inspection of the 0.9.0 artefacts; no
+  release containing them was ever published.
 - **`regstack doctor` no longer reports SecantusDB as vulnerable to
   CVE-2025-14847.** SecantusDB deliberately reports
   `buildInfo.version = "7.0.0"` — the MongoDB compatibility level drivers

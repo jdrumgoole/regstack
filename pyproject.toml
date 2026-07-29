@@ -1,6 +1,6 @@
 [project]
 name = "regstack"
-version = "0.8.6"
+version = "0.9.0"
 description = "Embeddable user registration, login, and account management for FastAPI apps. SQLite / Postgres / MongoDB."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -190,6 +190,12 @@ packages = ["src/regstack"]
 exclude = [
     ".git",
     ".github/",
+    # Local Claude Code state: settings.local.json carries the permission
+    # allowlist with absolute developer home paths, and scheduled_tasks.lock
+    # carries a session id + pid. Neither is git-tracked, but hatchling's
+    # sdist sweeps untracked files that aren't gitignored, so an explicit
+    # exclude is what actually keeps them out of the tarball.
+    ".claude/",
     ".python-version",
     ".readthedocs.yaml",
     "CLAUDE.md",

@@ -23,6 +23,7 @@ from click.testing import CliRunner
 
 import regstack.wizard.oauth_google.cli as wizard_cli
 from regstack.cli.__main__ import cli
+from regstack.wizard import _scaffold
 from regstack.wizard._shutdown import wait_for_shutdown
 from regstack.wizard.oauth_google.writer import (
     CONFIG_FILE,
@@ -139,7 +140,7 @@ def test_run_gui_happy_path_uses_make_wizard_server_and_joins_thread(
         # Mirror that by signalling the shutdown event.
         server.settings.shutdown_event.set()
 
-    monkeypatch.setattr(wizard_cli, "serve", _stub_serve_factory(call_log))
+    monkeypatch.setattr(_scaffold, "serve", _stub_serve_factory(call_log))
 
     # `open_wizard_window` is imported *inside* _run_gui from the
     # window module, not from cli — patch the source.
@@ -169,7 +170,7 @@ def test_run_gui_window_error_exits_nonzero(
     def fake_open_window(server: Any) -> None:
         raise window_mod.WizardWindowError("no display")
 
-    monkeypatch.setattr(wizard_cli, "serve", _stub_serve_factory(call_log))
+    monkeypatch.setattr(_scaffold, "serve", _stub_serve_factory(call_log))
     monkeypatch.setattr(window_mod, "open_wizard_window", fake_open_window)
 
     runner = CliRunner()
@@ -194,7 +195,7 @@ def test_run_gui_passes_existing_base_url_into_settings(
         captured["existing_base_url"] = server.settings.existing_base_url
         server.settings.shutdown_event.set()
 
-    monkeypatch.setattr(wizard_cli, "serve", _stub_serve_factory([]))
+    monkeypatch.setattr(_scaffold, "serve", _stub_serve_factory([]))
     import regstack.wizard.oauth_google.window as window_mod
 
     monkeypatch.setattr(window_mod, "open_wizard_window", fake_open_window)

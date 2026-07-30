@@ -1,63 +1,51 @@
 """pywebview launcher for the theme designer.
 
-Mirrors :mod:`regstack.wizard.oauth_google.window`. Same isolation —
-the only place ``import webview`` lives in the designer subtree.
+A thin adapter over :func:`regstack.wizard._scaffold.open_window`, which
+holds the window and shutdown-watcher mechanics shared with the OAuth and
+SES wizards. What stays here is the designer's own error type — its CLI
+catches that specific exception, and tests import it by name — plus the
+wider default window, since the designer shows a live preview alongside
+its controls.
 """
 
 from __future__ import annotations
 
-import contextlib
-import threading
 from typing import TYPE_CHECKING
 
+from regstack.wizard._scaffold import WizardWindowError as _BaseWindowError
+from regstack.wizard._scaffold import open_window
+
 if TYPE_CHECKING:
-    from regstack.wizard.theme_designer.server import DesignerServer
+    from regstack.wizard._scaffold import WizardServer
+
+_DESIGNER_WIDTH = 1100
 
 
-class DesignerWindowError(RuntimeError):
+class DesignerWindowError(_BaseWindowError):
     """Raised when pywebview can't open a window on this host."""
 
 
 def open_designer_window(
-    server: DesignerServer,
+    server: WizardServer,
     title: str = "regstack — theme designer",
 ) -> None:
-    """Open a native webview at ``server.url`` and run the GUI loop."""
-    try:
-        import webview
-    except Exception as exc:  # pragma: no cover — depends on host
-        raise DesignerWindowError(
-            "pywebview could not be imported. The theme designer "
-            "requires a desktop environment with a webview backend "
-            "(WebKit on macOS, GTK / QtWebEngine on Linux, Edge "
-            "WebView2 on Windows). Run `regstack theme design "
-            "--print-only` instead if you're on a headless host."
-        ) from exc
+    """Open a native webview at ``server.url`` and run the GUI loop.
 
-    window = webview.create_window(title, server.url, width=1100, height=720)
-    if window is None:  # pragma: no cover
-        raise DesignerWindowError("pywebview did not return a window handle.")
+    Blocks until the user closes the window OR the server's
+    ``shutdown_event`` fires (e.g. the SPA POSTed to ``/api/done``).
 
-    def _watch_shutdown() -> None:
-        # A plain blocking wait: shutdown_event is a threading.Event, so this
-        # needs no event loop. Spinning one up here (asyncio.run) is what
-        # raised "bound to a different event loop" — the Event already
-        # belonged to uvicorn's loop in the server thread.
-        try:
-            server.settings.shutdown_event.wait()
-        finally:
-            with contextlib.suppress(Exception):
-                window.destroy()
-
-    threading.Thread(target=_watch_shutdown, daemon=True).start()
-    try:
-        webview.start()
-    except Exception as exc:  # pragma: no cover — host-specific
-        raise DesignerWindowError(
-            f"pywebview failed to start: {exc}. The theme designer requires a desktop session."
-        ) from exc
-    finally:
-        server.settings.shutdown_event.set()
+    Raises:
+        DesignerWindowError: pywebview is missing or no GUI backend is
+            available (typical on a headless server).
+    """
+    open_window(
+        server,
+        title=title,
+        product="The theme designer",
+        print_only_command="regstack theme design --print-only",
+        error_cls=DesignerWindowError,
+        width=_DESIGNER_WIDTH,
+    )
 
 
 __all__ = ["DesignerWindowError", "open_designer_window"]

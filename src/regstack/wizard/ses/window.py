@@ -1,59 +1,44 @@
 """pywebview launcher for the SES setup wizard.
 
-Identical contract to :mod:`regstack.wizard.oauth_google.window`,
-just with a different window title.
+A thin adapter over :func:`regstack.wizard._scaffold.open_window`, which
+holds the window and shutdown-watcher mechanics shared with the OAuth
+wizard and the theme designer. What stays here is this wizard's own error
+type — its CLI catches that specific exception, and tests import it by
+name — plus the strings naming the product and its headless fallback.
 """
 
 from __future__ import annotations
 
-import contextlib
-import threading
 from typing import TYPE_CHECKING
 
+from regstack.wizard._scaffold import WizardWindowError as _BaseWindowError
+from regstack.wizard._scaffold import open_window
+
 if TYPE_CHECKING:
-    from regstack.wizard.ses.server import WizardServer
+    from regstack.wizard._scaffold import WizardServer
 
 
-class WizardWindowError(RuntimeError):
+class WizardWindowError(_BaseWindowError):
     """Raised when pywebview can't open a window on this host."""
 
 
 def open_wizard_window(server: WizardServer, title: str = "regstack — SES setup") -> None:
-    try:
-        import webview
-    except Exception as exc:  # pragma: no cover — depends on host
-        raise WizardWindowError(
-            "pywebview could not be imported. The SES setup wizard "
-            "requires a desktop environment with a webview backend "
-            "(WebKit on macOS, GTK/QtWebEngine on Linux, Edge "
-            "WebView2 on Windows). Run `regstack ses setup --print-only` "
-            "instead if you're on a headless host."
-        ) from exc
+    """Open a native webview at ``server.url`` and run the GUI loop.
 
-    window = webview.create_window(title, server.url, width=820, height=720)
-    if window is None:  # pragma: no cover — pywebview always returns a Window in practice
-        raise WizardWindowError("pywebview did not return a window handle.")
+    Blocks until the user closes the window OR the server's
+    ``shutdown_event`` fires (e.g. the SPA POSTed to ``/api/done``).
 
-    def _watch_shutdown() -> None:
-        # A plain blocking wait: shutdown_event is a threading.Event, so this
-        # needs no event loop. Spinning one up here (asyncio.run) is what
-        # raised "bound to a different event loop" — the Event already
-        # belonged to uvicorn's loop in the server thread.
-        try:
-            server.settings.shutdown_event.wait()
-        finally:
-            with contextlib.suppress(Exception):
-                window.destroy()
-
-    threading.Thread(target=_watch_shutdown, daemon=True).start()
-    try:
-        webview.start()
-    except Exception as exc:  # pragma: no cover — host-specific
-        raise WizardWindowError(
-            f"pywebview failed to start: {exc}. The SES setup wizard requires a desktop session."
-        ) from exc
-    finally:
-        server.settings.shutdown_event.set()
+    Raises:
+        WizardWindowError: pywebview is missing or no GUI backend is
+            available (typical on a headless server).
+    """
+    open_window(
+        server,
+        title=title,
+        product="The SES setup wizard",
+        print_only_command="regstack ses setup --print-only",
+        error_cls=WizardWindowError,
+    )
 
 
 __all__ = ["WizardWindowError", "open_wizard_window"]

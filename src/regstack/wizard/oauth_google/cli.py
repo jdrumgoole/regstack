@@ -15,7 +15,6 @@ Two modes:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import sys
 from pathlib import Path
@@ -23,7 +22,8 @@ from pathlib import Path
 import click
 
 from regstack.cli._paths import resolve_target_dir
-from regstack.wizard.oauth_google.server import make_wizard_server, serve
+from regstack.wizard._scaffold import run_windowed
+from regstack.wizard.oauth_google.server import make_wizard_server
 from regstack.wizard.oauth_google.validators import validate_all
 from regstack.wizard.oauth_google.writer import merge_into_config
 
@@ -224,27 +224,11 @@ def _run_gui(*, target_dir: Path, api_prefix: str, port: int | None) -> None:
         open_wizard_window,
     )
 
-    def _serve_forever() -> None:
-        # The loop lives entirely inside this thread. Nothing outside it may
-        # touch an asyncio primitive belonging to it — shutdown crosses the
-        # thread boundary via the threading.Event in server.settings.
-        asyncio.run(serve(server))
-
-    import threading
-
-    thread = threading.Thread(target=_serve_forever, daemon=True)
-    thread.start()
-
     try:
-        open_wizard_window(server)
+        run_windowed(server, open_wizard_window)
     except WizardWindowError as exc:
         click.echo(f"Error: {exc}", err=True)
-        server.settings.shutdown_event.set()
-        thread.join(timeout=5)
         sys.exit(1)
-    finally:
-        server.settings.shutdown_event.set()
-        thread.join(timeout=5)
 
 
 def _existing_base_url(config_path: Path) -> str | None:

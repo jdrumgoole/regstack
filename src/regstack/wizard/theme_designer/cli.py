@@ -13,7 +13,6 @@ Two modes:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import sys
 from pathlib import Path
@@ -21,8 +20,9 @@ from pathlib import Path
 import click
 
 from regstack.cli._paths import resolve_target_dir
+from regstack.wizard._scaffold import run_windowed
 from regstack.wizard.theme_designer.routes import DEFAULT_LIGHT
-from regstack.wizard.theme_designer.server import make_designer_server, serve
+from regstack.wizard.theme_designer.server import make_designer_server
 from regstack.wizard.theme_designer.validators import validate_vars
 from regstack.wizard.theme_designer.writer import THEME_FILE, save_theme
 
@@ -202,27 +202,11 @@ def _run_gui(*, target_dir: Path, filename: str, port: int | None) -> None:
         open_designer_window,
     )
 
-    def _serve_forever() -> None:
-        # The loop lives entirely inside this thread. Nothing outside it may
-        # touch an asyncio primitive belonging to it — shutdown crosses the
-        # thread boundary via the threading.Event in server.settings.
-        asyncio.run(serve(server))
-
-    import threading
-
-    thread = threading.Thread(target=_serve_forever, daemon=True)
-    thread.start()
-
     try:
-        open_designer_window(server)
+        run_windowed(server, open_designer_window)
     except DesignerWindowError as exc:
         click.echo(f"Error: {exc}", err=True)
-        server.settings.shutdown_event.set()
-        thread.join(timeout=5)
         sys.exit(1)
-    finally:
-        server.settings.shutdown_event.set()
-        thread.join(timeout=5)
 
 
 __all__ = ["design"]

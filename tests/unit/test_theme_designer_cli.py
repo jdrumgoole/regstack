@@ -14,8 +14,8 @@ from typing import Any
 import pytest
 from click.testing import CliRunner
 
-import regstack.wizard.theme_designer.cli as designer_cli
 from regstack.cli.__main__ import cli
+from regstack.wizard import _scaffold
 from regstack.wizard._shutdown import wait_for_shutdown
 from regstack.wizard.theme_designer.writer import THEME_FILE
 
@@ -159,7 +159,7 @@ def test_run_gui_happy_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
         call_log.append(f"opened:{server.url}")
         server.settings.shutdown_event.set()
 
-    monkeypatch.setattr(designer_cli, "serve", _stub_serve_factory(call_log))
+    monkeypatch.setattr(_scaffold, "serve", _stub_serve_factory(call_log))
     import regstack.wizard.theme_designer.window as window_mod
 
     monkeypatch.setattr(window_mod, "open_designer_window", fake_open_window)
@@ -183,7 +183,7 @@ def test_run_gui_window_error_exits_nonzero(
     def fake_open_window(server: Any) -> None:
         raise window_mod.DesignerWindowError("no display")
 
-    monkeypatch.setattr(designer_cli, "serve", _stub_serve_factory([]))
+    monkeypatch.setattr(_scaffold, "serve", _stub_serve_factory([]))
     monkeypatch.setattr(window_mod, "open_designer_window", fake_open_window)
 
     runner = CliRunner()

@@ -1,61 +1,30 @@
-"""Uvicorn launcher for the wizard's local-only FastAPI app.
+"""Uvicorn launcher for the OAuth wizard's local-only FastAPI app.
 
-Used by the CLI / pywebview launcher; the test suite drives the
-underlying app directly via :class:`fastapi.testclient.TestClient`
-without going through this module.
+The mechanics — free loopback port, launch token, uvicorn lifecycle,
+shutdown discipline — live in :mod:`regstack.wizard._scaffold` and are
+shared with the theme designer and the SES wizard. This module supplies
+only what's specific to this wizard: its settings fields and its app.
 
-The server binds ``127.0.0.1`` (never ``0.0.0.0``) on a free random
-port discovered ahead of time, so the pywebview window can be told
-the URL before uvicorn finishes binding. The launch token is
-generated here and passed into the FastAPI app via
-:class:`~regstack.wizard.oauth_google.routes.WizardSettings`.
+The test suite drives the underlying app directly via
+:class:`fastapi.testclient.TestClient` without going through this module.
 """
 
 from __future__ import annotations
 
-import asyncio
-import secrets
-import socket
-from contextlib import closing
-from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-import uvicorn
-
-from regstack.wizard._shutdown import new_shutdown_event, wait_for_shutdown
+from regstack.wizard._scaffold import (
+    WizardServer,
+    assemble_server,
+    find_free_port,
+    new_launch_token,
+    serve,
+)
+from regstack.wizard._shutdown import new_shutdown_event
 from regstack.wizard.oauth_google.routes import WizardSettings, build_wizard_app
 
-
-@dataclass(slots=True)
-class WizardServer:
-    """A running (or about-to-run) wizard server.
-
-    Attributes:
-        host: Always ``127.0.0.1``. Stored explicitly for clarity.
-        port: TCP port uvicorn binds to.
-        launch_token: Random URL-safe token the browser must present.
-        url: Convenience — the full SPA URL with the token in the
-            query string. Hand this to :func:`webview.create_window`.
-        settings: The :class:`WizardSettings` injected into the app.
-    """
-
-    host: str
-    port: int
-    launch_token: str
-    url: str
-    settings: WizardSettings
-
-
-def find_free_port() -> int:
-    """Return a free TCP port on ``127.0.0.1``.
-
-    Uses ``SO_REUSEADDR``; uvicorn binds the same port immediately
-    after, so the kernel-level race window is microseconds. Acceptable
-    for a single-user local-only flow.
-    """
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        s.bind(("127.0.0.1", 0))
-        return int(s.getsockname()[1])
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def make_wizard_server(
@@ -67,12 +36,11 @@ def make_wizard_server(
 ) -> WizardServer:
     """Build the :class:`WizardServer` descriptor (does not start it).
 
-    The settings object embedded in the returned descriptor is the
-    same one wired into the FastAPI app, so signalling
+    The settings object embedded in the returned descriptor is the same
+    one wired into the FastAPI app, so signalling
     ``settings.shutdown_event`` from anywhere stops the loop.
     """
-    bound_port = port or find_free_port()
-    token = secrets.token_urlsafe(32)
+    token = new_launch_token()
     settings = WizardSettings(
         target_dir=target_dir,
         api_prefix=api_prefix,
@@ -80,38 +48,12 @@ def make_wizard_server(
         shutdown_event=new_shutdown_event(),
         existing_base_url=existing_base_url,
     )
-    url = f"http://127.0.0.1:{bound_port}/?token={token}"
-    return WizardServer(
-        host="127.0.0.1",
-        port=bound_port,
-        launch_token=token,
-        url=url,
+    return assemble_server(
         settings=settings,
+        app_factory=build_wizard_app,
+        launch_token=token,
+        port=port,
     )
-
-
-async def serve(server: WizardServer) -> None:
-    """Run uvicorn until ``server.settings.shutdown_event`` is set.
-
-    Used by the CLI's launcher. Tests bypass this and drive the app
-    directly via :class:`TestClient`.
-    """
-    app = build_wizard_app(server.settings)
-    config = uvicorn.Config(
-        app,
-        host=server.host,
-        port=server.port,
-        log_level="warning",
-        access_log=False,
-    )
-    uv = uvicorn.Server(config)
-
-    serve_task = asyncio.create_task(uv.serve())
-    try:
-        await wait_for_shutdown(server.settings.shutdown_event)
-    finally:
-        uv.should_exit = True
-        await serve_task
 
 
 __all__ = [

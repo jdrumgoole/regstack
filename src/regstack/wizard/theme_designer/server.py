@@ -1,40 +1,35 @@
-"""Uvicorn launcher for the theme designer.
+"""Uvicorn launcher for the theme designer's local-only FastAPI app.
 
-Mirrors :mod:`regstack.wizard.oauth_google.server` — same free-port
-discovery, same launch-token mint, same shutdown-event lifecycle.
+The mechanics — free loopback port, launch token, uvicorn lifecycle,
+shutdown discipline — live in :mod:`regstack.wizard._scaffold` and are
+shared with the OAuth and SES wizards. This module supplies only what's
+specific to the designer: its settings fields and its app.
+
+``DesignerServer`` is an alias of the shared ``WizardServer``, kept
+because the CLI and tests refer to it by that name.
 """
 
 from __future__ import annotations
 
-import asyncio
-import secrets
-import socket
-from contextlib import closing
-from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-import uvicorn
-
-from regstack.wizard._shutdown import new_shutdown_event, wait_for_shutdown
+from regstack.wizard._scaffold import (
+    WizardServer as DesignerServer,
+)
+from regstack.wizard._scaffold import (
+    assemble_server,
+    find_free_port,
+    new_launch_token,
+    serve,
+)
+from regstack.wizard._shutdown import new_shutdown_event
 from regstack.wizard.theme_designer.routes import (
     DesignerSettings,
     build_designer_app,
 )
 
-
-@dataclass(slots=True)
-class DesignerServer:
-    host: str
-    port: int
-    launch_token: str
-    url: str
-    settings: DesignerSettings
-
-
-def find_free_port() -> int:
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        s.bind(("127.0.0.1", 0))
-        return int(s.getsockname()[1])
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def make_designer_server(
@@ -43,41 +38,20 @@ def make_designer_server(
     port: int | None = None,
     filename: str | None = None,
 ) -> DesignerServer:
-    bound_port = port or find_free_port()
-    token = secrets.token_urlsafe(32)
+    """Build the :class:`DesignerServer` descriptor (does not start it)."""
+    token = new_launch_token()
     settings = DesignerSettings(
         target_dir=target_dir,
         launch_token=token,
         shutdown_event=new_shutdown_event(),
         **({"filename": filename} if filename else {}),
     )
-    url = f"http://127.0.0.1:{bound_port}/?token={token}"
-    return DesignerServer(
-        host="127.0.0.1",
-        port=bound_port,
-        launch_token=token,
-        url=url,
+    return assemble_server(
         settings=settings,
+        app_factory=build_designer_app,
+        launch_token=token,
+        port=port,
     )
-
-
-async def serve(server: DesignerServer) -> None:
-    """Run uvicorn until ``server.settings.shutdown_event`` is set."""
-    app = build_designer_app(server.settings)
-    config = uvicorn.Config(
-        app,
-        host=server.host,
-        port=server.port,
-        log_level="warning",
-        access_log=False,
-    )
-    uv = uvicorn.Server(config)
-    serve_task = asyncio.create_task(uv.serve())
-    try:
-        await wait_for_shutdown(server.settings.shutdown_event)
-    finally:
-        uv.should_exit = True
-        await serve_task
 
 
 __all__ = [

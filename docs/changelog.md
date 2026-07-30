@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+## 0.9.2 — 2026-07-30
+
 ### Headline
 
 One wizard scaffold instead of three copies of it

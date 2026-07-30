@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+## 0.9.3 — 2026-07-30
+
 ### Headline
 
 The import guard now watches the package it was most likely to miss

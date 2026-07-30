@@ -14,7 +14,6 @@ Two modes:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import sys
 from pathlib import Path
@@ -22,7 +21,8 @@ from pathlib import Path
 import click
 
 from regstack.cli._paths import resolve_target_dir
-from regstack.wizard.ses.server import make_wizard_server, serve
+from regstack.wizard._scaffold import run_windowed
+from regstack.wizard.ses.server import make_wizard_server
 from regstack.wizard.ses.validators import (
     CREDENTIAL_SOURCES,
     KNOWN_SES_REGIONS,
@@ -223,30 +223,11 @@ def _run_gui(*, target_dir: Path, port: int | None) -> None:
 
     from regstack.wizard.ses.window import WizardWindowError, open_wizard_window
 
-    def _serve_forever() -> None:
-        async def _go() -> None:
-            try:
-                await serve(server)
-            finally:
-                server.settings.shutdown_event.set()
-
-        asyncio.run(_go())
-
-    import threading
-
-    thread = threading.Thread(target=_serve_forever, daemon=True)
-    thread.start()
-
     try:
-        open_wizard_window(server)
+        run_windowed(server, open_wizard_window)
     except WizardWindowError as exc:
         click.echo(f"Error: {exc}", err=True)
-        server.settings.shutdown_event.set()
-        thread.join(timeout=5)
         sys.exit(1)
-    finally:
-        server.settings.shutdown_event.set()
-        thread.join(timeout=5)
 
 
 def _existing_from_address(config_path: Path) -> str | None:

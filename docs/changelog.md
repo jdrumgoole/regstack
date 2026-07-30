@@ -5,6 +5,55 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+### Headline
+
+One wizard scaffold instead of three copies of it
+
+`regstack oauth setup`, `regstack theme design` and `regstack ses setup`
+were the same program three times over: mint a launch token, bind uvicorn
+to a free loopback port, open a native window at that URL, tear both down
+when either side finishes. Measured before this change, each wizard's
+`server.py` was 42 lines of code with 4 to 6 differing between wizards,
+and each `window.py` 32 lines with 6 to 8. Only the FastAPI app, the
+window's title and width, and the wizard's own settings fields genuinely
+varied.
+
+That was not merely repetition. The shutdown crash fixed in 0.9.1 was a
+single defect that shipped as three, because each wizard carried its own
+copy of the same watcher thread — and each had drifted slightly, one
+holding a vestigial event that was set but never awaited. The project's
+own convention said to consolidate once a third pywebview tool landed;
+the third landed, and then the bug arrived.
+
+The mechanics now live in one module. Each wizard keeps what actually
+differs: its settings dataclass, its routes, its CLI options, and its own
+window-error type — the CLI catches a specific one, so that stays local,
+now deriving from a shared base. Per-wizard code dropped from roughly 222
+lines to 77, against 85 lines of shared scaffold, and there is one place
+to fix the next shutdown bug rather than three to remember.
+
+#### Changed
+
+- **The three pywebview wizards share one scaffold**
+  (`regstack.wizard._scaffold`): port discovery, launch-token minting,
+  the server descriptor, the uvicorn lifecycle, the window and its
+  shutdown watcher, and the thread/window/teardown orchestration the
+  CLIs drive. Public names are unchanged — `make_wizard_server`,
+  `make_designer_server`, `serve`, `find_free_port`, `open_wizard_window`,
+  `open_designer_window`, and each wizard's window-error class all still
+  live where they did.
+
+#### Added
+
+- `tests/unit/test_wizard_scaffold.py` — guards against re-duplication.
+  Fails when a wizard defines machinery belonging to the scaffold, when a
+  CLI builds its own server thread instead of calling `run_windowed`, or
+  when a window-error type stops deriving from the shared base. Verified
+  by re-inlining a watcher into one wizard and watching it fire. The
+  0.9.1 no-event-loop-in-the-watcher check moved here too, following the
+  code it guards — left where it was, it would have passed trivially
+  against modules that no longer contain a watcher.
+
 ## 0.9.1 — 2026-07-30
 
 ### Headline

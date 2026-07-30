@@ -5,6 +5,35 @@ All notable changes to this project are documented here. Versions follow
 
 ## Unreleased
 
+### Headline
+
+The import guard now watches the package it was most likely to miss
+
+A guard is only worth what it covers. The check that catches a
+module-scope third-party import missing from its extra — written after
+`pip install regstack[oauth]` shipped unable to import its own Google
+provider — watched two subpackages and not the three pywebview wizards.
+Those wizards are the same shape as the original defect, and after 0.9.2
+put them on a shared scaffold, a single undeclared import there would
+reach all three at once. The gap is closed, and the guard was proved the
+way the others were: by adding an undeclared import and watching it fire.
+
+#### Added
+
+- **The extra-declares-its-imports guard now covers the `wizard`
+  package.** It previously watched only `oauth` and `backends/mongo`,
+  which left the three pywebview wizards unguarded — the same shape as
+  the defect it was written for: a module-scope third-party import behind
+  an extra, with the failure arriving at runtime rather than at install.
+  That gap mattered more after 0.9.2 consolidated the wizards onto a
+  shared scaffold, since a new import there would reach all three at
+  once. The wizard package passes as it stands (`uvicorn` and `tomlkit`
+  are both declared by the `wizard` extra); the guard was verified by
+  adding an undeclared import to the scaffold and confirming it names the
+  file and distribution. Imports guarded by `try`/`except` — how the SES
+  wizard reaches `aioboto3` — remain deliberately exempt, since that is
+  the legitimate way to touch an optional dependency.
+
 ## 0.9.2 — 2026-07-30
 
 ### Headline

@@ -34,6 +34,13 @@ SRC = REPO_ROOT / "src" / "regstack"
 GATED_PACKAGES = {
     "oauth": "oauth",
     "backends/mongo": "mongo",
+    # The three pywebview wizards. Their shared scaffold imports uvicorn at
+    # module scope and the writers import tomlkit, both declared by the
+    # `wizard` extra. Added after the 0.9.2 scaffold consolidation: this is
+    # exactly the shape of the httpx defect — module-scope third-party
+    # imports behind an extra — in the subpackage that had just been
+    # reorganised, so a new scaffold import would otherwise ship undeclared.
+    "wizard": "wizard",
 }
 
 # Import name -> distribution name, where they differ.
